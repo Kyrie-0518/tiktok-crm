@@ -18,11 +18,14 @@ services:
       - DB_PATH=data/erp.db
       - UPLOAD_DIR=/app/data/uploads
       - NODE_ENV=production
-      # TikTok OAuth（部署时填写）
-      - TIKTOK_APP_KEY=
-      - TIKTOK_APP_SECRET=
-      - TIKTOK_REDIRECT_URI=
-      - FRONTEND_URL=http://localhost
+      # TikTok OAuth
+      - TIKTOK_APP_KEY=6k44pdou0umit
+      - TIKTOK_APP_SECRET=0f17b939f9f7074ffbb396510110cb07effd1cf5
+      - TIKTOK_SERVICE_ID=7644440536870733576
+      - TIKTOK_REDIRECT_URI=http://8.163.24.221/api/shops/tiktok/callback
+      - FRONTEND_URL=http://8.163.24.221
+      - TIKTOK_ENV=sandbox
+      - TIKTOK_API_BASE=https://open-api-sandbox.tiktokglobalshop.com
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
