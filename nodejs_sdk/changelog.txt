@@ -1,0 +1,3 @@
+ API Cancel Target Collaboration Conflicts, Check Target Collaboration Conflicts, Get Product SKPP Detail, Get Shop SKPP Summary, List Products SKPP Status has been added. 
+ API: Create Open Collaboration, Edit Product, End Session, Get Affiliate Campaign Creator Product Content Statistics, Get Coupon , Get Global Product, Get Logistics Tracking, Get Marketplace Creator Performance, Get Opportunity Detail, Get Order Detail, Get Order Detail, Get Order List, Get Submission Records, List Opportunity, Recover Products, Redeem Info Callback, Search Coupons, Search Global Products, Search Global Products, Submit Product via Opportunity, Update Stock has been upgraded. 
+ API: Get Payments has a new version. 

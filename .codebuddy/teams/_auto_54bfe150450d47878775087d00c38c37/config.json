@@ -1,0 +1,18 @@
+{
+  "name": "_auto_54bfe150450d47878775087d00c38c37",
+  "leadAgentId": "54bfe150450d47878775087d00c38c37",
+  "workspacePath": "e:\\tiktok-crm",
+  "createdAt": "2026-05-17T08:50:51.565Z",
+  "options": {
+    "workspacePath": "e:\\tiktok-crm",
+    "isAutoTeam": true
+  },
+  "members": [
+    {
+      "memberId": "team-lead@_auto_54bfe150450d47878775087d00c38c37",
+      "name": "team-lead",
+      "role": "Team Lead - coordinates the team and interacts with the user"
+    }
+  ],
+  "isAutoTeam": true
+}

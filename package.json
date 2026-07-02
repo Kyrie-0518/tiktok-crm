@@ -1,0 +1,20 @@
+{
+  "name": "bozone-erp",
+  "version": "2.0.0",
+  "private": true,
+  "description": "博众智汇 - 全域跨境经营管理系统",
+  "scripts": {
+    "dev": "concurrently -n server,client \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && npx tsx watch src/index.ts",
+    "dev:client": "cd client && npx vite",
+    "build": "cd client && npx vite build",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:restart": "docker-compose down && docker-compose up -d --build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

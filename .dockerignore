@@ -1,0 +1,16 @@
+node_modules
+.git
+.gitignore
+*.log
+*.bat
+*.vbs
+*.zip
+.codebuddy
+.playwright-cli
+backups
+dist
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+.env

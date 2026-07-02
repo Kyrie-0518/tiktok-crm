@@ -1,0 +1,1158 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  Card, Table, Button, Space, Input, Select, Tag, Badge, Tabs,
+  Modal, Form, message, Popconfirm, Row, Col, Statistic, Tooltip,
+  InputNumber, Divider, Upload, Steps, Alert, Progress, Spin,
+  Typography, Result, Dropdown,
+} from 'antd';
+import {
+  SearchOutlined, PrinterOutlined, ExportOutlined,
+  PlusOutlined, DeleteOutlined, EyeOutlined, ReloadOutlined,
+  RobotOutlined, InboxOutlined, CheckCircleOutlined, WarningOutlined,
+  CloudUploadOutlined, CheckSquareOutlined, BorderOutlined,
+  UnorderedListOutlined,
+} from '@ant-design/icons';
+import api from '../api';
+import { useHasPerm } from '../stores/authStore';
+import DataTable from '../components/DataTable';
+
+const { Dragger } = Upload;
+const { Text } = Typography;
+
+const BRAND_COLOR = '#2563eb';
+
+const ORDER_STATUS: Record<string, { label: string; color: string }> = {
+  all:              { label: '全部',     color: 'default'  },
+  pending:          { label: '待支付',   color: 'default'  },
+  pending_ship:     { label: '待发货',   color: 'blue'     },
+  shipped:          { label: '已发货',   color: 'processing'},
+  completed:        { label: '已完成',   color: 'success'  },
+  cancelled:        { label: '已取消',   color: 'default'  },
+  cancel_requested: { label: '申请取消', color: 'warning'  },
+  refund_requested: { label: '申请退款', color: 'error'    },
+  refunded:         { label: '已退款',   color: 'default'  },
+  auto_cancelled:   { label: '自动取消', color: 'default'  },
+};
+
+// ==================== AI Import Modal ====================
+interface ImportResult {
+  success: number;
+  overwrite: number;
+  fail: number;
+  message: string;
+  errors: { order_no: string; reason: string }[];
+}
+
+interface ParseResult {
+  total_orders: number;
+  preview: any[];
+  headers: string[];
+  mapping: Record<string, string>;
+  errors: { row: number; reason: string }[];
+  orders: any[];
+}
+
+type ImportStep = 'upload' | 'parsing' | 'preview' | 'done';
+
+function AIImportModal({ open, onClose, onSuccess }: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [step, setStep] = useState<ImportStep>('upload');
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [committing, setCommitting] = useState(false);
+  const [shopId, setShopId] = useState<number | undefined>(undefined);
+  const [shops, setShops] = useState<any[]>([]);
+  // field mapping override
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+
+  const SYS_FIELDS = [
+    { value: '', label: '（忽略此列）' },
+    { value: 'order_no', label: '订单号' },
+    { value: 'order_time', label: '下单时间' },
+    { value: 'buyer_name', label: '买家名称' },
+    { value: 'buyer_phone', label: '买家联系方式' },
+    { value: 'status', label: '订单状态' },
+    { value: 'payment_status', label: '支付状态' },
+    { value: 'tracking_no', label: '物流单号' },
+    { value: 'carrier', label: '承运商' },
+    { value: 'logistics_status', label: '物流状态' },
+    { value: 'actual_amount', label: '实付金额' },
+    { value: 'item_total', label: '商品合计' },
+    { value: 'shipping_fee', label: '运费' },
+    { value: 'discount', label: '优惠金额' },
+    { value: 'remark', label: '备注' },
+    { value: 'product_name', label: '商品名称' },
+    { value: 'sku', label: 'SKU' },
+    { value: 'spec_name', label: '规格' },
+    { value: 'quantity', label: '数量' },
+    { value: 'unit_price', label: '单价' },
+  ];
+
+  useEffect(() => {
+    if (open) {
+      api.get('/shops').then(r => setShops(r.data)).catch(() => {});
+    }
+  }, [open]);
+
+  const handleClose = () => {
+    if (step === 'parsing' || committing) return; // 解析中不允许关闭
+    setStep('upload');
+    setParseResult(null);
+    setImportResult(null);
+    setMapping({});
+    onClose();
+  };
+
+  const handleUpload = async (file: File) => {
+    setStep('parsing');
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await api.post('/orders/ai-import/parse', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+      });
+      setParseResult(res.data);
+      setMapping(res.data.mapping || {});
+      setStep('preview');
+    } catch (e: any) {
+      const errMsg = e.response?.data?.error || e.message || '解析失败';
+      console.error('[AI导入] 解析失败:', errMsg, e.response?.data);
+      message.error(errMsg, 8);
+      setStep('upload');
+    }
+    return false; // prevent antd auto-upload
+  };
+
+  const handleCommit = async () => {
+    if (!parseResult) return;
+    setCommitting(true);
+    try {
+      // 重新 remap orders if user changed mapping
+      const ordersToCommit = parseResult.orders;
+      const res = await api.post('/orders/ai-import/commit', {
+        orders: ordersToCommit,
+        shop_id: shopId || undefined,
+      });
+      setImportResult(res.data);
+      setStep('done');
+      onSuccess();
+    } catch (e: any) {
+      message.error(e.response?.data?.error || '导入失败');
+    } finally {
+      setCommitting(false);
+    }
+  };
+
+  const stepIndex = { upload: 0, parsing: 1, preview: 2, done: 3 }[step];
+
+  const previewColumns = [
+    { title: '订单号', dataIndex: 'order_no', width: 160, render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text> },
+    { title: '下单时间', dataIndex: 'order_time', width: 130, render: (v: string) => v?.slice(0, 16) },
+    { title: '买家', dataIndex: 'buyer_name', width: 100 },
+    {
+      title: '商品', key: 'items', width: 180,
+      render: (_: any, r: any) => r.items?.length ? (
+        <div>
+          {r.items.slice(0, 2).map((it: any, i: number) => (
+            <div key={i} style={{ fontSize: 11, lineHeight: 1.4 }}>
+              {it.product_name || it.sku || '-'} × {it.quantity}
+            </div>
+          ))}
+          {(r.item_count || r.items.length) > 2 && <span style={{ color: '#999', fontSize: 11 }}>+{(r.item_count || r.items.length) - 2} 件</span>}
+        </div>
+      ) : <span style={{ color: '#ccc' }}>无</span>,
+    },
+    { title: '实付金额', dataIndex: 'actual_amount', width: 100, render: (v: number) => <span style={{ color: BRAND_COLOR }}>RM {(v || 0).toFixed(2)}</span> },
+    { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag color={ORDER_STATUS[v]?.color || 'default'}>{ORDER_STATUS[v]?.label || v}</Tag> },
+  ];
+
+  return (
+    <Modal
+      title={
+        <Space>
+          <RobotOutlined style={{ color: BRAND_COLOR }} />
+          <span>AI 导入订单</span>
+        </Space>
+      }
+      open={open}
+      onCancel={handleClose}
+      footer={null}
+      width={860}
+      maskClosable={false}
+      destroyOnClose
+    >
+      {/* Steps indicator */}
+      <Steps
+        current={stepIndex}
+        size="small"
+        style={{ marginBottom: 24 }}
+        items={[
+          { title: '上传文件' },
+          { title: 'AI 解析' },
+          { title: '预览确认' },
+          { title: '导入完成' },
+        ]}
+      />
+
+      {/* ---- Step 1: Upload ---- */}
+      {step === 'upload' && (
+        <div>
+          <Dragger
+            accept=".xlsx,.csv"
+            beforeUpload={(file) => {
+              handleUpload(file);
+              return false;
+            }}
+            showUploadList={false}
+            style={{ padding: '12px 0' }}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined style={{ fontSize: 48, color: BRAND_COLOR }} />
+            </p>
+            <p style={{ fontSize: 16, fontWeight: 600, margin: '8px 0 4px' }}>
+              拖拽文件到此处，或点击选择文件
+            </p>
+            <p style={{ color: '#999', fontSize: 13 }}>
+              支持 TikTok 商家后台导出的 .xlsx / .csv 订单表，单 Sheet，最大 20MB
+            </p>
+          </Dragger>
+          <Alert
+            style={{ marginTop: 16 }}
+            type="info"
+            showIcon
+            message="AI 智能识别"
+            description="上传后系统将自动调用 AI 识别表头，自适应 TikTok 原版导出格式，无需手动配置模板。"
+          />
+        </div>
+      )}
+
+      {/* ---- Step 2: Parsing ---- */}
+      {step === 'parsing' && (
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+          <Spin size="large" />
+          <div style={{ marginTop: 20, fontSize: 16, color: '#555' }}>
+            AI 正在智能解析订单表格，请稍候…
+          </div>
+          <div style={{ marginTop: 8, color: '#999', fontSize: 13 }}>
+            正在识别表头并映射系统字段，通常需要 10–30 秒
+          </div>
+        </div>
+      )}
+
+      {/* ---- Step 3: Preview ---- */}
+      {step === 'preview' && parseResult && (
+        <div>
+          {/* 统计行 */}
+          <Row gutter={12} style={{ marginBottom: 16 }}>
+            <Col span={8}>
+              <Card styles={{ body: { padding: '10px 16px' } }}>
+                <Statistic title="识别订单总数" value={parseResult.total_orders} valueStyle={{ color: BRAND_COLOR }} />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card styles={{ body: { padding: '10px 16px' } }}>
+                <Statistic title="异常行数" value={parseResult.errors.length} valueStyle={{ color: parseResult.errors.length > 0 ? '#faad14' : '#52c41a' }} />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card styles={{ body: { padding: '10px 16px' } }}>
+                <Statistic title="待导入" value={parseResult.total_orders} valueStyle={{ color: '#52c41a' }} />
+              </Card>
+            </Col>
+          </Row>
+
+          {/* 字段映射区（折叠展示，支持手动修改） */}
+          <details style={{ marginBottom: 12 }}>
+            <summary style={{ cursor: 'pointer', color: BRAND_COLOR, fontSize: 13 }}>
+              查看 / 修改 AI 字段映射（共 {parseResult.headers.length} 列）
+            </summary>
+            <div style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 6, padding: 8 }}>
+              <Row gutter={[8, 6]}>
+                {parseResult.headers.map((h) => (
+                  <Col span={12} key={h}>
+                    <Space size={4} style={{ width: '100%' }}>
+                      <Text style={{ width: 120, fontSize: 12, display: 'inline-block' }} ellipsis={{ tooltip: h }}>
+                        {h}
+                      </Text>
+                      <span style={{ color: '#ccc' }}>→</span>
+                      <Select
+                        size="small"
+                        style={{ width: 140 }}
+                        value={mapping[h] || ''}
+                        onChange={v => setMapping(prev => ({ ...prev, [h]: v }))}
+                        options={SYS_FIELDS}
+                      />
+                    </Space>
+                  </Col>
+                ))}
+              </Row>
+            </div>
+          </details>
+
+          {/* 异常报错明细 */}
+          {parseResult.errors.length > 0 && (
+            <Alert
+              style={{ marginBottom: 12 }}
+              type="warning"
+              showIcon
+              message={`发现 ${parseResult.errors.length} 行异常，已自动排除，不参与导入`}
+              description={
+                <div style={{ maxHeight: 100, overflowY: 'auto', fontSize: 12 }}>
+                  {parseResult.errors.map((e, i) => (
+                    <div key={i}>第 {e.row} 行：{e.reason}</div>
+                  ))}
+                </div>
+              }
+            />
+          )}
+
+          {/* 数据预览表 */}
+          <div style={{ marginBottom: 12 }}>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              数据预览（展示前 50 条，实际导入全部 {parseResult.total_orders} 条）
+            </Text>
+          </div>
+          <Table
+            rowKey="order_no"
+            dataSource={parseResult.preview}
+            columns={previewColumns}
+            size="small"
+            pagination={false}
+            scroll={{ x: 760, y: 280 }}
+            style={{ marginBottom: 16 }}
+          />
+
+          {/* 店铺绑定（可选） */}
+          <Row gutter={12} align="middle" style={{ marginBottom: 16 }}>
+            <Col>
+              <Text style={{ fontSize: 13 }}>指定店铺（可选）：</Text>
+            </Col>
+            <Col>
+              <Select
+                placeholder="自动识别 / 不指定"
+                value={shopId}
+                onChange={v => setShopId(v)}
+                style={{ width: 200 }}
+                allowClear
+              >
+                {shops.map(s => <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>)}
+              </Select>
+            </Col>
+            <Col>
+              <Text type="secondary" style={{ fontSize: 12 }}>指定后覆盖 Excel 中的店铺信息</Text>
+            </Col>
+          </Row>
+
+          {/* 底部操作 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button onClick={handleClose}>取消</Button>
+            <Button
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              onClick={handleCommit}
+              loading={committing}
+              disabled={parseResult.total_orders === 0}
+            >
+              确认导入 {parseResult.total_orders} 条订单
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Step 4: Done ---- */}
+      {step === 'done' && importResult && (
+        <div>
+          <Result
+            icon={importResult.fail === 0
+              ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 56 }} />
+              : <WarningOutlined style={{ color: '#faad14', fontSize: 56 }} />
+            }
+            title={importResult.fail === 0 ? '导入完成' : '导入完成（存在异常）'}
+            subTitle={importResult.message}
+          />
+          <Row gutter={12} style={{ marginTop: -16, marginBottom: 24 }}>
+            <Col span={8}>
+              <Card styles={{ body: { padding: '10px 16px', textAlign: 'center' } }}>
+                <Statistic title="成功导入" value={importResult.success} valueStyle={{ color: '#52c41a' }} />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card styles={{ body: { padding: '10px 16px', textAlign: 'center' } }}>
+                <Statistic title="覆盖更新" value={importResult.overwrite} valueStyle={{ color: BRAND_COLOR }} />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card styles={{ body: { padding: '10px 16px', textAlign: 'center' } }}>
+                <Statistic title="失败异常" value={importResult.fail} valueStyle={{ color: importResult.fail > 0 ? '#ff4d4f' : '#999' }} />
+              </Card>
+            </Col>
+          </Row>
+          {importResult.errors.length > 0 && (
+            <Alert
+              type="error"
+              showIcon
+              message="失败明细"
+              style={{ marginBottom: 16 }}
+              description={
+                <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: 12 }}>
+                  {importResult.errors.map((e, i) => (
+                    <div key={i}>订单 {e.order_no}：{e.reason}</div>
+                  ))}
+                </div>
+              }
+            />
+          )}
+          <div style={{ textAlign: 'center' }}>
+            <Button type="primary" onClick={handleClose}>关闭</Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ==================== Main Component ====================
+
+export default function OrderManagement() {
+  const canEdit = useHasPerm('orders', 'edit');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [shops, setShops] = useState<any[]>([]);
+
+  // Filters
+  const [statusTab, setStatusTab] = useState('all');
+  const [keyword, setKeyword] = useState('');
+  const [shopFilter, setShopFilter] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
+  // Modals
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailOrder, setDetailOrder] = useState<any>(null);
+  const [editStatusOrder, setEditStatusOrder] = useState<any>(null);
+  const [editStatusModal, setEditStatusModal] = useState(false);
+  const [aiImportOpen, setAiImportOpen] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<number>>(new Set());
+  const [selectedAll, setSelectedAll] = useState(false);
+  const [batchDeleting, setBatchDeleting] = useState(false);
+  const [selectAllLoading, setSelectAllLoading] = useState(false);
+  const [form] = Form.useForm();
+  const [statusForm] = Form.useForm();
+  const [itemRows, setItemRows] = useState([{ product_id: null as number | null, product_sku_id: null as number | null, product_name: '', sku: '', spec_name: '', quantity: 1, unit_price: 0, subtotal: 0 }]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [productSkus, setProductSkus] = useState<Record<number, any[]>>({});
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [ordersRes, countsRes] = await Promise.all([
+        api.get('/orders', {
+          params: {
+            status: statusTab === 'all' ? undefined : statusTab,
+            shop_id: shopFilter || undefined,
+            keyword: keyword || undefined,
+            page,
+            page_size: pageSize,
+          }
+        }),
+        api.get('/orders/meta/counts', { params: { shop_id: shopFilter || undefined } }),
+      ]);
+      setOrders(ordersRes.data.orders || []);
+      setTotal(ordersRes.data.total || 0);
+      setCounts(countsRes.data || {});
+    } finally {
+      setLoading(false);
+    }
+  }, [statusTab, shopFilter, keyword, page]);
+
+  useEffect(() => {
+    api.get('/shops').then(r => setShops(r.data)).catch(() => {});
+    // Load products for order item selection
+    api.get('/products').then(r => {
+      setProducts(r.data || []);
+      // Load SKUs for each product
+      const skuMap: Record<number, any[]> = {};
+      Promise.all((r.data || []).map((p: any) =>
+        api.get(`/products/${p.id}/skus`).then(skuRes => {
+          skuMap[p.id] = skuRes.data || [];
+        }).catch(() => {})
+      )).then(() => setProductSkus(skuMap));
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleSearch = () => { setPage(1); loadData(); };
+
+  const handleDelete = async (id: number) => {
+    await api.delete(`/orders/${id}`);
+    message.success('已删除');
+    loadData();
+  };
+
+  // ---- Batch operations ----
+  const toggleBatchMode = () => {
+    setBatchMode(prev => !prev);
+    setSelectedOrderIds(new Set());
+    setSelectedAll(false);
+  };
+
+  const selectCurrentPage = () => {
+    setSelectedOrderIds(new Set(orders.map(o => o.id)));
+    setSelectedAll(false);
+  };
+
+  const selectAllOrders = async () => {
+    setSelectAllLoading(true);
+    try {
+      const res = await api.get('/orders/ids', {
+        params: {
+          status: statusTab === 'all' ? undefined : statusTab,
+          shop_id: shopFilter || undefined,
+          keyword: keyword || undefined,
+        },
+      });
+      setSelectedOrderIds(new Set(res.data));
+      setSelectedAll(true);
+    } catch {
+      message.error('获取全部订单失败');
+    } finally {
+      setSelectAllLoading(false);
+    }
+  };
+
+  const toggleSelectOne = (id: number) => {
+    setSelectedAll(false);
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedOrderIds.size === 0) return;
+    setBatchDeleting(true);
+    try {
+      if (selectedAll) {
+        // 全选模式下，按筛选条件批量删除
+        await api.delete('/orders/batch', {
+          data: {
+            status: statusTab === 'all' ? undefined : statusTab,
+            shop_id: shopFilter || undefined,
+            keyword: keyword || undefined,
+          },
+        });
+      } else {
+        await Promise.all(
+          Array.from(selectedOrderIds).map(id => api.delete(`/orders/${id}`))
+        );
+      }
+      message.success(`成功删除 ${selectedOrderIds.size} 个订单`);
+      setBatchMode(false);
+      setSelectedOrderIds(new Set());
+      setSelectedAll(false);
+      loadData();
+    } catch {
+      message.error('部分删除失败');
+    } finally {
+      setBatchDeleting(false);
+    }
+  };
+
+  const exitBatchMode = () => {
+    setBatchMode(false);
+    setSelectedOrderIds(new Set());
+    setSelectedAll(false);
+  };
+
+  const displaySelectedCount = selectedAll ? `全部 (${total})` : `${selectedOrderIds.size}`;
+
+  const handleViewDetail = async (order: any) => {
+    try {
+      const res = await api.get(`/orders/${order.id}`);
+      setDetailOrder(res.data);
+      setDetailModalOpen(true);
+    } catch {
+      message.error('获取详情失败');
+    }
+  };
+
+  const handleOpenEditStatus = (order: any) => {
+    setEditStatusOrder(order);
+    statusForm.setFieldsValue({
+      status: order.status,
+      logistics_status: order.logistics_status,
+      tracking_no: order.tracking_no,
+      carrier: order.carrier,
+      remark: order.remark,
+    });
+    setEditStatusModal(true);
+  };
+
+  const handleUpdateStatus = async (values: any) => {
+    try {
+      await api.put(`/orders/${editStatusOrder.id}`, values);
+      message.success('状态已更新');
+      setEditStatusModal(false);
+      loadData();
+    } catch (e: any) {
+      message.error(e.response?.data?.error || '更新失败');
+    }
+  };
+
+  // Create order item rows helpers
+  const updateItem = (idx: number, field: string, val: any) => {
+    const next = [...itemRows];
+    next[idx] = { ...next[idx], [field]: val };
+    if (field === 'quantity' || field === 'unit_price') {
+      next[idx].subtotal = (next[idx].quantity || 0) * (next[idx].unit_price || 0);
+    }
+    setItemRows(next);
+  };
+
+  const handleSelectProduct = (idx: number, productId: number) => {
+    const product = products.find(p => p.id === productId);
+    const skus = productSkus[productId] || [];
+    const firstSku = skus[0];
+    const next = [...itemRows];
+    next[idx] = {
+      ...next[idx],
+      product_id: productId,
+      product_sku_id: firstSku?.id || null,
+      product_name: product?.name || '',
+      sku: firstSku?.sku_code || product?.sku || '',
+      spec_name: firstSku?.spec_name || '',
+      unit_price: firstSku?.sell_price || product?.sell_price || 0,
+      subtotal: (next[idx].quantity || 1) * (firstSku?.sell_price || product?.sell_price || 0),
+    };
+    setItemRows(next);
+  };
+
+  const handleSelectSku = (idx: number, skuId: number) => {
+    const row = itemRows[idx];
+    const skus = productSkus[row.product_id || 0] || [];
+    const sku = skus.find(s => s.id === skuId);
+    if (!sku) return;
+    const next = [...itemRows];
+    next[idx] = {
+      ...next[idx],
+      product_sku_id: skuId,
+      sku: sku.sku_code || '',
+      spec_name: sku.spec_name || '',
+      unit_price: sku.sell_price || 0,
+      subtotal: (next[idx].quantity || 1) * (sku.sell_price || 0),
+    };
+    setItemRows(next);
+  };
+
+  const handleCreateOrder = async (values: any) => {
+    const items = itemRows.filter(r => r.product_name);
+    const item_total = items.reduce((s, r) => s + (r.subtotal || 0), 0);
+    const actual_amount = item_total + (values.shipping_fee || 0) - (values.discount || 0);
+    try {
+      await api.post('/orders', { ...values, item_total, actual_amount, items });
+      message.success('订单创建成功');
+      setCreateModalOpen(false);
+      form.resetFields();
+      setItemRows([{ product_id: null, product_sku_id: null, product_name: '', sku: '', spec_name: '', quantity: 1, unit_price: 0, subtotal: 0 }]);
+      loadData();
+    } catch (e: any) {
+      message.error(e.response?.data?.error || '创建失败');
+    }
+  };
+
+  // Status tabs
+  const tabItems = ['all', 'pending', 'pending_ship', 'shipped', 'completed', 'cancelled', 'cancel_requested', 'refund_requested'].map(s => ({
+    key: s,
+    label: (
+      <span>
+        {ORDER_STATUS[s].label}
+        {counts[s] ? <Badge count={counts[s]} size="small" style={{ marginLeft: 6, backgroundColor: s === 'pending_ship' ? BRAND_COLOR : undefined }} /> : null}
+      </span>
+    ),
+  }));
+
+  const columns = [
+    {
+      title: '商品信息',
+      key: 'items',
+      width: 220,
+      render: (_: any, r: any) => {
+        const items = r.items || [];
+        if (!items.length) return <span style={{ color: '#ccc' }}>无商品信息</span>;
+        const item = items[0];
+        const imgSrc = item.sku_image || item.product_image || '';
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 44 }}>
+            {/* Left: Square image */}
+            <div style={{
+              width: 44, height: 44, borderRadius: 6, overflow: 'hidden', flexShrink: 0,
+              background: '#f5f5f5', border: '1px solid #e8e8e8',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {imgSrc ? (
+                <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: 22 }}>📦</span>
+              )}
+            </div>
+            {/* Right: Title + SKU */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
+              <div style={{
+                fontSize: 13, fontWeight: 400, color: '#333',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {item.product_name || '-'}
+              </div>
+              <div style={{
+                fontSize: 12, color: '#999',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {item.spec_name || ''}{items.length > 1 ? ` 等${items.length}件` : ` ×${item.quantity || 1}`}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: '订单编号',
+      dataIndex: 'order_no',
+      width: 160,
+      render: (v: string) => <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>{v}</span>,
+    },
+    {
+      title: '买家',
+      dataIndex: 'buyer_name',
+      width: 100,
+      render: (v: string) => v || <span style={{ color: '#ccc' }}>-</span>,
+    },
+    {
+      title: '实付金额',
+      dataIndex: 'actual_amount',
+      width: 100,
+      render: (v: number) => <span style={{ color: BRAND_COLOR, fontWeight: 600 }}>RM {(v || 0).toFixed(2)}</span>,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 100,
+      render: (v: string) => <Tag color={ORDER_STATUS[v]?.color || 'default'}>{ORDER_STATUS[v]?.label || v}</Tag>,
+    },
+    {
+      title: '店铺',
+      dataIndex: 'shop_name',
+      width: 120,
+      render: (v: string) => v || <span style={{ color: '#ccc' }}>-</span>,
+    },
+    {
+      title: '下单时间',
+      dataIndex: 'order_time',
+      width: 130,
+      render: (v: string) => v?.slice(0, 16),
+    },
+    {
+      title: '物流',
+      dataIndex: 'tracking_no',
+      width: 130,
+      render: (v: string, r: any) => v ? (
+        <Tooltip title={`${r.carrier || ''} ${v}`}>
+          <span style={{ fontSize: 12 }}>{v.slice(0, 12)}{v.length > 12 ? '…' : ''}</span>
+        </Tooltip>
+      ) : <span style={{ color: '#ccc' }}>-</span>,
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 160,
+      fixed: 'right' as const,
+      render: (_: any, r: any) => {
+        if (batchMode) {
+          const checked = selectedOrderIds.has(r.id);
+          return (
+            <CheckSquareOutlined
+              onClick={() => toggleSelectOne(r.id)}
+              style={{
+                fontSize: 20,
+                cursor: 'pointer',
+                color: checked ? BRAND_COLOR : '#ccc',
+              }}
+            />
+          );
+        }
+        return (
+          <Space size="small">
+            <Button size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(r)}>详情</Button>
+            {canEdit && (
+              <>
+                <Button size="small" onClick={() => handleOpenEditStatus(r)}>改状态</Button>
+                <Popconfirm title="确认删除此订单？" onConfirm={() => handleDelete(r.id)}>
+                  <Button size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              </>
+            )}
+          </Space>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
+      {/* Batch mode row highlight */}
+      <style>{`
+        .batch-selected-row > td {
+          background-color: #e6f4ff !important;
+        }
+      `}</style>
+      {/* 页面标题 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 18,
+        }}>
+          <UnorderedListOutlined />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>订单管理</h2>
+          <span style={{ fontSize: 12, color: '#999' }}>订单追踪 · 状态管理 · AI智能导入</span>
+        </div>
+      </div>
+
+      {/* Header Actions */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <span />
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
+          {canEdit && (
+            <>
+              <Button
+                icon={<RobotOutlined />}
+                onClick={() => setAiImportOpen(true)}
+                style={{ borderColor: BRAND_COLOR, color: BRAND_COLOR }}
+              >
+                AI 导入订单
+              </Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>新建订单</Button>
+            </>
+          )}
+        </Space>
+      </div>
+
+      {/* Top Stats */}
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        {[
+          { label: '今日待发货', key: 'pending_ship', color: '#2563eb' },
+          { label: '申请取消', key: 'cancel_requested', color: '#faad14' },
+          { label: '退货/退款', key: 'refund_requested', color: '#ff4d4f' },
+          { label: '自动取消', key: 'auto_cancelled', color: '#999' },
+          { label: '已完成', key: 'completed', color: '#52c41a' },
+        ].map(item => (
+          <Col key={item.key} xs={12} sm={8} md={4}>
+            <Card styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={item.label} value={counts[item.key] || 0} valueStyle={{ color: item.color, fontSize: 22 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      {/* Main Card */}
+      <Card styles={{ body: { padding: 0 } }}>
+        {/* Tabs */}
+        <Tabs
+          activeKey={statusTab}
+          onChange={k => { setStatusTab(k); setPage(1); }}
+          items={tabItems}
+          style={{ padding: '0 16px' }}
+        />
+
+        {/* Filters */}
+        <div style={{ padding: '12px 16px', background: '#fafafa', borderTop: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Space wrap>
+            <Input
+              placeholder="搜索订单号、买家名称"
+              prefix={<SearchOutlined />}
+              value={keyword}
+              onChange={e => setKeyword(e.target.value)}
+              onPressEnter={handleSearch}
+              style={{ width: 220 }}
+              allowClear
+            />
+            <Select
+              placeholder="全部店铺"
+              value={shopFilter}
+              onChange={v => { setShopFilter(v); setPage(1); }}
+              style={{ width: 160 }}
+              allowClear
+            >
+              {shops.map(s => <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>)}
+            </Select>
+            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+            <Button icon={<ExportOutlined />} onClick={() => message.info('导出功能开发中')}>导出</Button>
+          </Space>
+          {canEdit && (
+            !batchMode ? (
+              <Button
+                icon={<BorderOutlined />}
+                onClick={toggleBatchMode}
+                style={{ borderColor: '#faad14', color: '#faad14' }}
+              >
+                批量操作
+              </Button>
+            ) : (
+              <Space>
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'page', label: '全选当页' },
+                      { key: 'all', label: `全选全部 (${total})` },
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'page') selectCurrentPage();
+                      else selectAllOrders();
+                    },
+                  }}
+                >
+                  <Button icon={<CheckSquareOutlined />} loading={selectAllLoading}>
+                    全选 <span style={{ fontSize: 12, color: '#999', marginLeft: 2 }}>▾</span>
+                  </Button>
+                </Dropdown>
+                <Popconfirm
+                  title={selectedAll
+                    ? `确认删除全部 ${total} 个订单？此操作不可撤销！`
+                    : `确认删除 ${selectedOrderIds.size} 个订单？`}
+                  onConfirm={handleBatchDelete}
+                  okText="确认删除"
+                  okType="danger"
+                  disabled={selectedOrderIds.size === 0}
+                >
+                  <Button danger icon={<DeleteOutlined />} disabled={selectedOrderIds.size === 0} loading={batchDeleting}>
+                    删除 ({displaySelectedCount})
+                  </Button>
+                </Popconfirm>
+                <Button onClick={exitBatchMode}>取消</Button>
+              </Space>
+            )
+          )}
+        </div>
+
+        {/* Table */}
+        <DataTable
+          dataSource={orders}
+          columns={columns}
+          loading={loading}
+          scroll={{ x: 1200 }}
+          rowClassName={r => batchMode && (selectedAll || selectedOrderIds.has(r.id)) ? 'batch-selected-row' : ''}
+          serverPagination={{
+            current: page,
+            total,
+            onChange: p => setPage(p),
+          }}
+          style={{ padding: '0 4px' }}
+        />
+      </Card>
+
+      {/* AI Import Modal */}
+      <AIImportModal
+        open={aiImportOpen}
+        onClose={() => setAiImportOpen(false)}
+        onSuccess={() => { loadData(); }}
+      />
+
+      {/* Detail Modal */}
+      <Modal
+        title={`订单详情 — ${detailOrder?.order_no || ''}`}
+        open={detailModalOpen}
+        onCancel={() => setDetailModalOpen(false)}
+        footer={<Button onClick={() => setDetailModalOpen(false)}>关闭</Button>}
+        width={700}
+      >
+        {detailOrder && (
+          <div>
+            <Row gutter={16}>
+              <Col span={12}><p><strong>订单号：</strong>{detailOrder.order_no}</p></Col>
+              <Col span={12}><p><strong>状态：</strong><Tag color={ORDER_STATUS[detailOrder.status]?.color}>{ORDER_STATUS[detailOrder.status]?.label}</Tag></p></Col>
+              <Col span={12}><p><strong>买家：</strong>{detailOrder.buyer_name || '-'}</p></Col>
+              <Col span={12}><p><strong>联系方式：</strong>{detailOrder.buyer_phone || '-'}</p></Col>
+              <Col span={12}><p><strong>店铺：</strong>{detailOrder.shop_name || '-'}</p></Col>
+              <Col span={12}><p><strong>下单时间：</strong>{detailOrder.order_time?.slice(0, 16)}</p></Col>
+              <Col span={12}><p><strong>物流单号：</strong>{detailOrder.tracking_no || '-'}</p></Col>
+              <Col span={12}><p><strong>承运商：</strong>{detailOrder.carrier || '-'}</p></Col>
+            </Row>
+            <Divider />
+            <strong>商品明细</strong>
+            <Table
+              dataSource={detailOrder.items || []}
+              rowKey="id"
+              size="small"
+              pagination={false}
+              style={{ marginTop: 8 }}
+              columns={[
+                { title: '商品名称', dataIndex: 'product_name' },
+                { title: '规格', dataIndex: 'spec_name' },
+                { title: 'SKU', dataIndex: 'sku' },
+                { title: '数量', dataIndex: 'quantity' },
+                { title: '单价', dataIndex: 'unit_price', render: (v: number) => `RM ${v.toFixed(2)}` },
+                { title: '小计', dataIndex: 'subtotal', render: (v: number) => `RM ${v.toFixed(2)}` },
+              ]}
+            />
+            <div style={{ textAlign: 'right', marginTop: 12 }}>
+              <Space>
+                <span>商品合计：RM {(detailOrder.item_total || 0).toFixed(2)}</span>
+                <span>运费：RM {(detailOrder.shipping_fee || 0).toFixed(2)}</span>
+                <span>优惠：-RM {(detailOrder.discount || 0).toFixed(2)}</span>
+                <strong style={{ color: BRAND_COLOR }}>实付：RM {(detailOrder.actual_amount || 0).toFixed(2)}</strong>
+              </Space>
+            </div>
+            {detailOrder.remark && <div style={{ marginTop: 12, color: '#666' }}><strong>备注：</strong>{detailOrder.remark}</div>}
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Status Modal */}
+      <Modal
+        title="更新订单状态"
+        open={editStatusModal}
+        onCancel={() => setEditStatusModal(false)}
+        onOk={() => statusForm.submit()}
+        okText="保存"
+      >
+        <Form form={statusForm} layout="vertical" onFinish={handleUpdateStatus}>
+          <Form.Item name="status" label="订单状态">
+            <Select>
+              {Object.entries(ORDER_STATUS).filter(([k]) => k !== 'all').map(([k, v]) => (
+                <Select.Option key={k} value={k}>{v.label}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="logistics_status" label="物流状态">
+            <Input placeholder="如：已揽件、运输中、已签收" />
+          </Form.Item>
+          <Form.Item name="tracking_no" label="物流单号">
+            <Input placeholder="快递单号" />
+          </Form.Item>
+          <Form.Item name="carrier" label="承运商">
+            <Input placeholder="如：J&T, Ninja Van, Pos Laju" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Create Order Modal */}
+      <Modal
+        title="新建订单"
+        open={createModalOpen}
+        onCancel={() => { setCreateModalOpen(false); form.resetFields(); }}
+        onOk={() => form.submit()}
+        okText="提交"
+        width={720}
+      >
+        <Form form={form} layout="vertical" onFinish={handleCreateOrder}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="order_no" label="订单号" rules={[{ required: true }]}>
+                <Input placeholder="输入或粘贴TikTok订单号" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="shop_id" label="所属店铺">
+                <Select allowClear placeholder="选择店铺">
+                  {shops.map(s => <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>)}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="buyer_name" label="买家名称">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="buyer_phone" label="买家联系方式">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="status" label="订单状态" initialValue="pending_ship">
+                <Select>
+                  {Object.entries(ORDER_STATUS).filter(([k]) => k !== 'all').map(([k, v]) => (
+                    <Select.Option key={k} value={k}>{v.label}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="order_time" label="下单时间">
+                <Input type="datetime-local" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider>商品明细</Divider>
+          {itemRows.map((row, idx) => (
+            <Row gutter={8} key={idx} style={{ marginBottom: 8 }}>
+              <Col span={7}>
+                <Select
+                  placeholder="选择产品"
+                  value={row.product_id || undefined}
+                  onChange={v => handleSelectProduct(idx, v)}
+                  style={{ width: '100%' }}
+                  showSearch
+                  optionFilterProp="label"
+                  options={products.map(p => ({ value: p.id, label: p.name }))}
+                />
+              </Col>
+              <Col span={5}>
+                <Select
+                  placeholder="选择SKU"
+                  value={row.product_sku_id || undefined}
+                  onChange={v => handleSelectSku(idx, v)}
+                  style={{ width: '100%' }}
+                  disabled={!row.product_id}
+                  options={(productSkus[row.product_id || 0] || []).map((s: any) => ({ value: s.id, label: `${s.spec_name} (${s.sku_code})` }))}
+                />
+              </Col>
+              <Col span={3}><InputNumber placeholder="数量" min={1} value={row.quantity} onChange={v => updateItem(idx, 'quantity', v)} style={{ width: '100%' }} /></Col>
+              <Col span={4}><InputNumber placeholder="单价RM" min={0} step={0.01} value={row.unit_price} onChange={v => updateItem(idx, 'unit_price', v)} style={{ width: '100%' }} /></Col>
+              <Col span={3}><Input placeholder="小计" value={`RM ${row.subtotal.toFixed(2)}`} readOnly /></Col>
+              <Col span={2}>
+                <Button danger size="small" onClick={() => setItemRows(itemRows.filter((_, i) => i !== idx))} disabled={itemRows.length === 1}>删</Button>
+              </Col>
+            </Row>
+          ))}
+          <Button type="dashed" block onClick={() => setItemRows([...itemRows, { product_id: null, product_sku_id: null, product_name: '', sku: '', spec_name: '', quantity: 1, unit_price: 0, subtotal: 0 }])} style={{ marginBottom: 16 }}>+ 添加商品</Button>
+
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item name="shipping_fee" label="运费(RM)" initialValue={0}>
+                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="discount" label="优惠金额(RM)" initialValue={0}>
+                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="remark" label="备注">
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
