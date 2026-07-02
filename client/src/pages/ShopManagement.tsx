@@ -83,12 +83,31 @@ export default function ShopManagement() {
     loadStats();
   }, []);
 
-  // Handle TikTok OAuth callback (when redirected back with ?code=XXX)
+  // Handle TikTok OAuth callback (two modes)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Mode 1: GET /callback redirect (TikTok → backend → frontend)
+    const authResult = params.get('auth');
+    const authMsg = params.get('message');
+    const authShop = params.get('shop');
+
+    if (authResult === 'success') {
+      window.history.replaceState({}, '', '/shops');
+      message.success(`TikTok 店铺授权成功！`);
+      loadShops();
+      loadStats();
+      return;
+    }
+    if (authResult === 'error') {
+      window.history.replaceState({}, '', '/shops');
+      message.error(`授权失败: ${decodeURIComponent(authMsg || '未知错误')}`);
+      return;
+    }
+
+    // Mode 2: Frontend-based code submission (legacy support)
     const code = params.get('code');
     if (code) {
-      // Clear URL params immediately
       window.history.replaceState({}, '', '/shops');
       handleOAuthCallback(code);
     }
@@ -214,7 +233,8 @@ export default function ShopManagement() {
     e.stopPropagation();
     setRefreshLoading(prev => ({ ...prev, [shopId]: true }));
     try {
-      await api.post(`/shops/tiktok/${shopId}/refresh-token`);
+      const shop = shops.find(s => s.id === shopId);
+      await api.post('/shops/tiktok/refresh', { shop_id: shop?.shop_id || String(shopId) });
       message.success('Token 刷新成功');
       loadShops();
     } catch (e: any) {
@@ -240,9 +260,10 @@ export default function ShopManagement() {
     setAuthLoading(true);
     try {
       const res = await api.post('/shops/tiktok/auth-url');
-      if (res.data.auth_url) {
+      const authUrl = res.data.authUrl || res.data.auth_url;
+      if (authUrl) {
         // 直接跳转到 TikTok 授权页面
-        window.location.href = res.data.auth_url;
+        window.location.href = authUrl;
       }
     } catch (e: any) {
       message.error(e.response?.data?.error || '获取授权链接失败');

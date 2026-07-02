@@ -1,114 +1,252 @@
 /**
  * TikTok Shop OAuth 授权服务
- * 负责生成授权URL、用auth_code换取token、刷新token
+ * 基于 Bozone 已验证的授权流程重构
+ * Ref: https://partner.tiktokshop.com/docv2/page/67c83e0799a75104986ae498
  */
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
-const TIKTOK_AUTH_HOST = 'https://auth.tiktok-shops.com';
-const TIKTOK_OAUTH_AUTHORIZE = 'https://services.tiktokshop.com/open/oauth/authorize';
+// ── 环境变量读取 ──
+function env(key: string, fallback = ''): string {
+  return process.env[key] || fallback;
+}
 
-function getConfig() {
-  const app_key = process.env.TIKTOK_APP_KEY;
-  const app_secret = process.env.TIKTOK_APP_SECRET;
-  if (!app_key || !app_secret || app_key === 'your_app_key_here') {
-    throw new Error('TIKTOK_APP_KEY 和 TIKTOK_APP_SECRET 未配置，请在 server/.env 中设置');
+function apiAppKey(): string {
+  const k = env('TIKTOK_APP_KEY');
+  if (!k) throw new Error('TIKTOK_APP_KEY 未配置');
+  return k;
+}
+
+function apiAppSecret(): string {
+  const s = env('TIKTOK_APP_SECRET');
+  if (!s) throw new Error('TIKTOK_APP_SECRET 未配置');
+  return s;
+}
+
+// ── API 签名 (官方 HMAC-SHA256) ──
+function sign(params: Record<string, string>, path: string, body?: any): string {
+  const appSecret = apiAppSecret();
+  const sorted = Object.keys(params)
+    .filter(k => k !== 'sign' && k !== 'access_token')
+    .sort()
+    .map(k => `${k}${params[k]}`)
+    .join('');
+  let str = `${path}${sorted}`;
+  if (body && typeof body === 'object' && Object.keys(body).length > 0) {
+    str += JSON.stringify(body);
   }
-  return { app_key, app_secret };
+  return crypto.createHmac('sha256', appSecret).update(`${appSecret}${str}${appSecret}`).digest('hex');
 }
 
-/**
- * 生成 TikTok Shop OAuth 授权 URL
- * @param redirectUri 授权后 TikTok 回调的地址（通常是前端地址）
- * @param state 防 CSRF 的随机状态码
- */
-export function generateAuthUrl(redirectUri: string, state?: string): string {
-  const { app_key } = getConfig();
-  const _state = state || crypto.randomBytes(16).toString('hex');
-  const params = new URLSearchParams({
-    app_key,
-    state: _state,
-    redirect_uri: redirectUri,
-  });
-  return `${TIKTOK_OAUTH_AUTHORIZE}?${params.toString()}`;
-}
+// ── 通用 API 调用 ──
+export async function apiCall(
+  path: string, accessToken: string,
+  extraParams: Record<string, string> = {},
+  opts?: { method?: string; body?: any }
+) {
+  const appKey = apiAppKey();
+  const apiBase = env('TIKTOK_API_BASE', 'https://open-api.tiktokglobalshop.com');
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const params: Record<string, string> = { app_key: appKey, sign_method: 'HMAC-SHA256', timestamp, ...extraParams };
+  params.sign = sign(params, path, opts?.body);
 
-/**
- * 用 auth_code 换取 access_token
- */
-export async function exchangeAuthCode(authCode: string): Promise<TokenExchangeResult> {
-  const { app_key, app_secret } = getConfig();
+  const url = `${apiBase}${path}?${new URLSearchParams(params)}`;
+  console.log(`[TikTok API] ${opts?.method || 'GET'} ${path}`);
 
-  const params = new URLSearchParams({
-    grant_type: 'authorized_code',
-    auth_code: authCode,
-    app_key,
-    app_secret,
-  });
-
-  const url = `${TIKTOK_AUTH_HOST}/api/v2/token/get?${params.toString()}`;
-
-  const res = await fetch(url, { method: 'GET' });
-  const body = await res.json();
-
-  if (!res.ok || body.code !== 0) {
-    throw new Error(body.message || `Token 换取失败 (HTTP ${res.status})`);
-  }
-
-  const data = body.data;
-  return {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    access_token_expire_in: data.access_token_expire_in,
-    refresh_token_expire_in: data.refresh_token_expire_in,
-    open_id: data.open_id,
-    seller_name: data.seller_name,
-    seller_base_region: data.seller_base_region,
-    user_type: data.user_type,
-  };
-}
-
-/**
- * 刷新 access_token
- */
-export async function refreshAccessToken(refreshToken: string): Promise<TokenExchangeResult> {
-  const { app_key, app_secret } = getConfig();
-
-  const params = new URLSearchParams({
-    grant_type: 'authorized_code',
-    refresh_token: refreshToken,
-    app_key,
-    app_secret,
+  const res = await fetch(url, {
+    method: opts?.method || 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-tts-access-token': accessToken,
+    },
+    body: opts?.body ? JSON.stringify(opts?.body) : undefined,
   });
 
-  const url = `${TIKTOK_AUTH_HOST}/api/v2/token/refresh?${params.toString()}`;
-
-  const res = await fetch(url, { method: 'GET' });
-  const body = await res.json();
-
-  if (!res.ok || body.code !== 0) {
-    throw new Error(body.message || `Token 刷新失败 (HTTP ${res.status})`);
+  const text = await res.text();
+  let json: any;
+  try { json = JSON.parse(text); } catch { throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`); }
+  if (json.code !== undefined && json.code !== 0) {
+    throw new Error(json.message || json.msg || JSON.stringify(json));
   }
-
-  const data = body.data;
-  return {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    access_token_expire_in: data.access_token_expire_in,
-    refresh_token_expire_in: data.refresh_token_expire_in,
-    open_id: data.open_id,
-    seller_name: data.seller_name,
-    seller_base_region: data.seller_base_region,
-    user_type: data.user_type,
-  };
+  return json;
 }
 
-export interface TokenExchangeResult {
+// ── State 管理 (CSRF 防护，5分钟过期) ──
+const states = new Map<string, number>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, t] of states) if (now - t > 300_000) states.delete(k);
+}, 60_000);
+
+function makeState(): string {
+  const s = `${crypto.randomUUID()}.${crypto.randomBytes(8).toString('hex')}`;
+  states.set(s, Date.now());
+  return s;
+}
+
+export function verifyState(s: string): boolean {
+  if (!states.has(s)) return false;
+  states.delete(s);
+  return true;
+}
+
+// ── OAuth: 生成授权 URL ──
+// ⚠️ 关键: 授权 URL 使用 service_id (授权ID), 不是 app_key (应用密钥)!
+// service_id 默认 fallback 到 app_key, 但某些应用需要独立的 Service ID
+export function buildAuthUrl(redirectUri?: string): { authUrl: string; state: string } {
+  const appKey = apiAppKey();
+  apiAppSecret(); // just validate
+  const serviceId = env('TIKTOK_SERVICE_ID', appKey);
+  const finalRedirectUri = redirectUri || env('TIKTOK_REDIRECT_URI');
+
+  if (!finalRedirectUri) {
+    throw new Error('TIKTOK_REDIRECT_URI 未配置，请在 .env 中设置');
+  }
+
+  if (!env('TIKTOK_SERVICE_ID') && serviceId === appKey) {
+    console.warn('[TikTok] ⚠️ 未配置 TIKTOK_SERVICE_ID，使用 APP_KEY 作为 fallback');
+    console.warn('[TikTok] ⚠️ 如果遇到 "This service does not exist" 错误，请在 .env 中设置 TIKTOK_SERVICE_ID');
+  }
+
+  const state = makeState();
+  const scopes = ['seller.order', 'seller.product', 'seller.shop', 'seller.finance', 'affiliate_seller'].join(',');
+
+  const url = `https://services.tiktokshop.com/open/authorize?service_id=${serviceId}&state=${state}&redirect_uri=${encodeURIComponent(finalRedirectUri)}&scope=${scopes}`;
+
+  console.log(`[TikTok] Auth URL: service_id=${serviceId.slice(0, 8)}...`);
+  return { authUrl: url, state };
+}
+
+// ── OAuth: auth_code 换 token ──
+const AUTH_HOST = 'https://auth.tiktok-shops.com';
+
+export interface TokenResponse {
   access_token: string;
   refresh_token: string;
-  access_token_expire_in?: number;
-  refresh_token_expire_in?: number;
-  open_id?: string;
-  seller_name?: string;
-  seller_base_region?: string;
-  user_type?: number;
+  shop_id: string;
+  shop_cipher: string;
+  shop_name?: string;
+  expires_in: number;
+  scope: string;
+}
+
+export async function exchangeCode(code: string): Promise<TokenResponse> {
+  const appKey = apiAppKey();
+  const appSecret = apiAppSecret();
+
+  const params = new URLSearchParams({
+    app_key: appKey,
+    app_secret: appSecret,
+    auth_code: code,
+    grant_type: 'authorized_code',
+  });
+  const url = `${AUTH_HOST}/api/v2/token/get?${params}`;
+
+  console.log('[TikTok] 正在用 auth_code 换取 token...');
+  const res = await fetch(url);
+  const text = await res.text();
+  console.log(`[TikTok] Token 交换响应 (${res.status}):`, text.slice(0, 300));
+
+  let json: any;
+  try { json = JSON.parse(text); } catch { throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`); }
+
+  if (json.code !== 0) {
+    throw new Error(json.message || json.msg || `Token 交换失败 (code=${json.code})`);
+  }
+
+  const d = json.data;
+  const token = d.access_token;
+  // ⚠️ access_token_expire_in 是 Unix 时间戳（秒），不是剩余的秒数！
+  const expiresIn = d.access_token_expire_in
+    ? Math.floor(d.access_token_expire_in - Date.now() / 1000)
+    : 86400;
+
+  // 获取店铺信息 (shop_cipher 是后续 API 调用的必要参数)
+  let shopId = '';
+  let shopCipher = '';
+  try {
+    const shopsJson = await apiCall('/authorization/202309/shops', token);
+    const shops = shopsJson?.data?.shops || [];
+    if (shops.length > 0) {
+      shopId = shops[0].id || shops[0].shop_id || '';
+      shopCipher = shops[0].cipher || shops[0].shop_cipher || '';
+    }
+    console.log(`[TikTok] 店铺信息: shopId=${shopId}, cipher=${shopCipher ? 'yes' : 'no'}`);
+  } catch (e: any) {
+    console.warn('[TikTok] 获取店铺信息失败（非致命）:', e.message);
+  }
+
+  return {
+    access_token: token,
+    refresh_token: d.refresh_token || '',
+    shop_id: shopId || d.open_id?.split('_')?.[0] || '',
+    shop_cipher: shopCipher,
+    shop_name: d.seller_name || d.shop_name || '',
+    expires_in: expiresIn,
+    scope: '',
+  };
+}
+
+// ── OAuth: 刷新 token ──
+export async function refreshToken(refreshTokenStr: string): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}> {
+  const appKey = apiAppKey();
+  const appSecret = apiAppSecret();
+
+  const params = new URLSearchParams({
+    app_key: appKey,
+    app_secret: appSecret,
+    refresh_token: refreshTokenStr,
+    grant_type: 'authorized_code',
+  });
+  const url = `${AUTH_HOST}/api/v2/token/refresh?${params}`;
+
+  console.log('[TikTok] 正在刷新 token...');
+  const res = await fetch(url);
+  const json: any = await res.json();
+
+  if (json.code !== 0) throw new Error(json.message || 'Token 刷新失败');
+
+  const d = json.data;
+  const expiresIn = d.access_token_expire_in
+    ? Math.floor(d.access_token_expire_in - Date.now() / 1000)
+    : 86400;
+
+  return {
+    access_token: d.access_token,
+    refresh_token: d.refresh_token || refreshTokenStr,
+    expires_in: expiresIn,
+  };
+}
+
+// ── 获取已授权的店铺列表 ──
+export async function getAuthorizedShops(accessToken: string) {
+  const result = await apiCall('/authorization/202309/shops', accessToken);
+  return ((result?.data as any)?.shops || []).map((shop: any) => ({
+    id: shop.id || shop.shop_id || '',
+    name: shop.name || shop.shop_name || '',
+    cipher: shop.cipher || shop.shop_cipher || '',
+    region: shop.region || shop.shop_region || '',
+  }));
+}
+
+// ── 测试连接 ──
+export async function testConnection(accessToken: string, _shopCipher?: string) {
+  const errors: string[] = [];
+
+  // Try 1: 获取已授权店铺列表
+  try {
+    const result = await apiCall('/authorization/202309/shops', accessToken);
+    return { endpoint: 'shops', data: result };
+  } catch (e: any) { errors.push(`shops: ${e.message}`); }
+
+  // Try 2: 获取订单列表
+  try {
+    const result = await apiCall('/order/202309/orders/list', accessToken, { page_size: '1' });
+    return { endpoint: 'orders', data: result };
+  } catch (e: any) { errors.push(`orders: ${e.message}`); }
+
+  throw new Error(`所有 API 端点均失败: ${errors.join('; ')}`);
 }
