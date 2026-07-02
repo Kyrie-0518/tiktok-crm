@@ -27,6 +27,28 @@ import { startAutoBackup } from './utils/backup';
 import { auditMiddleware, startAuditLogCleanup } from './middleware/audit';
 import auditLogRoutes from './routes/audit-logs';
 import aiStudioRoutes from './routes/ai-studio';
+import { getDb } from './db';
+
+// ── 启动时强制检查 tiktok_shops 表结构迁移 ──
+const startupDb = getDb();
+const shopCols = startupDb.prepare("PRAGMA table_info(tiktok_shops)").all() as any[];
+const tikApiMigrations: [string, string][] = [
+  ['app_key', "ALTER TABLE tiktok_shops ADD COLUMN app_key TEXT DEFAULT ''"],
+  ['app_secret', "ALTER TABLE tiktok_shops ADD COLUMN app_secret TEXT DEFAULT ''"],
+  ['access_token', "ALTER TABLE tiktok_shops ADD COLUMN access_token TEXT DEFAULT ''"],
+  ['refresh_token', "ALTER TABLE tiktok_shops ADD COLUMN refresh_token TEXT DEFAULT ''"],
+  ['shop_cipher', "ALTER TABLE tiktok_shops ADD COLUMN shop_cipher TEXT DEFAULT ''"],
+  ['token_expires_at', "ALTER TABLE tiktok_shops ADD COLUMN token_expires_at DATETIME"],
+  ['api_version', "ALTER TABLE tiktok_shops ADD COLUMN api_version TEXT DEFAULT '202309'"],
+  ['sync_enabled', "ALTER TABLE tiktok_shops ADD COLUMN sync_enabled INTEGER DEFAULT 0"],
+];
+for (const [col, sql] of tikApiMigrations) {
+  if (!shopCols.some((c: any) => c.name === col)) {
+    startupDb.exec(sql);
+    console.log(`[migrate] Added ${col} to tiktok_shops`);
+  }
+}
+
 
 // Load environment variables
 import dotenv from 'dotenv';
