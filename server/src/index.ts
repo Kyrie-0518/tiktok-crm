@@ -27,7 +27,7 @@ import { startAutoBackup } from './utils/backup';
 import { auditMiddleware, startAuditLogCleanup } from './middleware/audit';
 import auditLogRoutes from './routes/audit-logs';
 import aiStudioRoutes from './routes/ai-studio';
-import { getDb } from './db';
+import getDb from './db';
 
 // ── 启动时强制检查 tiktok_shops 表结构迁移 ──
 const startupDb = getDb();

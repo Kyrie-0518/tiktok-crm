@@ -162,10 +162,19 @@ function initTables() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       region TEXT DEFAULT 'MY',
-      shop_id TEXT DEFAULT '',
+      shop_id TEXT UNIQUE NOT NULL,
+      shop_cipher TEXT DEFAULT '',
+      app_key TEXT DEFAULT '',
+      app_secret TEXT DEFAULT '',
+      access_token TEXT DEFAULT '',
+      refresh_token TEXT DEFAULT '',
+      token_expires_at DATETIME,
+      api_version TEXT DEFAULT '202309',
+      sync_enabled INTEGER DEFAULT 1,
       status TEXT DEFAULT 'active',
       last_synced_at DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS orders (
@@ -336,10 +345,19 @@ function initTables() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         region TEXT DEFAULT 'MY',
-        shop_id TEXT DEFAULT '',
+        shop_id TEXT UNIQUE NOT NULL,
+        shop_cipher TEXT DEFAULT '',
+        app_key TEXT DEFAULT '',
+        app_secret TEXT DEFAULT '',
+        access_token TEXT DEFAULT '',
+        refresh_token TEXT DEFAULT '',
+        token_expires_at DATETIME,
+        api_version TEXT DEFAULT '202309',
+        sync_enabled INTEGER DEFAULT 1,
         status TEXT DEFAULT 'active',
         last_synced_at DATETIME,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
   }
