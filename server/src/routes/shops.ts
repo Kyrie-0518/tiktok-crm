@@ -15,15 +15,18 @@ router.get('/', authMiddleware, (_req: Request, res: Response) => {
   const cols = (db.prepare("PRAGMA table_info(tiktok_shops)").all() as any[]).map((c: any) => c.name);
   const safeCols = ['id', 'name', 'region', 'shop_id', 'status', 'last_synced_at', 'created_at']
     .filter(c => cols.includes(c));
-  const extraCols = ['sync_enabled', 'product_sync_enabled', 'app_key', 'api_version']
+  const extraCols = ['sync_enabled', 'product_sync_enabled', 'app_key', 'api_version', 'refresh_token', 'token_expires_at', 'open_id']
     .filter(c => cols.includes(c));
   const selectCols = [...safeCols, ...extraCols].join(', ');
   const shops = db.prepare(`SELECT ${selectCols} FROM tiktok_shops ORDER BY id ASC`).all() as any[];
-  // 掩码处理 app_key：只显示前4后4
+  // 掩码处理敏感信息
   const masked = shops.map((s: any) => ({
     ...s,
-    _has_credentials: !!(s.app_key && s.app_key.length > 0),
+    _has_credentials: !!(s.access_token && s.access_token.length > 0),
+    _has_app_key: !!(s.app_key && s.app_key.length > 0),
+    _token_valid: s.token_expires_at ? new Date(s.token_expires_at) > new Date() : false,
     _app_key_masked: s.app_key ? s.app_key.slice(0, 4) + '****' + s.app_key.slice(-4) : '',
+    _refresh_token_exists: !!(s.refresh_token && s.refresh_token.length > 0),
   }));
   res.json(masked);
 });
@@ -150,15 +153,18 @@ router.get('/:id', authMiddleware, (req: Request, res: Response) => {
   res.json(shop);
 });
 
-// POST /api/shops — create shop
+// POST /api/shops — create shop（手动创建，不使用 OAuth 授权时）
 router.post('/', authMiddleware, (req: Request, res: Response) => {
-  const { name, region, shop_id, app_key, app_secret, access_token, shop_cipher, api_version, sync_enabled } = req.body;
+  const { name, region, shop_id, app_key, app_secret, access_token, shop_cipher, api_version, sync_enabled, refresh_token, token_expires_at } = req.body;
   if (!name) return res.status(400).json({ error: '店铺名称必填' });
   const db = getDb();
   try {
+    // 如果有 access_token 但没填 app_key/app_secret，使用环境变量
+    const ak = app_key || process.env.TIKTOK_APP_KEY || '';
+    const as = app_secret || process.env.TIKTOK_APP_SECRET || '';
     const result = db.prepare(
-      'INSERT INTO tiktok_shops (name, region, shop_id, status, app_key, app_secret, access_token, shop_cipher, api_version, sync_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(name, region || 'MY', shop_id || '', 'active', app_key || '', app_secret || '', access_token || '', shop_cipher || '', api_version || '202309', sync_enabled ? 1 : 0);
+      'INSERT INTO tiktok_shops (name, region, shop_id, status, app_key, app_secret, access_token, refresh_token, token_expires_at, shop_cipher, api_version, sync_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(name, region || 'MY', shop_id || '', 'active', ak, as, access_token || '', refresh_token || '', token_expires_at || null, shop_cipher || '', api_version || '202309', sync_enabled ? 1 : 0);
     res.json({ id: result.lastInsertRowid, name, region: region || 'MY', status: 'active' });
   } catch (e: any) {
     if (e.message?.includes('UNIQUE')) return res.status(400).json({ error: '店铺已存在' });
@@ -166,9 +172,9 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/shops/:id — update shop (including API credentials)
+// PUT /api/shops/:id — update shop
 router.put('/:id', authMiddleware, (req: Request, res: Response) => {
-  const { name, region, shop_id, status, app_key, app_secret, access_token, shop_cipher, api_version, sync_enabled } = req.body;
+  const { name, region, shop_id, status, app_key, app_secret, access_token, refresh_token, shop_cipher, api_version, sync_enabled, product_sync_enabled } = req.body;
   const db = getDb();
   const shop = db.prepare('SELECT * FROM tiktok_shops WHERE id = ?').get(req.params.id) as any;
   if (!shop) return res.status(404).json({ error: '店铺不存在' });
@@ -183,16 +189,18 @@ router.put('/:id', authMiddleware, (req: Request, res: Response) => {
     }
   };
 
-  set('name', name ?? shop.name);
-  set('region', region ?? shop.region);
-  set('shop_id', shop_id ?? shop.shop_id);
-  set('status', status ?? shop.status);
-  set('app_key', app_key ?? shop.app_key);
-  set('app_secret', app_secret ?? shop.app_secret);
-  set('access_token', access_token ?? shop.access_token);
-  set('shop_cipher', shop_cipher ?? shop.shop_cipher);
-  set('api_version', api_version ?? shop.api_version);
-  set('sync_enabled', sync_enabled !== undefined ? (sync_enabled ? 1 : 0) : shop.sync_enabled);
+  set('name', name);
+  set('region', region);
+  set('shop_id', shop_id);
+  set('status', status);
+  set('app_key', app_key);
+  set('app_secret', app_secret);
+  set('access_token', access_token);
+  set('refresh_token', refresh_token);
+  set('shop_cipher', shop_cipher);
+  set('api_version', api_version);
+  set('sync_enabled', sync_enabled !== undefined ? (sync_enabled ? 1 : 0) : undefined);
+  set('product_sync_enabled', product_sync_enabled !== undefined ? (product_sync_enabled ? 1 : 0) : undefined);
 
   if (updates.length === 0) return res.json({ success: true, message: '无变更' });
   values.push(req.params.id);

@@ -42,14 +42,16 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
   if (!shop) {
     return { created: 0, updated: 0, errors: ['店铺未启用同步或无凭证'] };
   }
-  if (!shop.app_key || !shop.app_secret || !shop.access_token) {
-    return { created: 0, updated: 0, errors: ['缺少 API 凭证 (app_key/app_secret/access_token)'] };
+  // 2. 初始化 API 客户端（优先使用店铺凭证，fallback 到环境变量）
+  const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
+  const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
+  if (!appKey || !appSecret || !shop.access_token) {
+    return { created: 0, updated: 0, errors: ['缺少 API 凭证 (app_key/app_secret/access_token)，请重新授权或配置环境变量'] };
   }
 
-  // 2. 初始化 API 客户端
   const api = new TikTokAPI({
-    app_key: shop.app_key,
-    app_secret: shop.app_secret,
+    app_key: appKey,
+    app_secret: appSecret,
     access_token: shop.access_token,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
@@ -215,13 +217,18 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
   const db = getDb();
   const shop = db.prepare('SELECT * FROM tiktok_shops WHERE id = ?').get(shopId) as any;
 
-  if (!shop || !shop.app_key || !shop.app_secret || !shop.access_token) {
+  if (!shop || !shop.access_token) {
     return { success: false, message: '缺少 API 凭证' };
   }
+  if (!shop.app_key && !process.env.TIKTOK_APP_KEY) {
+    return { success: false, message: '缺少 App Key，请在环境变量中配置 TIKTOK_APP_KEY' };
+  }
 
+  const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
+  const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
   const api = new TikTokAPI({
-    app_key: shop.app_key,
-    app_secret: shop.app_secret,
+    app_key: appKey,
+    app_secret: appSecret,
     access_token: shop.access_token,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',

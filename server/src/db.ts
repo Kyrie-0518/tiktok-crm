@@ -1016,6 +1016,12 @@ function initTables() {
     console.log('[migrate v2.3] Added product_sync_enabled to tiktok_shops');
   }
 
+  // 12b. TikTok Shop open_id（OAuth 授权后由 TikTok 返回的唯一标识）
+  if (!tikApiCols.some((c: any) => c.name === 'open_id')) {
+    db.exec("ALTER TABLE tiktok_shops ADD COLUMN open_id TEXT DEFAULT ''");
+    console.log('[migrate v2.4] Added open_id to tiktok_shops');
+  }
+
   // 13. order_items 补充 TikTok 源字段
   const oiColsV2 = db.prepare("PRAGMA table_info(order_items)").all() as any[];
   const oiMigrations: [string, string][] = [

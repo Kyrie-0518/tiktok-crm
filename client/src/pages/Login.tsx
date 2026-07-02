@@ -22,7 +22,6 @@ export default function Login() {
   }, [token, isTokenValid]);
 
   const handleSubmit = async (values: any) => {
-    console.log('🔥 handleSubmit 被调用了！values:', values);
     try {
       const { data } = await api.post('/auth/login', {
         username: values.username,
