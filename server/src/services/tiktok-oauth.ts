@@ -199,7 +199,7 @@ export async function refreshToken(refreshTokenStr: string): Promise<{
     app_key: appKey,
     app_secret: appSecret,
     refresh_token: refreshTokenStr,
-    grant_type: 'authorized_code',
+    grant_type: 'refresh_token',
   });
   const url = `${AUTH_HOST}/api/v2/token/refresh?${params}`;
 
