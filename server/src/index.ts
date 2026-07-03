@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth';
 import productRoutes from './routes/products';
 import financeRoutes, { autoUpdateExchangeRate } from './routes/finance';
@@ -24,7 +23,7 @@ import adminRoutes from './routes/admin';
 // import plan1688Routes from './routes/1688-plan';
 // import douyinSearchRoutes from './routes/douyin-search';
 import { startAutoBackup } from './utils/backup';
-import { auditMiddleware, startAuditLogCleanup } from './middleware/audit';
+import { startAuditLogCleanup } from './middleware/audit';
 import auditLogRoutes from './routes/audit-logs';
 import aiStudioRoutes from './routes/ai-studio';
 import getDb from './db';
@@ -61,32 +60,11 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Rate Limiting: 登录接口 5次失败锁定15分钟
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15分钟
-  max: 5, // 最多5次尝试
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (_req: any, res: any) => {
-    res.status(429).json({ error: '登录尝试次数过多，请15分钟后重试' });
-  },
-  keyGenerator: (req: any) => {
-    // 使用 username 作为限流key，如果没有则使用 IP
-    return req.body?.username || (req.ip || req.socket?.remoteAddress || 'unknown');
-  },
-  skipSuccessfulRequests: true, // 成功的登录请求不计入限制
-});
 
-// 审计日志中间件（全局记录所有API操作）
-app.use(auditMiddleware);
-
-// Health Check（Docker 健康检查用，不记录审计日志的路由）
+// Health Check（Docker 健康检查用）
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
-
-// 登录限流
-app.use('/api/auth/login', loginLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);

@@ -5,7 +5,7 @@ import { signToken, authMiddleware, JwtPayload } from '../middleware/auth';
 
 const router = Router();
 
-// POST /api/auth/login
+// POST /api/auth/login — 简化版：仅账号密码验证
 router.post('/login', (req: Request, res: Response) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -17,30 +17,11 @@ router.post('/login', (req: Request, res: Response) => {
     return res.status(401).json({ error: '账号或密码错误' });
   }
 
-  // Get user permissions from role
-  let permissions: Record<string, string> = {};
-  let role_name = '';
-  let role_id = user.role_id || null;
-  let role_key: string | null = null;
-  if (user.role_id) {
-    const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(user.role_id) as any;
-    if (role) {
-      permissions = JSON.parse(role.permissions || '{}');
-      role_name = role.name;
-      role_key = role.role_key || null;
-    }
-  }
-
-  const token = signToken({ userId: user.id, username: user.username, roleKey: role_key || undefined });
+  const token = signToken({ userId: user.id, username: user.username });
   res.json({
     token,
     username: user.username,
     display_name: user.display_name || user.username,
-    permissions,
-    role_name,
-    role_id,
-    role_key,
-    require_password_change: user.password_changed === 0 ? true : false,
   });
 });
 
