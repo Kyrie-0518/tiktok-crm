@@ -224,8 +224,9 @@ export default function ShopManagement() {
     try {
       const res = await api.post(`/shops/${shopId}/test`);
       message[res.data.success ? 'success' : 'error'](res.data.message);
-    } catch {
-      message.error('测试失败');
+    } catch (e: any) {
+      console.error('[ShopManagement] 测试连接失败:', e);
+      message.error(e.response?.data?.message || e.response?.data?.error || '测试失败');
     }
   };
 

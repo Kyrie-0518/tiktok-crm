@@ -2,7 +2,7 @@
  * TikTok Shop Partner Center API 客户端
  * 封装订单、商品、店铺等常用 API 调用
  */
-import { buildHeaders, buildUrl, TikTokAuth } from '../utils/tiktok-sign';
+import { buildSignedRequest, TikTokAuth } from '../utils/tiktok-sign';
 
 export class TikTokAPI {
   private auth: TikTokAuth;
@@ -23,9 +23,7 @@ export class TikTokAPI {
     queryParams?: Record<string, string>,
     body?: Record<string, any>,
   ): Promise<any> {
-    const path = `/api/${this.apiVersion}/${endpoint}`;
-    const url = buildUrl(this.apiVersion, endpoint, queryParams);
-    const headers = buildHeaders(this.auth, path, body);
+    const { url, headers } = buildSignedRequest(this.auth, endpoint, queryParams, body);
 
     const fetchOptions: RequestInit = { method, headers };
     if (body && method === 'POST') {
