@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
-import { navigate } from '../utils/navigation';
 
 const api = axios.create({
   baseURL: '/api',
@@ -16,23 +15,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor - handle 401
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      // 清除 store 状态
-      useAuthStore.getState().logout();
-      // 保存当前路径，登录后跳转回来
-      const currentPath = window.location.pathname;
-      if (currentPath !== '/login') {
-        sessionStorage.setItem('redirect_after_login', currentPath);
-      }
-      // 跳转到登录页
-      window.location.href = '/login';
-    }
-    return Promise.reject(err);
-  }
-);
+// 开发阶段：不拦截 401，避免踢回登录页
+// (401 拦截器已注释，等登录功能完善后再恢复)
 
 export default api;

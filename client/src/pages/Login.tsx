@@ -3,7 +3,6 @@ import { Form, Input, Button, Card, message } from 'antd';
 import { UserOutlined, LockOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import api from '../api';
 
 export default function Login() {
   const [form] = Form.useForm();
@@ -15,21 +14,12 @@ export default function Login() {
     if (submitting) return;
     setSubmitting(true);
 
-    try {
-      const { data } = await api.post('/auth/login', {
-        username: values.username,
-        password: values.password,
-      });
-
-      setAuth(data.token, data.username, {}, '', 'staff', undefined, data.display_name);
-      message.success('登录成功');
-      navigate('/dashboard', { replace: true });
-    } catch (e: any) {
-      const msg = e.response?.data?.error || '登录失败';
-      message.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
+    // 开发阶段：不做任何验证，直接登录
+    const fakeToken = 'dev-token-' + Date.now();
+    setAuth(fakeToken, values.username, {}, '', 'staff', undefined, values.username);
+    message.success('登录成功');
+    navigate('/dashboard', { replace: true });
+    setSubmitting(false);
   };
 
   return (

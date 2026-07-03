@@ -114,13 +114,7 @@ function hasPerm(permissions: Record<string, string>, permKey: string, parentKey
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = useAuthStore((s) => s.token);
-  const isTokenValid = useAuthStore((s) => s.isTokenValid);
-  if (!token || !isTokenValid()) {
-    const currentPath = window.location.pathname;
-    if (currentPath !== '/login') sessionStorage.setItem('redirect_after_login', currentPath);
-    return <Navigate to="/login" replace />;
-  }
+  // 开发阶段：不做 token 验证，直接放行
   return <>{children}</>;
 }
 
