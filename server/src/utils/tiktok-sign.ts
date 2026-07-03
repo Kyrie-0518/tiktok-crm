@@ -42,6 +42,15 @@ function generateSign(
   return crypto.createHmac('sha256', appSecret).update(signString).digest('hex');
 }
 
+/** endpoint 前缀到官方 API category 的映射（SDK 单数/复数不一致） */
+const CATEGORY_MAP: Record<string, string> = {
+  orders: 'order',
+  products: 'product',
+  shop: 'seller',
+  logistics: 'logistics',
+  finance: 'finance',
+};
+
 /** 生成完整的请求 URL 和请求头（官方 SDK 格式） */
 export function buildSignedRequest(
   auth: TikTokAuth,
@@ -50,8 +59,9 @@ export function buildSignedRequest(
   body?: Record<string, any>,
 ): { url: string; headers: Record<string, string> } {
   const apiVersion = auth.api_version || '202309';
-  // 从 endpoint 推断 API category（orders/search → orders）
-  const category = endpoint.split('/')[0] || endpoint;
+  // 从 endpoint 推断 API category（orders → order, products → product 等）
+  const rawCategory = endpoint.split('/')[0] || endpoint;
+  const category = CATEGORY_MAP[rawCategory] || rawCategory;
   const base = `https://open-api.tiktokglobalshop.com/api/${category}/${apiVersion}/${endpoint}`;
   const pathname = `/api/${category}/${apiVersion}/${endpoint}`;
 
