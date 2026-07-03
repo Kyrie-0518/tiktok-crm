@@ -244,6 +244,6 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
     return { success: true, message: '连接成功' };
   } catch (e: any) {
     console.error('[testApiConnection] TikTok API 连接失败:', e.message, e);
-    return { success: false, message: `连接失败: ${e.message}` };
+    return { success: false, message: `连接失败: ${e.message || e}` };
   }
 }

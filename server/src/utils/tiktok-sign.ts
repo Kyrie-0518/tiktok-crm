@@ -50,8 +50,10 @@ export function buildSignedRequest(
   body?: Record<string, any>,
 ): { url: string; headers: Record<string, string> } {
   const apiVersion = auth.api_version || '202309';
-  const base = `https://open-api.tiktokglobalshop.com/api/${apiVersion}/${endpoint}`;
-  const pathname = `/api/${apiVersion}/${endpoint}`;
+  // 从 endpoint 推断 API category（orders/search → orders）
+  const category = endpoint.split('/')[0] || endpoint;
+  const base = `https://open-api.tiktokglobalshop.com/api/${category}/${apiVersion}/${endpoint}`;
+  const pathname = `/api/${category}/${apiVersion}/${endpoint}`;
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const bodyStr = body && Object.keys(body).length > 0 ? JSON.stringify(body) : '';
