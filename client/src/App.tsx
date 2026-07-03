@@ -67,7 +67,7 @@ const SYSTEM_BOTTOM_MENUS = [
   { key: 'config', icon: <SettingOutlined />, label: '系统设置', tabKey: 'config' },
   { key: 'audit-logs', icon: <AuditOutlined />, label: '操作日志', tabKey: 'audit' },
 ];
-const ADMIN_BOTTOM_MENUS = [];
+const ADMIN_BOTTOM_MENUS: any[] = [];
 
 // 构建 Ant Design Menu 的 items（含分组标题）
 function buildMenuItems() {
