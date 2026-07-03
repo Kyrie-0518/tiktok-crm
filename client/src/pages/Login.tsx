@@ -1,6 +1,6 @@
 import React from 'react';
 import { Form, Input, Button, Card, message, Modal } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import api from '../api';
@@ -14,6 +14,7 @@ export default function Login() {
   const isTokenValid = useAuthStore((s) => s.isTokenValid);
   const [forceChangeOpen, setForceChangeOpen] = React.useState(false);
   const [pendingPassword, setPendingPassword] = React.useState<string>('');
+  const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
     if (token && isTokenValid()) {
@@ -22,11 +23,20 @@ export default function Login() {
   }, [token, isTokenValid]);
 
   const handleSubmit = async (values: any) => {
+    if (submitting) return;
+    setSubmitting(true);
+
+    console.log('[Login] 开始登录, username:', values.username);
+    console.log('[Login] API baseURL:', (api.defaults as any)?.baseURL || '/api');
+
     try {
       const { data } = await api.post('/auth/login', {
         username: values.username,
         password: values.password,
       });
+
+      console.log('[Login] 登录成功, response:', { ...data, token: data.token?.substring(0, 20) + '...' });
+
       setAuth(
         data.token, data.username, data.permissions || {},
         data.role_name || '', data.role_key || 'staff', undefined,
@@ -36,6 +46,7 @@ export default function Login() {
       if (data.require_password_change) {
         setPendingPassword(values.password);
         setForceChangeOpen(true);
+        setSubmitting(false);
         return;
       }
 
@@ -44,7 +55,31 @@ export default function Login() {
       sessionStorage.removeItem('redirect_after_login');
       navigate(redirectPath, { replace: true });
     } catch (e: any) {
-      message.error(e.response?.data?.error || '登录失败');
+      console.error('[Login] 登录失败:', e);
+
+      // 详细错误分类
+      if (e.code === 'ERR_NETWORK' || e.message?.includes('Network Error')) {
+        message.error('网络连接失败，请检查：\n1. 服务器是否正常运行\n2. 网络是否连通\n3. API代理是否配置正确', 5);
+      } else if (e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
+        message.error('请求超时（30秒），请检查服务器状态后重试', 5);
+      } else if (e.response) {
+        // 服务端返回了错误
+        const status = e.response.status;
+        const serverMsg = e.response.data?.error || e.response.data?.message || '';
+        if (status === 429) {
+          message.error(serverMsg || '登录尝试次数过多，请15分钟后重试', 5);
+        } else if (status === 401) {
+          message.error(serverMsg || '账号或密码错误', 3);
+        } else if (status >= 500) {
+          message.error(`服务器内部错误(${status})，请联系管理员`, 5);
+        } else {
+          message.error(serverMsg || `登录失败 (${status})`, 3);
+        }
+      } else {
+        message.error('登录失败：' + (e.message || '未知错误'), 3);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -98,18 +133,56 @@ export default function Login() {
 
           <Form form={form} onFinish={handleSubmit} layout="vertical" size="large">
             <Form.Item name="username" label="账号" rules={[{ required: true, message: '请输入账号' }]}>
-              <Input prefix={<UserOutlined style={{ color: '#2563eb' }} />} placeholder="请输入账号" />
+              <Input
+                prefix={<UserOutlined style={{ color: '#2563eb' }} />}
+                placeholder="请输入账号"
+                disabled={submitting}
+                autoComplete="username"
+              />
             </Form.Item>
             <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
-              <Input.Password prefix={<LockOutlined style={{ color: '#2563eb' }} />} placeholder="请输入密码" />
+              <Input.Password
+                prefix={<LockOutlined style={{ color: '#2563eb' }} />}
+                placeholder="请输入密码"
+                disabled={submitting}
+                autoComplete="current-password"
+                onPressEnter={() => form.submit()}
+              />
             </Form.Item>
             <Form.Item style={{ marginBottom: 4 }}>
-              <Button type="primary" htmlType="submit" block size="large"
-                style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', borderRadius: 8, fontWeight: 600, height: 46, letterSpacing: 2 }}>
-                登 录
+              <Button
+                type="primary"
+                htmlType="submit"
+                block
+                size="large"
+                loading={submitting}
+                disabled={submitting}
+                icon={submitting ? <LoadingOutlined /> : undefined}
+                style={{
+                  background: submitting ? undefined : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  borderRadius: 8, fontWeight: 600, height: 46, letterSpacing: 2,
+                }}
+              >
+                {submitting ? '登录中...' : '登 录'}
               </Button>
             </Form.Item>
           </Form>
+
+          {/* 调试信息：帮助定位 API 连接问题 */}
+          {!submitting && (
+            <div style={{
+              marginTop: 12, padding: '8px 12px',
+              background: '#f0f9ff', borderRadius: 6, border: '1px solid #bae6fd',
+              fontSize: 11, color: '#0369a1',
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>📡 连接诊断</div>
+              <div>API: <code style={{ background: '#e0f2fe', padding: '1px 4px', borderRadius: 3 }}>/api/auth/login</code></div>
+              <div>当前地址: <code style={{ background: '#e0f2fe', padding: '1px 4px', borderRadius: 3 }}>{window.location.origin}</code></div>
+              <div style={{ marginTop: 4 }}>
+                如无法登录，请打开浏览器开发者工具 (F12) → Console 查看详细错误日志
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 
