@@ -65,9 +65,9 @@ else
 fi
 echo ""
 
-# ── 4. 拉取/构建镜像 ──
+# ── 4. 构建镜像（使用层缓存，仅重建变更层） ──
 echo -e "${YELLOW}[4/5] 构建 Docker 镜像...${NC}"
-docker compose build --no-cache
+docker compose build
 echo -e "${GREEN}镜像构建完成${NC}"
 echo ""
 
