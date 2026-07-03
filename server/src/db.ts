@@ -505,10 +505,17 @@ function initTables() {
     try { db.prepare('DROP TABLE user_roles').run(); } catch {}
   }
 
-  // users 表添加 password_changed 字段（首次登录强制改密）— 必须在种子用户之前
-  const userColsForPw = db.prepare("PRAGMA table_info(users)").all() as any[];
-  if (!userColsForPw.some((c: any) => c.name === 'password_changed')) {
+  // users 表添加需要的新字段 — 必须在种子用户之前
+  const allUserColsResult = db.prepare("PRAGMA table_info(users)").all() as any[];
+  const allUserCols = allUserColsResult.map((c: any) => c.name);
+  if (!allUserCols.includes('password_changed')) {
     db.exec("ALTER TABLE users ADD COLUMN password_changed INTEGER DEFAULT 0");
+  }
+  if (!allUserCols.includes('display_name')) {
+    db.exec("ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''");
+  }
+  if (!allUserCols.includes('role_id')) {
+    db.exec('ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id) ON DELETE SET NULL');
   }
 
   // Seed default admin if not exist — 随机生成密码+首次强制修改
@@ -542,12 +549,6 @@ function initTables() {
     // Ensure Kyrie is developer (role_id=1) and force password change
     db.prepare('UPDATE users SET role_id = 1, display_name = ?, password_changed = 0 WHERE username = ?').run('开发者', 'Kyrie');
   }
-
-  // Add role_id column to users if missing
-  const userCols = db.prepare("PRAGMA table_info(users)").all() as any[];
-  const userColNames = userCols.map(c => c.name);
-  if (!userColNames.includes('display_name')) db.exec("ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''");
-  if (!userColNames.includes('role_id')) db.exec('ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id) ON DELETE SET NULL');
 
   // Add commission_rate to orders if missing (for profit calculation linkage)
   const orderCols2 = db.prepare("PRAGMA table_info(orders)").all() as any[];
