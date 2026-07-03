@@ -68,9 +68,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   isTokenValid: () => {
-    const state = get();
-    if (!state.token) return false;
-    return checkTokenValid(state.token);
+    // 开发阶段：token 永远有效
+    return true;
   },
 }));
 

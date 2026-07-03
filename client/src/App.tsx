@@ -65,13 +65,9 @@ const MENU_GROUPS = [
 // 系统设置菜单 — 侧边栏底部独立区域，点击跳转 /system-settings?tab=xxx
 const SYSTEM_BOTTOM_MENUS = [
   { key: 'config', icon: <SettingOutlined />, label: '系统设置', tabKey: 'config' },
-  { key: 'permissions', icon: <KeyOutlined />, label: '用户与权限', tabKey: 'permissions' },
   { key: 'audit-logs', icon: <AuditOutlined />, label: '操作日志', tabKey: 'audit' },
 ];
-const ADMIN_BOTTOM_MENUS = [
-  { key: 'admin-roles', icon: <SafetyOutlined />, label: '角色与账号', tabKey: 'roles' },
-  { key: 'admin-audit', icon: <AuditOutlined />, label: '全局日志', tabKey: 'global-audit' },
-];
+const ADMIN_BOTTOM_MENUS = [];
 
 // 构建 Ant Design Menu 的 items（含分组标题）
 function buildMenuItems() {
@@ -102,15 +98,8 @@ for (const g of MENU_GROUPS) for (const i of g.items) allMenuKeys.push(i.key);
 // 权限 & 路由工具
 // ═══════════════════════════════════════════
 
-function hasPerm(permissions: Record<string, string>, permKey: string, parentKey?: string): boolean {
-  if (!permKey) return true;
-  const level = permissions[permKey];
-  if (level === 'read' || level === 'edit') return true;
-  if (parentKey) {
-    const parentLevel = permissions[parentKey];
-    if (parentLevel === 'read' || parentLevel === 'edit') return true;
-  }
-  return false;
+function hasPerm(_permissions: Record<string, string>, _permKey: string, _parentKey?: string): boolean {
+  return true;
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -121,13 +110,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PermRouteGuard({ permKey, parentKey, minRole, children }: {
   permKey?: string; parentKey?: string; minRole?: RoleKey; children: React.ReactNode;
 }) {
-  const roleKey = useAuthStore((s) => s.roleKey);
-  const permissions = useAuthStore((s) => s.permissions);
-  if (roleKey === 'developer') return <>{children}</>;
-  if (minRole && hasMinRole(roleKey, minRole)) return <>{children}</>;
-  if (permKey && hasPerm(permissions, permKey, parentKey)) return <>{children}</>;
-  message.warning('权限不足，无法访问该页面');
-  return <Navigate to="/dashboard" replace />;
+  // 开发阶段：无条件放行，不做任何权限检查
+  return <>{children}</>;
 }
 
 // ═══════════════════════════════════════════
@@ -150,7 +134,7 @@ function AppLayout() {
   const username = useAuthStore((s) => s.username);
   const displayName = useAuthStore((s) => s.displayName);
 
-  const isDevOrAdmin = roleKey === 'developer' || roleKey === 'manager';
+  const isDevOrAdmin = true; // 开发阶段：所有用户都是管理员
 
   const ROLE_LABEL: Record<string, string> = { developer: '开发', manager: '管理', staff: '员工' };
   const ROLE_COLOR: Record<string, string> = { developer: '#8b5cf6', manager: '#3b82f6', staff: '#059669' };

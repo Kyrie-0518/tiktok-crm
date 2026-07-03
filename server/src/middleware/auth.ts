@@ -52,19 +52,15 @@ export function signToken(payload: JwtPayload): string {
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: '未登录' });
-  }
-  try {
-    const token = header.slice(7);
-    const db = getDb();
-    const decoded = jwt.verify(token, getJwtSecret(db)) as JwtPayload;
-    req.user = decoded;
-    next();
-  } catch {
-    return res.status(401).json({ error: '登录已过期' });
-  }
+  // 开发阶段：直接放行，不验证 token，固定为 Kyrie
+  req.user = { userId: 1, username: 'Kyrie' };
+  next();
+}
+
+export function optionalAuthMiddleware(req: Request, res: Response, next: NextFunction) {
+  // 开发阶段：直接放行，不验证 token，固定为 Kyrie
+  req.user = { userId: 1, username: 'Kyrie' };
+  next();
 }
 
 export default authMiddleware;
