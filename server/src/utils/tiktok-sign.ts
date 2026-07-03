@@ -62,8 +62,8 @@ export function buildSignedRequest(
   // 从 endpoint 推断 API category（orders → order, products → product 等）
   const rawCategory = endpoint.split('/')[0] || endpoint;
   const category = CATEGORY_MAP[rawCategory] || rawCategory;
-  const base = `https://open-api.tiktokglobalshop.com/api/${category}/${apiVersion}/${endpoint}`;
-  const pathname = `/api/${category}/${apiVersion}/${endpoint}`;
+  const base = `https://open-api.tiktokglobalshop.com/${category}/${apiVersion}/${endpoint}`;
+  const pathname = `/${category}/${apiVersion}/${endpoint}`;
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const bodyStr = body && Object.keys(body).length > 0 ? JSON.stringify(body) : '';
