@@ -98,8 +98,14 @@ export class TikTokAPI {
 
   // ─── 店铺 API ──────────────────────────────────
 
-  /** 获取授权店铺列表 */
+  /** 
+   * 获取授权店铺列表 (DEPRECATED: 此方法路径错误)
+   * 正确的 API 路径是 /authorization/202309/shops，不走 CATEGORY_MAP 映射
+   * 请使用 tiktok-oauth.ts 中的 getAuthorizedShops(accessToken) 函数
+   */
   async getAuthorizedShops() {
+    // TODO: 修复 CATEGORY_MAP 使其支持 authorization 类别
+    // 当前路径错误，返回 shop/get_authorized_shop 在 TikTok API 中不存在
     return this.get('shop/get_authorized_shop');
   }
 

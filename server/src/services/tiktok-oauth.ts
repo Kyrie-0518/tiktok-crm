@@ -46,7 +46,8 @@ export async function apiCall(
   const appKey = apiAppKey();
   const apiBase = env('TIKTOK_API_BASE', 'https://open-api.tiktokglobalshop.com');
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const params: Record<string, string> = { app_key: appKey, sign_method: 'HMAC-SHA256', timestamp, ...extraParams };
+  // 官方 SDK 不传 sign_method 参数，否则签名结果与 SDK 不一致
+  const params: Record<string, string> = { app_key: appKey, timestamp, ...extraParams };
   params.sign = sign(params, path, opts?.body);
 
   const url = `${apiBase}${path}?${new URLSearchParams(params)}`;
@@ -199,7 +200,7 @@ export async function refreshToken(refreshTokenStr: string): Promise<{
     app_key: appKey,
     app_secret: appSecret,
     refresh_token: refreshTokenStr,
-    grant_type: 'refresh_token',
+    grant_type: 'authorized_code',
   });
   const url = `${AUTH_HOST}/api/v2/token/refresh?${params}`;
 
@@ -244,7 +245,8 @@ export async function testConnection(accessToken: string, _shopCipher?: string) 
 
   // Try 2: 获取订单列表
   try {
-    const result = await apiCall('/order/202309/orders/list', accessToken, { page_size: '1' });
+    // 正确路径: POST /order/202309/orders/search (官方SDK)
+    const result = await apiCall('/order/202309/orders/search', accessToken, { page_size: '1' }, { method: 'POST', body: { page_size: 1 } });
     return { endpoint: 'orders', data: result };
   } catch (e: any) { errors.push(`orders: ${e.message}`); }
 
