@@ -26,8 +26,13 @@ export class TikTokAPI {
     const { url, headers } = buildSignedRequest(this.auth, endpoint, queryParams, body);
 
     const fetchOptions: RequestInit = { method, headers };
-    if (body && method === 'POST') {
+    // 只在有 body 时设置 Content-Type，避免空 body 的 POST 被拒绝
+    const hasBody = body && Object.keys(body).length > 0;
+    if (hasBody && method === 'POST') {
       fetchOptions.body = JSON.stringify(body);
+    } else {
+      // 移除 Content-Type，让 fetch 自动处理
+      delete (fetchOptions.headers as Record<string, string>)['Content-Type'];
     }
 
     const res = await fetch(url, fetchOptions);
@@ -65,18 +70,46 @@ export class TikTokAPI {
     return this.get('orders', { ids });
   }
 
-  /** 搜索/获取订单列表 */
+  /** 搜索/获取订单列表 — 严格匹配官方 SDK OrdersSearchPost */
   async getOrderList(params: {
     order_status?: string;
     page_size?: number;
     page_token?: string;
+    sort_by?: string;
+    sort_type?: string;
+    sort_field?: string;
+    sort_order?: string;
     create_time_from?: number;
     create_time_to?: number;
     update_time_from?: number;
     update_time_to?: number;
+    buyer_user_id?: string;
     [key: string]: any;
   }) {
-    return this.post('orders/search', params);
+    // 官方 SDK: page_size / sort_* / page_token 在 URL 参数中
+    const queryParams: Record<string, string> = {};
+    if (params.page_size) queryParams['page_size'] = String(params.page_size);
+    if (params.page_token) queryParams['page_token'] = params.page_token;
+    if (params.sort_by) queryParams['sort_by'] = params.sort_by;
+    if (params.sort_type) queryParams['sort_type'] = params.sort_type;
+    if (params.sort_field) queryParams['sort_field'] = params.sort_field;
+    if (params.sort_order) queryParams['sort_order'] = params.sort_order;
+
+    // 官方 SDK: 过滤参数在 POST body 中 (GetOrderListRequestBody)
+    const body: Record<string, any> = {};
+    if (params.order_status) body['order_status'] = params.order_status;
+    if (params.create_time_from) body['create_time_ge'] = params.create_time_from;
+    if (params.create_time_to) body['create_time_lt'] = params.create_time_to;
+    if (params.update_time_from) body['update_time_ge'] = params.update_time_from;
+    if (params.update_time_to) body['update_time_lt'] = params.update_time_to;
+    if (params.buyer_user_id) body['buyer_user_id'] = params.buyer_user_id;
+
+    return this.request(
+      'POST',
+      'orders/search',
+      Object.keys(queryParams).length > 0 ? queryParams : undefined,
+      Object.keys(body).length > 0 ? body : undefined,
+    );
   }
 
   /** 获取订单价格详情 (需要 202407+) */

@@ -218,7 +218,7 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
   const shop = db.prepare('SELECT * FROM tiktok_shops WHERE id = ?').get(shopId) as any;
 
   if (!shop || !shop.access_token) {
-    return { success: false, message: '缺少 API 凭证' };
+    return { success: false, message: '缺少 access_token，请重新授权店铺' };
   }
   if (!shop.app_key && !process.env.TIKTOK_APP_KEY) {
     return { success: false, message: '缺少 App Key，请在环境变量中配置 TIKTOK_APP_KEY' };
@@ -234,6 +234,15 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
     api_version: shop.api_version || '202309',
   });
 
+  console.log('[testApiConnection] 店铺信息:', {
+    id: shop.id,
+    name: shop.name,
+    has_token: !!shop.access_token,
+    has_cipher: !!shop.shop_cipher,
+    has_app_key: !!appKey,
+    api_base: process.env.TIKTOK_API_BASE || '(default)',
+  });
+
   try {
     // 拉订单列表第1页（1条）测试连通性
     const resp = await api.getOrderList({ page_size: 1 });
@@ -243,7 +252,17 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
     }
     return { success: true, message: '连接成功' };
   } catch (e: any) {
-    console.error('[testApiConnection] TikTok API 连接失败:', e.message, e);
-    return { success: false, message: `连接失败: ${e.message || e}` };
+    // 详细打印错误原因，便于排查
+    console.error('[testApiConnection] ❌ TikTok API 连接失败');
+    console.error('  message:', e.message);
+    console.error('  name:', e.name);
+    if (e.cause) {
+      console.error('  cause:', e.cause);
+      console.error('  cause.code:', e.cause?.code);
+      console.error('  cause.message:', e.cause?.message);
+    }
+    if (e.stack) console.error('  stack:', e.stack.split('\n').slice(0, 3).join('\n'));
+    
+    return { success: false, message: `连接失败: ${e.message || JSON.stringify(e)}` };
   }
 }

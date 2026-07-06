@@ -1,3 +1,7 @@
+// ⚠️ 必须在所有 import 之前加载环境变量
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -48,10 +52,6 @@ for (const [col, sql] of tikApiMigrations) {
   }
 }
 
-
-// Load environment variables
-import dotenv from 'dotenv';
-dotenv.config();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
