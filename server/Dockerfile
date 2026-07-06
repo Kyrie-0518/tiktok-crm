@@ -3,8 +3,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# 安装编译 better-sqlite3 需要的工具 + wget（健康检查用）
-RUN apk add --no-cache python3 make g++ wget
+# 安装编译 better-sqlite3 需要的工具 + wget + CA证书 + DNS工具
+# ca-certificates: Node.js fetch 发 HTTPS 请求必需
+# bind-tools: 提供 dig/nslookup 用于网络诊断
+RUN apk add --no-cache python3 make g++ wget ca-certificates bind-tools
+
+# 更新 CA 证书列表（确保 TLS 验证通过）
+RUN update-ca-certificates
 
 # 复制依赖文件
 COPY package.json package-lock.json ./

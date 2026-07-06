@@ -224,6 +224,22 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
     return { success: false, message: '缺少 App Key，请在环境变量中配置 TIKTOK_APP_KEY' };
   }
 
+  // 如果数据库没有 shop_cipher，尝试自动补全
+  if (!shop.shop_cipher && shop.access_token) {
+    console.log('[testApiConnection] shop_cipher 为空，尝试从 TikTok API 获取...');
+    try {
+      const { getAuthorizedShops } = require('../services/tiktok-oauth');
+      const shops = await getAuthorizedShops(shop.access_token);
+      if (shops.length > 0 && shops[0].cipher) {
+        shop.shop_cipher = shops[0].cipher;
+        db.prepare('UPDATE tiktok_shops SET shop_cipher = ? WHERE id = ?').run(shop.shop_cipher, shopId);
+        console.log('[testApiConnection] ✅ 已获取并保存 shop_cipher');
+      }
+    } catch (e: any) {
+      console.warn('[testApiConnection] ⚠️ 自动获取 shop_cipher 失败:', e.message);
+    }
+  }
+
   const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
   const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
   const api = new TikTokAPI({
@@ -234,25 +250,26 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
     api_version: shop.api_version || '202309',
   });
 
-  console.log('[testApiConnection] 店铺信息:', {
-    id: shop.id,
-    name: shop.name,
-    has_token: !!shop.access_token,
-    has_cipher: !!shop.shop_cipher,
-    has_app_key: !!appKey,
-    api_base: process.env.TIKTOK_API_BASE || '(default)',
-  });
+  const apiBase = process.env.TIKTOK_API_BASE || 'https://open-api.tiktokglobalshop.com';
+  console.log('[testApiConnection] ==================== 测试连接 ====================');
+  console.log('[testApiConnection] 店铺:', { id: shop.id, name: shop.name, shop_id: shop.shop_id });
+  console.log('[testApiConnection] API Base:', apiBase);
+  console.log('[testApiConnection] 凭证检测:');
+  console.log('  access_token:', shop.access_token ? `✅ (${shop.access_token.slice(0, 8)}...)` : '❌ 缺失');
+  console.log('  shop_cipher:', shop.shop_cipher ? `✅ (${shop.shop_cipher.slice(0, 8)}...)` : '❌ 缺失');
+  console.log('  app_key:', appKey ? `✅ (${appKey.slice(0, 8)}...)` : '❌ 缺失');
+  console.log('  api_version:', shop.api_version || '202309');
 
   try {
     // 拉订单列表第1页（1条）测试连通性
     const resp = await api.getOrderList({ page_size: 1 });
+    console.log('[testApiConnection] ✅ 响应:', JSON.stringify(resp).slice(0, 300));
     const list = resp?.data?.orders || resp?.data?.order_list;
     if (Array.isArray(list)) {
       return { success: true, message: `连接成功，共 ${resp?.data?.total || list.length} 条订单可同步` };
     }
     return { success: true, message: '连接成功' };
   } catch (e: any) {
-    // 详细打印错误原因，便于排查
     console.error('[testApiConnection] ❌ TikTok API 连接失败');
     console.error('  message:', e.message);
     console.error('  name:', e.name);
@@ -261,7 +278,7 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
       console.error('  cause.code:', e.cause?.code);
       console.error('  cause.message:', e.cause?.message);
     }
-    if (e.stack) console.error('  stack:', e.stack.split('\n').slice(0, 3).join('\n'));
+    if (e.stack) console.error('  stack:', e.stack.split('\n').slice(0, 4).join('\n'));
     
     return { success: false, message: `连接失败: ${e.message || JSON.stringify(e)}` };
   }

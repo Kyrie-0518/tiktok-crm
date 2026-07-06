@@ -32,6 +32,10 @@ services:
       timeout: 10s
       retries: 3
     mem_limit: 1g
+    # DNS 备用，确保容器能解析 TikTok API 域名
+    dns:
+      - 8.8.8.8
+      - 114.114.114.114
     networks:
       - bozone-net
 

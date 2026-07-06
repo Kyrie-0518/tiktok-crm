@@ -35,7 +35,23 @@ export class TikTokAPI {
       delete (fetchOptions.headers as Record<string, string>)['Content-Type'];
     }
 
-    const res = await fetch(url, fetchOptions);
+    console.log(`[TikTokAPI] → ${method} ${url}`);
+    if (body && Object.keys(body).length > 0) {
+      console.log(`[TikTokAPI]   body:`, JSON.stringify(body).slice(0, 200));
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(url, fetchOptions);
+    } catch (fetchErr: any) {
+      console.error(`[TikTokAPI] ❌ fetch() 底层失败:`);
+      console.error(`  URL: ${url}`);
+      console.error(`  message: ${fetchErr.message}`);
+      console.error(`  cause:`, fetchErr.cause ? JSON.stringify(fetchErr.cause) : 'none');
+      console.error(`  code: ${fetchErr.code || 'none'}`);
+      throw new Error(`网络连接失败: ${fetchErr.message || fetchErr} (${url})`);
+    }
+
     const text = await res.text();
 
     if (!res.ok) {
@@ -44,6 +60,7 @@ export class TikTokAPI {
         const errJson = JSON.parse(text);
         errMsg = errJson.message || errJson.msg || errMsg;
       } catch {}
+      console.error(`[TikTokAPI] ❌ HTTP ${res.status}:`, text.slice(0, 500));
       throw new Error(`[${res.status}] ${errMsg}`);
     }
 

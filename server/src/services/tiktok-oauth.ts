@@ -233,20 +233,26 @@ export async function getAuthorizedShops(accessToken: string) {
   }));
 }
 
-// ── 测试连接 ──
-export async function testConnection(accessToken: string, _shopCipher?: string) {
+// ── 测试连接（需要 shop_cipher 用于订单 API）──
+export async function testConnection(accessToken: string, shopCipher?: string) {
   const errors: string[] = [];
 
-  // Try 1: 获取已授权店铺列表
+  // Try 1: 获取已授权店铺列表（不需要 shop_cipher）
   try {
     const result = await apiCall('/authorization/202309/shops', accessToken);
     return { endpoint: 'shops', data: result };
   } catch (e: any) { errors.push(`shops: ${e.message}`); }
 
-  // Try 2: 获取订单列表
+  if (!shopCipher) {
+    throw new Error(`缺少 shop_cipher，无法测试订单 API (已尝试 shops: ${errors.join('; ')})`);
+  }
+
+  // Try 2: 获取订单列表（POST body 只放过滤参数，page_size 在 URL 参数）
   try {
-    // 正确路径: POST /order/202309/orders/search (官方SDK)
-    const result = await apiCall('/order/202309/orders/search', accessToken, { page_size: '1' }, { method: 'POST', body: { page_size: 1 } });
+    const result = await apiCall('/order/202309/orders/search', accessToken,
+      { page_size: '1', shop_cipher: shopCipher },
+      { method: 'POST' },
+    );
     return { endpoint: 'orders', data: result };
   } catch (e: any) { errors.push(`orders: ${e.message}`); }
 
