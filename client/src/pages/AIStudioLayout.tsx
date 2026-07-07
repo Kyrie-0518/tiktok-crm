@@ -7,7 +7,7 @@ import {
   FileImageOutlined, PayCircleOutlined, ColumnHeightOutlined,
   FolderOpenOutlined, SendOutlined, ExclamationCircleOutlined,
   BarChartOutlined, UserOutlined, ThunderboltOutlined,
-  ArrowLeftOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
 import AIStudio from './AIStudio';
@@ -65,7 +65,6 @@ const STUDIO_MENU_GROUPS = [
     label: 'AI 智创视频',
     items: [
       { key: '/ai-studio/seedance', icon: <RobotOutlined />, label: 'AI视频生成' },
-      { key: '/ai-studio/video-models', icon: <VideoCameraOutlined />, label: '视频模型配置' },
       { key: '/ai-studio/material-library', icon: <PictureOutlined />, label: '素材库' },
       { key: '/ai-studio/raw-materials', icon: <FileImageOutlined />, label: '原料素材' },
     ],
@@ -112,7 +111,6 @@ for (const g of STUDIO_MENU_GROUPS) for (const i of g.items) allStudioKeys.push(
 export default function AIStudioLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [siderCollapsed, setSiderCollapsed] = React.useState(false);
   const username = useAuthStore((s) => s.username);
   const roleKey = useAuthStore((s) => s.roleKey);
 
@@ -288,12 +286,9 @@ export default function AIStudioLayout() {
         </div>
 
         <Layout style={{ paddingTop: HEADER_H, minHeight: '100vh', background: 'var(--studio-bg)' }}>
-          {/* 左侧边栏 */}
+          {/* 左侧边栏 — 固定 220px，不再支持折叠 */}
           <Sider
             width={220}
-            collapsedWidth={56}
-            collapsible
-            collapsed={siderCollapsed}
             trigger={null}
             className="studio-sider"
             style={{
@@ -301,35 +296,18 @@ export default function AIStudioLayout() {
               position: 'fixed', left: 0, top: HEADER_H, bottom: 0,
               overflow: 'hidden', zIndex: 100,
               borderRight: '1px solid var(--studio-border)',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               display: 'flex', flexDirection: 'column',
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* 展开/折叠按钮 */}
-              {!siderCollapsed && (
-                <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'flex-end' }}>
-                  <div
-                    onClick={() => setSiderCollapsed(!siderCollapsed)}
-                    style={{
-                      display: 'flex', justifyContent: 'center', alignItems: 'center',
-                      width: 24, height: 24, borderRadius: 4,
-                      cursor: 'pointer', color: 'var(--studio-text-tertiary)', fontSize: 12,
-                    }}
-                  >
-                    <MenuFoldOutlined />
-                  </div>
-                </div>
-              )}
-
-              {/* 主菜单 */}
+              {/* 主菜单（无折叠按钮） */}
               <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
                 <Menu
                   mode="inline"
                   selectedKeys={getSelectedKeys()}
                   items={menuItems}
                   onClick={handleMenuClick}
-                  inlineCollapsed={siderCollapsed}
+                  inlineCollapsed={false}
                   inlineIndent={14}
                   style={{
                     borderRight: 0,
@@ -340,63 +318,33 @@ export default function AIStudioLayout() {
                 />
               </div>
 
-              {/* 折叠展开按钮 */}
-              {siderCollapsed && (
-                <div style={{ borderTop: '1px solid var(--studio-border)', padding: '6px 0' }}>
-                  <div
-                    onClick={() => setSiderCollapsed(!siderCollapsed)}
-                    style={{
-                      display: 'flex', justifyContent: 'center', alignItems: 'center',
-                      padding: '4px 0', borderRadius: 4,
-                      cursor: 'pointer', color: 'var(--studio-text-tertiary)', fontSize: 13,
-                    }}
-                  >
-                    <MenuUnfoldOutlined />
-                  </div>
-                </div>
-              )}
-
               {/* 返回主系统按钮 */}
               <div style={{
                 borderTop: '1px solid var(--studio-border)',
-                padding: siderCollapsed ? '8px 0' : '8px 12px',
+                padding: '8px 12px',
                 backgroundColor: 'var(--studio-sider-bg)',
               }}>
-                {siderCollapsed ? (
-                  <div
-                    onClick={handleBack}
-                    style={{
-                      display: 'flex', justifyContent: 'center', cursor: 'pointer',
-                      color: 'var(--studio-text-tertiary)', fontSize: 16, padding: '4px 0',
-                    }}
-                    title="返回主系统"
-                  >
-                    <ArrowLeftOutlined />
-                  </div>
-                ) : (
-                  <Button
-                    type="text"
-                    icon={<ArrowLeftOutlined />}
-                    onClick={handleBack}
-                    style={{
-                      width: '100%', justifyContent: 'flex-start',
-                      color: 'var(--studio-bottom-item-color)',
-                      borderRadius: 8, paddingLeft: 8,
-                      fontSize: 14,
-                    }}
-                  >
-                    <Text style={{ fontSize: 14, color: 'var(--studio-bottom-item-color)' }}>返回主系统</Text>
-                  </Button>
-                )}
+                <Button
+                  type="text"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={handleBack}
+                  style={{
+                    width: '100%', justifyContent: 'flex-start',
+                    color: 'var(--studio-bottom-item-color)',
+                    borderRadius: 8, paddingLeft: 8,
+                    fontSize: 14,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: 'var(--studio-bottom-item-color)' }}>返回主系统</Text>
+                </Button>
               </div>
             </div>
           </Sider>
 
-          {/* 内容区 */}
+          {/* 内容区 — 固定 marginLeft: 220 */}
           <Layout style={{
-            marginLeft: siderCollapsed ? 56 : 220,
+            marginLeft: 220,
             background: 'var(--studio-bg)',
-            transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             minHeight: `calc(100vh - ${HEADER_H}px)`,
           }}>
             <Content
