@@ -95,9 +95,12 @@ export function buildSignedRequest(
     });
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     'x-tts-access-token': auth.access_token,
   };
+  // 只在有 body 时设置 Content-Type
+  if (body && Object.keys(body).length > 0) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   return { url: url.toString(), headers };
 }

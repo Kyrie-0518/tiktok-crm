@@ -52,19 +52,27 @@ export async function apiCall(
   const params: Record<string, string> = { app_key: appKey, timestamp, ...extraParams };
   params.sign = sign(params, path, opts?.body);
 
+  const method = opts?.method || 'GET';
+  const bodyJson = opts?.body ? JSON.stringify(opts?.body) : undefined;
   const url = `${apiBase}${path}?${new URLSearchParams(params)}`;
-  console.log(`[TikTok API] ${opts?.method || 'GET'} ${path}`);
 
-  const res = await fetch(url, {
-    method: opts?.method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-tts-access-token': accessToken,
-    },
-    body: opts?.body ? JSON.stringify(opts?.body) : undefined,
-  });
+  // GET 不带 Content-Type，POST 有 body 才带
+  const headers: Record<string, string> = {
+    'x-tts-access-token': accessToken,
+  };
+  if (bodyJson) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  console.log(`[TikTok API] ${method} ${path}`);
+  console.log(`[TikTok API] URL: ${url}`);
+  console.log(`[TikTok API] Body: ${bodyJson || '(none)'}`);
+
+  const res = await fetch(url, { method, headers, body: bodyJson });
 
   const text = await res.text();
+  console.log(`[TikTok API] Response ${res.status}: ${text.slice(0, 500)}`);
+
   let json: any;
   try { json = JSON.parse(text); } catch { throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`); }
   if (json.code !== undefined && json.code !== 0) {
@@ -249,11 +257,11 @@ export async function testConnection(accessToken: string, shopCipher?: string) {
     throw new Error(`缺少 shop_cipher，无法测试订单 API (已尝试 shops: ${errors.join('; ')})`);
   }
 
-  // Try 2: 获取订单列表（POST body 只放过滤参数，page_size 在 URL 参数）
+  // Try 2: 获取订单列表（POST body 传 page_size）
   try {
     const result = await apiCall('/order/202309/orders/search', accessToken,
-      { page_size: '1', shop_cipher: shopCipher },
-      { method: 'POST' },
+      { shop_cipher: shopCipher },
+      { method: 'POST', body: { page_size: 1 } },
     );
     return { endpoint: 'orders', data: result };
   } catch (e: any) { errors.push(`orders: ${e.message}`); }
