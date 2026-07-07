@@ -23,6 +23,7 @@ function apiAppSecret(): string {
 }
 
 // ── API 签名 (官方 HMAC-SHA256) ──
+// 与 tiktok-sign.ts generateSign 保持一致：空 body 不参与签名
 function sign(params: Record<string, string>, path: string, body?: any): string {
   const appSecret = apiAppSecret();
   const sorted = Object.keys(params)
@@ -31,6 +32,7 @@ function sign(params: Record<string, string>, path: string, body?: any): string 
     .map(k => `${k}${params[k]}`)
     .join('');
   let str = `${path}${sorted}`;
+  // 官方规则：只有非空 body 才参与签名（Object.keys(body).length > 0）
   if (body && typeof body === 'object' && Object.keys(body).length > 0) {
     str += JSON.stringify(body);
   }

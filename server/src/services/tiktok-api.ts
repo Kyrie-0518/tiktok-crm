@@ -26,9 +26,12 @@ export class TikTokAPI {
     const { url, headers } = buildSignedRequest(this.auth, endpoint, queryParams, body);
 
     const fetchOptions: RequestInit = { method, headers };
-    if (method === 'POST') {
-      // POST 请求必须带 application/json，即使没有 body 也传 {}
-      fetchOptions.body = (body && Object.keys(body).length > 0) ? JSON.stringify(body) : '{}';
+    // 只有在有实际 body 数据时才设置 body，否则不发 body（避免签名不一致）
+    if (body && Object.keys(body).length > 0 && method === 'POST') {
+      fetchOptions.body = JSON.stringify(body);
+    } else if (method === 'POST') {
+      // POST 无 body 时删除 Content-Type，避免 415 错误
+      delete (fetchOptions.headers as Record<string, string>)['Content-Type'];
     }
 
     console.log(`[TikTokAPI] → ${method} ${url}`);
