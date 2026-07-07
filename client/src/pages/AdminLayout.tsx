@@ -260,7 +260,15 @@ export default function AdminLayout() {
                 background: 'var(--admin-bg)',
               }}
             >
-              <ActiveComponent />
+              <div style={{
+                background: '#fff',
+                borderRadius: 12,
+                padding: 24,
+                minHeight: 'calc(100vh - 64px - 48px)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              }}>
+                <ActiveComponent />
+              </div>
             </Content>
           </Layout>
         </Layout>
