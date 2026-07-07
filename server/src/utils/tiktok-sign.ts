@@ -63,9 +63,12 @@ export function buildSignedRequest(
   const rawCategory = endpoint.split('/')[0] || endpoint;
   const category = CATEGORY_MAP[rawCategory] || rawCategory;
   // 使用环境变量 TIKTOK_API_BASE，支持沙箱/生产环境切换
-  const apiBase = process.env.TIKTOK_API_BASE || 'https://open-api.tiktokglobalshop.com';
+  // 官方 SDK 默认 basePath: https://open-api.tiktokglobalshop.com/api (含 /api)
+  const apiBase = (process.env.TIKTOK_API_BASE || 'https://open-api.tiktokglobalshop.com/api').replace(/\/$/, '');
+  const apiBaseUrl = new URL(apiBase);
+  const pathnamePrefix = apiBaseUrl.pathname.replace(/\/$/, '');
   const base = `${apiBase}/${category}/${apiVersion}/${endpoint}`;
-  const pathname = `/${category}/${apiVersion}/${endpoint}`;
+  const pathname = `${pathnamePrefix}/${category}/${apiVersion}/${endpoint}`;
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
   // 签名只包含有实际数据的 body，空对象不参与签名（官方规则）
@@ -94,13 +97,12 @@ export function buildSignedRequest(
       url.searchParams.set(key, allParams[key]);
     });
 
+  // ⚠️ 官方 SDK 对所有请求（包括 GET）都设置 Content-Type: application/json
+  // 参见 nodejs_sdk/client/create-trans-request-options.ts 第46-51行
   const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
     'x-tts-access-token': auth.access_token,
   };
-  // 只在有 body 时设置 Content-Type
-  if (body && Object.keys(body).length > 0) {
-    headers['Content-Type'] = 'application/json';
-  }
 
   return { url: url.toString(), headers };
 }
