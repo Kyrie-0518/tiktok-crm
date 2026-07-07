@@ -14,6 +14,15 @@ export interface Shop {
   created_at: string;
 }
 
+export interface TikTokShop {
+  id: number;
+  name: string;
+  region: string;
+  status: string;
+  product_sync_enabled: number;
+  access_token?: string;
+}
+
 /** @deprecated Use ProductSku instead. Kept for legacy product_specs compatibility. */
 export interface ProductSpec {
   id?: number;
@@ -63,14 +72,24 @@ export interface Product {
   created_at?: string;
 }
 
+export interface SyncResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
 interface ProductState {
   products: Product[];
   suppliers: Supplier[];
   shopList: string[];
+  tiktokShops: TikTokShop[];
   loading: boolean;
+  syncing: boolean;
   fetchProducts: (keyword?: string, shopName?: string) => Promise<void>;
   fetchSuppliers: () => Promise<void>;
   fetchShops: () => Promise<void>;
+  fetchTikTokShops: () => Promise<void>;
   fetchProduct: (id: number) => Promise<Product>;
   createProduct: (data: any) => Promise<void>;
   updateProduct: (id: number, data: any) => Promise<void>;
@@ -80,21 +99,28 @@ interface ProductState {
   createSupplier: (data: any) => Promise<void>;
   updateSupplier: (id: number, data: any) => Promise<void>;
   deleteSupplier: (id: number) => Promise<void>;
+  syncFromTikTok: (shopId: number) => Promise<SyncResult>;
 }
 
 export const useProductStore = create<ProductState>((set, get) => ({
   products: [],
   suppliers: [],
   shopList: [],
+  tiktokShops: [],
   loading: false,
+  syncing: false,
 
   fetchProducts: async (keyword?: string, shopName?: string) => {
     set({ loading: true });
-    const params: any = {};
-    if (keyword) params.keyword = keyword;
-    if (shopName) params.shop_name = shopName;
-    const { data } = await api.get('/products', { params });
-    set({ products: data, loading: false });
+    try {
+      const params: any = {};
+      if (keyword) params.keyword = keyword;
+      if (shopName) params.shop_name = shopName;
+      const { data } = await api.get('/products', { params });
+      set({ products: data, loading: false });
+    } catch {
+      set({ loading: false });
+    }
   },
 
   fetchSuppliers: async () => {
@@ -105,6 +131,25 @@ export const useProductStore = create<ProductState>((set, get) => ({
   fetchShops: async () => {
     const { data } = await api.get('/shops');
     set({ shopList: data.map((s: any) => s.name) });
+    // Also cache TikTok shops for sync
+    set({ tiktokShops: data.filter((s: any) => s.access_token || s.shop_cipher).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      region: s.region || '',
+      status: s.status || '',
+      product_sync_enabled: s.product_sync_enabled || 0,
+    })) });
+  },
+
+  fetchTikTokShops: async () => {
+    const { data } = await api.get('/shops');
+    set({ tiktokShops: data.filter((s: any) => s.access_token || s.shop_cipher).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      region: s.region || '',
+      status: s.status || '',
+      product_sync_enabled: s.product_sync_enabled || 0,
+    })) });
   },
 
   fetchProduct: async (id: number) => {
@@ -150,6 +195,21 @@ export const useProductStore = create<ProductState>((set, get) => ({
   deleteSupplier: async (id: number) => {
     await api.delete(`/products/suppliers/${id}`);
     get().fetchSuppliers();
+  },
+
+  /** 从 TikTok 同步产品到本地数据库 */
+  syncFromTikTok: async (shopId: number): Promise<SyncResult> => {
+    set({ syncing: true });
+    try {
+      const { data } = await api.post(`/shops/${shopId}/sync-products`);
+      set({ syncing: false });
+      // 同步完成后刷新产品列表
+      get().fetchProducts();
+      return data as SyncResult;
+    } catch {
+      set({ syncing: false });
+      throw new Error('同步请求失败');
+    }
   },
 
 }));

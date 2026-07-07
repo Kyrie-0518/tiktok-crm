@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  Table, Button, Input, Select, Space, Modal, Form, InputNumber, Popconfirm, message, Divider, Tag, Tooltip
+  Table, Button, Input, Select, Space, Modal, Form, InputNumber, Popconfirm, message, Divider, Tag, Tooltip, Spin
 } from 'antd';
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, UploadOutlined, CloseOutlined, UnorderedListOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, UploadOutlined, CloseOutlined, UnorderedListOutlined, AppstoreOutlined, CloudDownloadOutlined, SyncOutlined, CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from '@ant-design/icons';
 import { useProductStore, ProductShop, ProductSku } from '../stores/productStore';
 import { useHasPerm } from '../stores/authStore';
 import type { ColumnsType } from 'antd/es/table';
@@ -10,6 +10,26 @@ import DataTable from '../components/DataTable';
 import ExportButton from '../components/ExportButton';
 
 const BRAND = '#2563eb';
+
+/** Sync result statistic card */
+function ResultCard({ icon, color, bg, label, value }: {
+  icon: React.ReactNode;
+  color: string;
+  bg: string;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div style={{
+      background: bg, borderRadius: 10, padding: '16px 12px',
+      textAlign: 'center', border: `1px solid ${color}20`,
+    }}>
+      <div style={{ fontSize: 24, color, marginBottom: 6 }}>{icon}</div>
+      <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{label}</div>
+    </div>
+  );
+}
 
 export default function Products() {
   const canEdit = useHasPerm('products', 'edit');
@@ -30,6 +50,11 @@ export default function Products() {
   // SKU detail modal (read-only / editable)
   const [skuModalOpen, setSkuModalOpen] = useState(false);
   const [skuModalProduct, setSkuModalProduct] = useState<any>(null);
+  // TikTok sync
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [selectedShopId, setSelectedShopId] = useState<number | undefined>();
+  const [syncResult, setSyncResult] = useState<any>(null);
+  const [syncError, setSyncError] = useState('');
 
   useEffect(() => {
     store.fetchProducts();
@@ -162,6 +187,39 @@ export default function Products() {
       message.success('导出成功');
     } catch {
       message.error('导出失败');
+    }
+  };
+
+  // ============ TikTok Sync ============
+
+  const handleOpenSyncModal = () => {
+    store.fetchTikTokShops();
+    setSyncResult(null);
+    setSyncError('');
+    setSelectedShopId(undefined);
+    setSyncModalOpen(true);
+  };
+
+  const handleSyncStart = async () => {
+    if (!selectedShopId) {
+      message.warning('请先选择要同步的店铺');
+      return;
+    }
+    setSyncResult(null);
+    setSyncError('');
+    try {
+      const result = await store.syncFromTikTok(selectedShopId);
+      setSyncResult(result);
+      if (result.created > 0 || result.updated > 0) {
+        message.success(`同步完成：新增 ${result.created} 个，更新 ${result.updated} 个`);
+      } else if (result.errors.length > 0) {
+        message.warning(`同步部分失败：${result.errors.slice(0, 2).join('；')}`);
+      } else {
+        message.info('无新数据或变更');
+      }
+    } catch (e: any) {
+      setSyncError(e.response?.data?.errors?.[0] || e.message || '同步请求失败，请检查店铺凭证');
+      message.error('同步失败');
     }
   };
 
@@ -339,6 +397,15 @@ export default function Products() {
         <Space>
           {canEdit && <Button icon={<UploadOutlined />} onClick={() => message.info('导入功能：请准备Excel数据后使用')}>导入</Button>}
           <ExportButton onExport={handleExport}>导出Excel</ExportButton>
+          {canEdit && (
+            <Button
+              icon={<CloudDownloadOutlined />}
+              onClick={handleOpenSyncModal}
+              style={{ borderColor: BRAND, color: BRAND }}
+            >
+              同步TikTok产品
+            </Button>
+          )}
           {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => openProductModal()}>新增产品</Button>}
         </Space>
       </div>
@@ -782,6 +849,170 @@ export default function Products() {
               );
             }}
           />
+        )}
+      </Modal>
+
+      {/* ========== TikTok Sync Modal ========== */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 16,
+            }}>
+              <CloudDownloadOutlined />
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>同步TikTok产品</div>
+              <div style={{ fontSize: 12, color: '#999', fontWeight: 400 }}>
+                从 TikTok Shop 拉取产品数据到本地
+              </div>
+            </div>
+          </div>
+        }
+        open={syncModalOpen}
+        onCancel={() => setSyncModalOpen(false)}
+        width={560}
+        footer={syncResult ? (
+          <Button type="primary" onClick={() => { setSyncModalOpen(false); store.fetchProducts(); }}>
+            关闭
+          </Button>
+        ) : (
+          <Space>
+            <Button onClick={() => setSyncModalOpen(false)}>取消</Button>
+            <Button
+              type="primary"
+              icon={store.syncing ? <LoadingOutlined /> : <SyncOutlined />}
+              onClick={handleSyncStart}
+              loading={store.syncing}
+              disabled={!selectedShopId}
+              style={{ background: BRAND, borderColor: BRAND }}
+            >
+              开始同步
+            </Button>
+          </Space>
+        )}
+      >
+        {/* Step 1: Select Shop */}
+        {!syncResult && !syncError && (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: '#333', marginBottom: 8 }}>
+                选择要同步的 TikTok 店铺
+              </div>
+              <Select
+                placeholder="请选择已授权的 TikTok 店铺"
+                value={selectedShopId}
+                onChange={v => setSelectedShopId(v)}
+                style={{ width: '100%' }}
+                size="large"
+                showSearch
+                optionFilterProp="label"
+                options={store.tiktokShops.map(s => ({
+                  value: s.id,
+                  label: `${s.name} (${s.region || '未知地区'})`,
+                }))}
+                notFoundContent={
+                  <div style={{ padding: 12, color: '#999', textAlign: 'center' }}>
+                    暂无可同步的 TikTok 店铺，请先到
+                    <a href="/shops" style={{ color: BRAND, marginLeft: 4 }}>店铺管理</a>
+                    {' '}完成授权
+                  </div>
+                }
+              />
+            </div>
+
+            {selectedShopId && (
+              <div style={{
+                background: '#f0f6ff', border: '1px solid #d6e4ff',
+                borderRadius: 8, padding: '12px 16px',
+                color: '#1e40af', fontSize: 13,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <SyncOutlined spin={store.syncing} />
+                  <span style={{ fontWeight: 600 }}>即将从 TikTok 同步</span>
+                </div>
+                <div style={{ color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
+                  同步包括：产品名称、图片、售价、库存、SKU、品牌、类目、描述等完整数据。
+                  <br />已存在的产品将更新，新产品将自动创建。
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Syncing Progress */}
+        {store.syncing && (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <Spin size="large" />
+            <div style={{ marginTop: 16, color: '#666' }}>正在从 TikTok 拉取产品数据...</div>
+          </div>
+        )}
+
+        {/* Sync Error */}
+        {syncError && !store.syncing && (
+          <div style={{
+            background: '#fff2f0', border: '1px solid #ffccc7',
+            borderRadius: 8, padding: 16, marginBottom: 16,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <CloseCircleFilled style={{ color: '#ff4d4f', fontSize: 18 }} />
+              <span style={{ fontWeight: 600, color: '#cf1322' }}>同步失败</span>
+            </div>
+            <div style={{ color: '#666', fontSize: 13 }}>{syncError}</div>
+          </div>
+        )}
+
+        {/* Sync Result */}
+        {syncResult && !store.syncing && (
+          <div>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+              marginBottom: 20,
+            }}>
+              <ResultCard
+                icon={<PlusOutlined />}
+                color="#2563eb"
+                bg="#eff6ff"
+                label="新增产品"
+                value={syncResult.created}
+              />
+              <ResultCard
+                icon={<SyncOutlined />}
+                color="#059669"
+                bg="#ecfdf5"
+                label="更新产品"
+                value={syncResult.updated}
+              />
+              <ResultCard
+                icon={<CheckCircleFilled />}
+                color="#d97706"
+                bg="#fffbeb"
+                label="无变更"
+                value={syncResult.skipped}
+              />
+            </div>
+
+            {syncResult.errors?.length > 0 && (
+              <div style={{
+                background: '#fffbe6', border: '1px solid #ffe58f',
+                borderRadius: 8, padding: '12px 16px',
+              }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: '#ad6800', marginBottom: 8 }}>
+                  ⚠ {syncResult.errors.length} 条错误
+                </div>
+                <div style={{ maxHeight: 120, overflow: 'auto' }}>
+                  {syncResult.errors.map((err: string, i: number) => (
+                    <div key={i} style={{ fontSize: 12, color: '#666', padding: '3px 0', borderBottom: '1px solid #f5f5f5' }}>
+                      {err}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </Modal>
     </div>
