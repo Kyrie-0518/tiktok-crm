@@ -99,14 +99,17 @@ export class TikTokAPI {
     buyer_user_id?: string;
     [key: string]: any;
   }) {
-    // 官方 SDK: 订单搜索参数（page_size / sort_* / page_token 等）在新版接口中放在 POST body
+    // 官方 SDK: page_size / sort_* / page_token 在 URL 参数中
+    const queryParams: Record<string, string> = {};
+    if (params.page_size) queryParams['page_size'] = String(params.page_size);
+    if (params.page_token) queryParams['page_token'] = params.page_token;
+    if (params.sort_by) queryParams['sort_by'] = params.sort_by;
+    if (params.sort_type) queryParams['sort_type'] = params.sort_type;
+    if (params.sort_field) queryParams['sort_field'] = params.sort_field;
+    if (params.sort_order) queryParams['sort_order'] = params.sort_order;
+
+    // 官方 SDK: 过滤参数在 POST body 中 (GetOrderListRequestBody)
     const body: Record<string, any> = {};
-    if (params.page_size) body['page_size'] = params.page_size;
-    if (params.page_token) body['page_token'] = params.page_token;
-    if (params.sort_by) body['sort_by'] = params.sort_by;
-    if (params.sort_type) body['sort_type'] = params.sort_type;
-    if (params.sort_field) body['sort_field'] = params.sort_field;
-    if (params.sort_order) body['sort_order'] = params.sort_order;
     if (params.order_status) body['order_status'] = params.order_status;
     if (params.create_time_from) body['create_time_ge'] = params.create_time_from;
     if (params.create_time_to) body['create_time_lt'] = params.create_time_to;
@@ -117,7 +120,7 @@ export class TikTokAPI {
     return this.request(
       'POST',
       'orders/search',
-      undefined, // 新版接口：所有参数在 POST body 中，URL 参数仅留 app_key/timestamp/shop_cipher
+      Object.keys(queryParams).length > 0 ? queryParams : undefined,
       Object.keys(body).length > 0 ? body : undefined,
     );
   }
