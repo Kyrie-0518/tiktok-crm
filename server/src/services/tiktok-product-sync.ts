@@ -393,14 +393,15 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
   if (!existing) return;
 
   // DEBUG: 打印详情接口关键字段结构（实际字段名）
+  const firstSku = Array.isArray(detail.skus) && detail.skus.length > 0 ? detail.skus[0] : null;
   console.log('[ProductSync] 详情接口字段:', {
     id: detail.id,
     title: detail.title,
     has_main_images: Array.isArray(detail.main_images),
     has_skus: Array.isArray(detail.skus),
     sku_count: Array.isArray(detail.skus) ? detail.skus.length : 0,
-    first_sku_price: Array.isArray(detail.skus) && detail.skus[0]?.price?.sale_price,
-    first_sku_inv: Array.isArray(detail.skus) && detail.skus[0]?.inventory?.[0]?.quantity,
+    first_sku_price: firstSku?.price?.sale_price,
+    first_sku_inv: firstSku?.inventory?.[0]?.quantity,
   });
 
   // 解析详情接口（TikTok API JSON 返回 snake_case 字段名）
@@ -409,9 +410,10 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
   const image = firstMainImg
     ? (firstMainImg.thumb_urls?.[0] || firstMainImg.urls?.[0] || '')
     : '';
-  // 价格：取第一个 SKU 的 price.sale_price
-  const firstSku = Array.isArray(detail.skus) ? detail.skus[0] : null;
+  // 价格：取第一个 SKU 的 price.sale_price / original_price
+  // firstSku 已在上方 debug 日志中定义
   const sellPrice = parseFloat(firstSku?.price?.sale_price || '0') || 0;
+  const originalPrice = parseFloat(firstSku?.price?.original_price || firstSku?.price?.originalPrice || String(sellPrice)) || sellPrice;
   // 库存：所有 SKU 的所有仓库 inventory 求和
   const stock = Array.isArray(detail.skus)
     ? detail.skus.reduce((sum: number, sku: any) => sum + (Array.isArray(sku.inventory)
