@@ -27,6 +27,13 @@ const LOGISTICS_MAP: Record<string, string> = {
   COMPLETED: '已完成',
 };
 
+/** 将秒级 Unix 时间戳转换为 UTC+8 的 ISO 字符串（马来西亚时区） */
+function toUtc8(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  const offset = 8 * 60 * 60 * 1000; // UTC+8
+  return new Date(date.getTime() + offset).toISOString().replace('Z', '');
+}
+
 /** 同步指定店铺的订单 */
 export async function syncShopOrders(shopId: number): Promise<{ created: number; updated: number; errors: string[] }> {
   const db = getDb();
@@ -82,10 +89,26 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
 
       if (orders.length === 0) break;
 
-      // 4. 写入/更新数据库
+      // 4. 获取订单详情（含商品信息）并写入数据库
       for (const order of orders) {
         try {
-          const saved = saveOrder(db, order, shopId);
+          const orderId = order.id || order.order_id || '';
+          let orderDetail = order;
+
+          // TikTok /orders/search 列表只返回概要，商品信息需要获取详情
+          if (orderId) {
+            try {
+              const detailResp = await api.getOrderDetail([orderId]);
+              const detail = detailResp?.data?.orders?.[0] || detailResp?.data?.order_list?.[0];
+              if (detail) {
+                orderDetail = { ...order, ...detail, line_items: detail.line_items || detail.item_list || detail.items || order.line_items };
+              }
+            } catch (detailErr: any) {
+              console.warn(`[order-sync] 获取订单 ${orderId} 详情失败: ${detailErr.message}`);
+            }
+          }
+
+          const saved = saveOrder(db, orderDetail, shopId);
           if (saved === 'created') created++;
           else if (saved === 'updated') updated++;
         } catch (e: any) {
@@ -123,10 +146,10 @@ function saveOrder(db: any, order: any, shopId: number): 'created' | 'updated' |
   const actualAmount = parseFloat(order.total_amount || order.payment?.total_amount || '0') || 0;
   const currency = order.currency || 'MYR';
   const orderTime = order.create_time 
-    ? new Date(order.create_time * 1000).toISOString() 
-    : (order.created_time || new Date().toISOString());
+    ? toUtc8(order.create_time)
+    : (order.created_time || new Date().toISOString().replace('Z', ''));
   const updateTime = order.update_time
-    ? new Date(order.update_time * 1000).toISOString()
+    ? toUtc8(order.update_time)
     : orderTime;
 
   // 收款状态
@@ -179,23 +202,28 @@ function saveOrder(db: any, order: any, shopId: number): 'created' | 'updated' |
 /** 保存订单明细（order_items） */
 function saveOrderItems(db: any, orderId: number, order: any) {
   const items = order.line_items || order.items || order.item_list || [];
-  if (items.length === 0) return;
+  if (items.length === 0) {
+    console.warn(`[saveOrderItems] 订单 ${orderId} 没有商品信息，原始字段:`, Object.keys(order).filter(k => k.includes('item') || k.includes('sku') || k.includes('product')));
+    return;
+  }
 
   // 先删除旧明细再重新插入
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
 
   const insert = db.prepare(`
-    INSERT INTO order_items (order_id, product_id, product_name, sku, price, quantity, item_status, image_url)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO order_items (order_id, product_id, product_name, sku, unit_price, quantity, subtotal, item_status, image_url, spec_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   for (const item of items) {
-    const productName = item.product_name || item.name || '';
-    const sku = item.sku_id || item.seller_sku || '';
-    const price = parseFloat(item.sale_price || item.price || '0') || 0;
-    const quantity = item.quantity || 1;
-    const itemStatus = STATUS_MAP[item.status] || 'pending';
-    const imageUrl = item.sku_image || item.image_url || '';
+    const productName = item.product_name || item.productName || item.name || '';
+    const sku = item.sku_id || item.skuId || item.seller_sku || item.sellerSku || '';
+    const unitPrice = parseFloat(item.sale_price || item.salePrice || item.price || '0') || 0;
+    const quantity = item.quantity || item.qty || 1;
+    const subtotal = unitPrice * quantity;
+    const itemStatus = STATUS_MAP[item.status] || STATUS_MAP[item.display_status] || 'pending';
+    const imageUrl = item.sku_image || item.skuImage || item.image_url || item.imageUrl || '';
+    const specName = item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
 
     // 尝试匹配本地产品
     let productId: number | null = null;
@@ -208,7 +236,7 @@ function saveOrderItems(db: any, orderId: number, order: any) {
       if (localProduct) productId = localProduct.id;
     }
 
-    insert.run(orderId, productId, productName, sku, price, quantity, itemStatus, imageUrl);
+    insert.run(orderId, productId, productName, sku, unitPrice, quantity, subtotal, itemStatus, imageUrl, specName);
   }
 }
 
