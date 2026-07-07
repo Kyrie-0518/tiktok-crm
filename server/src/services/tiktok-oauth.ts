@@ -46,16 +46,11 @@ export async function apiCall(
   opts?: { method?: string; body?: any }
 ) {
   const appKey = apiAppKey();
-  const apiBase = env('TIKTOK_API_BASE', 'https://open-api.tiktokglobalshop.com/api').replace(/\/$/, '');
+  const apiBase = env('TIKTOK_API_BASE', 'https://open-api.tiktokglobalshop.com').replace(/\/$/, '');
   const timestamp = Math.floor(Date.now() / 1000).toString();
   // 官方 SDK 不传 sign_method 参数，否则签名结果与 SDK 不一致
   const params: Record<string, string> = { app_key: appKey, timestamp, ...extraParams };
-
-  // 签名 pathname 必须与 URL 的 pathname 完全一致（含 /api 前缀）
-  const apiBaseUrl = new URL(apiBase);
-  const pathnamePrefix = apiBaseUrl.pathname.replace(/\/$/, '');
-  const signPath = `${pathnamePrefix}${path}`;
-  params.sign = sign(params, signPath, opts?.body);
+  params.sign = sign(params, path, opts?.body);
 
   const method = opts?.method || 'GET';
   const bodyJson = opts?.body ? JSON.stringify(opts?.body) : undefined;
@@ -69,7 +64,6 @@ export async function apiCall(
   };
 
   console.log(`[TikTok API] ${method} ${path}`);
-  console.log(`[TikTok API] Sign Path: ${signPath}`);
   console.log(`[TikTok API] URL: ${url}`);
   console.log(`[TikTok API] Headers:`, headers);
   console.log(`[TikTok API] Body: ${bodyJson || '(none)'}`);
