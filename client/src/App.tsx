@@ -458,31 +458,31 @@ function AppLayout() {
 
         {/* ── 管理后台入口（紧贴底部用户区） ── */}
         {!siderCollapsed && (
-          <div style={{ margin: '0 12px', padding: '6px 0', display: 'flex', justifyContent: 'center' }}>
-            <Tooltip title="管理后台" placement="right">
-              <div
-                onClick={() => navigate('/admin')}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 32, height: 32, borderRadius: 6, cursor: 'pointer',
-                  color: location.pathname === '/admin'
-                    ? 'var(--bo-primary)' : 'var(--bo-bottom-item-color)',
-                  background: location.pathname === '/admin'
-                    ? 'var(--bo-bottom-item-active-bg)' : 'transparent',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                  if (location.pathname !== '/admin')
-                    e.currentTarget.style.background = 'var(--bo-bottom-item-hover-bg)';
-                }}
-                onMouseLeave={e => {
-                  if (location.pathname !== '/admin')
-                    e.currentTarget.style.background = 'transparent';
-                }}
-              >
-                <SafetyOutlined style={{ fontSize: 16 }} />
-              </div>
-            </Tooltip>
+          <div style={{ margin: '0 12px', padding: '4px 0' }}>
+            <div
+              onClick={() => navigate('/admin')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '5px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                color: location.pathname === '/admin'
+                  ? 'var(--bo-bottom-item-active-color)' : 'var(--bo-bottom-item-color)',
+                fontWeight: location.pathname === '/admin' ? 600 : 400,
+                background: location.pathname === '/admin'
+                  ? 'var(--bo-bottom-item-active-bg)' : 'transparent',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                if (location.pathname !== '/admin')
+                  e.currentTarget.style.background = 'var(--bo-bottom-item-hover-bg)';
+              }}
+              onMouseLeave={e => {
+                if (location.pathname !== '/admin')
+                  e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ fontSize: 14, flexShrink: 0 }}><SafetyOutlined /></span>
+              管理后台
+            </div>
           </div>
         )}
         {siderCollapsed && (

@@ -1,13 +1,15 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Layout, Button, Typography, Avatar } from 'antd';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Layout, Button, Typography, Avatar, Menu } from 'antd';
 import {
   SafetyOutlined,
   ArrowLeftOutlined,
-  MenuFoldOutlined, MenuUnfoldOutlined,
+  SettingOutlined, KeyOutlined, AuditOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
-import AdminDashboard from './AdminDashboard';
+import Settings from './Settings';
+import UserPermissions from './UserPermissions';
+import AuditLogs from './AuditLogs';
 
 const { Sider, Content } = Layout;
 const { Text } = Typography;
@@ -26,14 +28,41 @@ const ROLE_LABEL: Record<string, string> = {
   viewer: '访客',
 };
 
+// 管理后台菜单项
+const ADMIN_MENU_ITEMS = [
+  { key: '/admin/settings', icon: <SettingOutlined />, label: '系统配置' },
+  { key: '/admin/permissions', icon: <KeyOutlined />, label: '用户与权限' },
+  { key: '/admin/audit', icon: <AuditOutlined />, label: '操作日志' },
+];
+
+// 组件映射
+const COMPONENT_MAP: Record<string, React.ComponentType> = {
+  '/admin/settings': Settings,
+  '/admin/permissions': UserPermissions,
+  '/admin/audit': AuditLogs,
+};
+
 // ═══════════════════════════════════════════
 // 管理后台布局组件（独立页面，带顶部横栏）
 // ═══════════════════════════════════════════
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const [siderCollapsed, setSiderCollapsed] = React.useState(false);
+  const location = useLocation();
   const username = useAuthStore((s) => s.username);
   const roleKey = useAuthStore((s) => s.roleKey);
+
+  // 获取当前选中菜单
+  const getSelectedKey = (): string => {
+    for (const item of ADMIN_MENU_ITEMS) {
+      if (location.pathname === item.key || location.pathname.startsWith(item.key + '/')) {
+        return item.key;
+      }
+    }
+    return '/admin/settings';
+  };
+
+  const activeKey = getSelectedKey();
+  const ActiveComponent = COMPONENT_MAP[activeKey] || Settings;
 
   const handleBack = () => {
     navigate('/dashboard');
@@ -54,7 +83,6 @@ export default function AdminLayout() {
           --admin-text: #1e293b;
           --admin-text-secondary: #475569;
           --admin-text-tertiary: #94a3b8;
-          --admin-group-label: #94a3b8;
           --admin-selected-bg: rgba(37,99,235,0.08);
           --admin-selected-color: #1d4ed8;
           --admin-bottom-border: #f1efe8;
@@ -70,7 +98,6 @@ export default function AdminLayout() {
           --admin-text: #e8eaed;
           --admin-text-secondary: #9ca3af;
           --admin-text-tertiary: #6b7280;
-          --admin-group-label: #6b7280;
           --admin-selected-bg: rgba(37,99,235,0.14);
           --admin-selected-color: #60a5fa;
           --admin-bottom-border: #252836;
@@ -87,6 +114,25 @@ export default function AdminLayout() {
         .admin-sider {
           box-shadow: 2px 0 8px rgba(0,0,0,0.04) !important;
         }
+
+        /* 菜单样式 */
+        .admin-menu .ant-menu-item {
+          height: 38px !important;
+          line-height: 38px !important;
+          margin: 2px 8px !important;
+          padding-inline: 12px !important;
+          border-radius: 8px !important;
+          font-size: 13.5px;
+        }
+        .admin-menu .ant-menu-item:hover {
+          background: rgba(37,99,235,0.06) !important;
+        }
+        .admin-menu .ant-menu-item-selected {
+          background: rgba(37,99,235,0.10) !important;
+          color: var(--admin-selected-color) !important;
+          font-weight: 600;
+        }
+        .admin-menu .ant-menu-item-selected::after { display: none !important; }
 
         .admin-content::-webkit-scrollbar {
           width: 6px;
@@ -167,12 +213,10 @@ export default function AdminLayout() {
         </div>
 
         <Layout style={{ paddingTop: 56, minHeight: '100vh' }}>
-          {/* ── 左侧边栏 ── */}
+          {/* ── 左侧边栏（无折叠功能） ── */}
           <Sider
             width={220}
-            collapsedWidth={56}
             collapsible
-            collapsed={siderCollapsed}
             trigger={null}
             className="admin-sider"
             style={{
@@ -180,90 +224,67 @@ export default function AdminLayout() {
               position: 'fixed', left: 0, top: 56, bottom: 0,
               overflow: 'hidden', zIndex: 100,
               borderRight: '1px solid var(--admin-border)',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               display: 'flex', flexDirection: 'column',
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* 展开/折叠按钮 */}
-              {!siderCollapsed && (
-                <div style={{
-                  padding: '10px 16px',
-                  display: 'flex', justifyContent: 'flex-end',
+              {/* 标题 */}
+              <div style={{
+                minHeight: 50, display: 'flex', alignItems: 'center',
+                padding: '0 16px',
+              }}>
+                <span style={{
+                  fontSize: 15, fontWeight: 700,
+                  color: 'var(--admin-text)', lineHeight: 1.2,
                 }}>
-                  <div
-                    onClick={() => setSiderCollapsed(!siderCollapsed)}
-                    style={{
-                      display: 'flex', justifyContent: 'center', alignItems: 'center',
-                      width: 24, height: 24, borderRadius: 4,
-                      cursor: 'pointer', color: 'var(--admin-text-tertiary)', fontSize: 12,
-                    }}
-                  >
-                    <MenuFoldOutlined />
-                  </div>
-                </div>
-              )}
+                  管理后台
+                </span>
+              </div>
 
-              {/* 内容占位 */}
-              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }} />
-
-              {/* 折叠展开按钮 */}
-              {siderCollapsed && (
-                <div style={{ borderTop: '1px solid var(--admin-border)', padding: '6px 0' }}>
-                  <div
-                    onClick={() => setSiderCollapsed(!siderCollapsed)}
-                    style={{
-                      display: 'flex', justifyContent: 'center', alignItems: 'center',
-                      padding: '4px 0', borderRadius: 4,
-                      cursor: 'pointer', color: 'var(--admin-text-tertiary)', fontSize: 13,
-                    }}
-                  >
-                    <MenuUnfoldOutlined />
-                  </div>
-                </div>
-              )}
+              {/* 菜单 */}
+              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
+                <Menu
+                  mode="inline"
+                  selectedKeys={[activeKey]}
+                  items={ADMIN_MENU_ITEMS.map(item => ({
+                    key: item.key,
+                    icon: item.icon,
+                    label: item.label,
+                  }))}
+                  onClick={({ key }) => navigate(key)}
+                  className="admin-menu"
+                  style={{ borderRight: 0, paddingTop: 2 }}
+                  theme="light"
+                />
+              </div>
 
               {/* 返回主系统按钮 */}
               <div style={{
                 borderTop: '1px solid var(--admin-border)',
-                padding: siderCollapsed ? '8px 0' : '8px 12px',
+                padding: '8px 12px',
                 backgroundColor: 'var(--admin-sider-bg)',
               }}>
-                {siderCollapsed ? (
-                  <div
-                    onClick={handleBack}
-                    style={{
-                      display: 'flex', justifyContent: 'center', cursor: 'pointer',
-                      color: 'var(--admin-text-tertiary)', fontSize: 16, padding: '4px 0',
-                    }}
-                    title="返回主系统"
-                  >
-                    <ArrowLeftOutlined />
-                  </div>
-                ) : (
-                  <Button
-                    type="text"
-                    icon={<ArrowLeftOutlined />}
-                    onClick={handleBack}
-                    style={{
-                      width: '100%', justifyContent: 'flex-start',
-                      color: 'var(--admin-bottom-item-color)',
-                      borderRadius: 8, paddingLeft: 8,
-                      fontSize: 13,
-                    }}
-                  >
-                    <Text style={{ fontSize: 13, color: 'var(--admin-bottom-item-color)' }}>返回主系统</Text>
-                  </Button>
-                )}
+                <Button
+                  type="text"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={handleBack}
+                  style={{
+                    width: '100%', justifyContent: 'flex-start',
+                    color: 'var(--admin-bottom-item-color)',
+                    borderRadius: 8, paddingLeft: 8,
+                    fontSize: 13,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: 'var(--admin-bottom-item-color)' }}>返回主系统</Text>
+                </Button>
               </div>
             </div>
           </Sider>
 
           {/* ── 内容区 ── */}
           <Layout style={{
-            marginLeft: siderCollapsed ? 56 : 220,
+            marginLeft: 220,
             background: 'var(--admin-bg)',
-            transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             minHeight: 'calc(100vh - 56px)',
           }}>
             <Content
@@ -274,7 +295,7 @@ export default function AdminLayout() {
                 background: 'transparent',
               }}
             >
-              <AdminDashboard embedded />
+              <ActiveComponent />
             </Content>
           </Layout>
         </Layout>
