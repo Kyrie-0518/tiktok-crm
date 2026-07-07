@@ -94,13 +94,12 @@ export function buildSignedRequest(
       url.searchParams.set(key, allParams[key]);
     });
 
+  // ⚠️ 官方 SDK 对所有请求（包括 GET）都设置 Content-Type: application/json
+  // 参见 nodejs_sdk/client/create-trans-request-options.ts 第46-51行
   const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
     'x-tts-access-token': auth.access_token,
   };
-  // 只在有 body 时设置 Content-Type
-  if (body && Object.keys(body).length > 0) {
-    headers['Content-Type'] = 'application/json';
-  }
 
   return { url: url.toString(), headers };
 }

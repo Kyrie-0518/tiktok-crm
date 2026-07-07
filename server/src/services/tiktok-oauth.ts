@@ -56,13 +56,12 @@ export async function apiCall(
   const bodyJson = opts?.body ? JSON.stringify(opts?.body) : undefined;
   const url = `${apiBase}${path}?${new URLSearchParams(params)}`;
 
-  // GET 不带 Content-Type，POST 有 body 才带
+  // ⚠️ 官方 SDK 对所有请求都设 Content-Type: application/json
+  // 包括 GET 请求（参见 nodejs_sdk/client/create-trans-request-options.ts）
   const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
     'x-tts-access-token': accessToken,
   };
-  if (bodyJson) {
-    headers['Content-Type'] = 'application/json';
-  }
 
   console.log(`[TikTok API] ${method} ${path}`);
   console.log(`[TikTok API] URL: ${url}`);
@@ -257,11 +256,11 @@ export async function testConnection(accessToken: string, shopCipher?: string) {
     throw new Error(`缺少 shop_cipher，无法测试订单 API (已尝试 shops: ${errors.join('; ')})`);
   }
 
-  // Try 2: 获取订单列表（POST body 传 page_size）
+  // Try 2: 获取订单列表（page_size 在 URL 参数中，与官方 SDK 一致）
   try {
     const result = await apiCall('/order/202309/orders/search', accessToken,
-      { shop_cipher: shopCipher },
-      { method: 'POST', body: { page_size: 1 } },
+      { shop_cipher: shopCipher, page_size: '1' },
+      { method: 'POST' },
     );
     return { endpoint: 'orders', data: result };
   } catch (e: any) { errors.push(`orders: ${e.message}`); }
