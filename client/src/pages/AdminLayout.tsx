@@ -1,30 +1,49 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Button, Typography } from 'antd';
+import { Layout, Button, Typography, Avatar } from 'antd';
 import {
-  SettingOutlined, AuditOutlined, SafetyOutlined,
-  GlobalOutlined, ArrowLeftOutlined,
+  SafetyOutlined,
+  ArrowLeftOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined,
 } from '@ant-design/icons';
+import { useAuthStore } from '../stores/authStore';
 import AdminDashboard from './AdminDashboard';
 
 const { Sider, Content } = Layout;
 const { Text } = Typography;
 
+const ROLE_COLOR: Record<string, string> = {
+  developer: '#2563eb',
+  manager: '#d97706',
+  staff: '#059669',
+  viewer: '#6b7280',
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  developer: '开发者',
+  manager: '管理员',
+  staff: '运营人员',
+  viewer: '访客',
+};
+
 // ═══════════════════════════════════════════
-// 管理后台布局组件（独立页面，类似 AI 工作室）
+// 管理后台布局组件（独立页面，带顶部横栏）
 // ═══════════════════════════════════════════
 export default function AdminLayout() {
   const navigate = useNavigate();
   const [siderCollapsed, setSiderCollapsed] = React.useState(false);
+  const username = useAuthStore((s) => s.username);
+  const roleKey = useAuthStore((s) => s.roleKey);
 
   const handleBack = () => {
     navigate('/dashboard');
   };
 
+  const avatarText = (username || 'User').slice(0, 1).toUpperCase();
+  const userRoleLabel = ROLE_LABEL[roleKey || 'staff'];
+
   return (
     <>
-      {/* ═══ 管理后台样式 ═══ */}
       <style>{`
         :root {
           --admin-primary: #2563eb;
@@ -38,8 +57,6 @@ export default function AdminLayout() {
           --admin-group-label: #94a3b8;
           --admin-selected-bg: rgba(37,99,235,0.08);
           --admin-selected-color: #1d4ed8;
-          --admin-avatar-bg: #dbeafe;
-          --admin-avatar-color: #2563eb;
           --admin-bottom-border: #f1efe8;
           --admin-bottom-item-color: #64748b;
           --admin-bottom-item-hover-bg: rgba(37,99,235,0.04);
@@ -56,8 +73,6 @@ export default function AdminLayout() {
           --admin-group-label: #6b7280;
           --admin-selected-bg: rgba(37,99,235,0.14);
           --admin-selected-color: #60a5fa;
-          --admin-avatar-bg: #1e293b;
-          --admin-avatar-color: #60a5fa;
           --admin-bottom-border: #252836;
           --admin-bottom-item-color: #9ca3af;
           --admin-bottom-item-hover-bg: rgba(37,99,235,0.06);
@@ -65,9 +80,6 @@ export default function AdminLayout() {
           --admin-bottom-item-active-color: #60a5fa;
         }
 
-        .admin-layout {
-          min-height: 100vh;
-        }
         .admin-layout .ant-layout {
           background: transparent;
         }
@@ -91,8 +103,70 @@ export default function AdminLayout() {
         }
       `}</style>
 
-      <div className="admin-layout">
-        <Layout style={{ minHeight: '100vh', background: 'var(--admin-bg)' }}>
+      <div className="admin-layout" style={{ minHeight: '100vh' }}>
+        {/* ═══════════════════════════════════════════
+           ── 顶部横栏（Header） ──
+           ═══════════════════════════════════════════ */}
+        <div style={{
+          height: 56,
+          background: 'var(--admin-sider-bg)',
+          borderBottom: '1px solid var(--admin-border)',
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 20px 0 16px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          {/* ── 左侧：图标 + 标题 + 副标题 ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 8,
+              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+              flexShrink: 0,
+            }}>
+              <SafetyOutlined style={{ color: '#fff', fontSize: 16 }} />
+            </div>
+            <div>
+              <div style={{
+                fontSize: 15, fontWeight: 700,
+                color: 'var(--admin-text)', lineHeight: 1.3,
+              }}>
+                管理后台
+              </div>
+              <div style={{
+                fontSize: 11, color: 'var(--admin-text-tertiary)',
+                marginTop: 1, lineHeight: 1.3,
+              }}>
+                智汇系统管理中心
+              </div>
+            </div>
+          </div>
+
+          {/* ── 右侧：用户角色 + 头像 ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Text style={{
+              fontSize: 13, color: 'var(--admin-text-secondary)',
+              fontWeight: 500, lineHeight: 1,
+            }}>
+              {userRoleLabel}
+            </Text>
+            <Avatar
+              size={28}
+              style={{
+                background: ROLE_COLOR[roleKey || 'staff'],
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 13,
+                flexShrink: 0,
+              }}
+            >
+              {avatarText}
+            </Avatar>
+          </div>
+        </div>
+
+        <Layout style={{ paddingTop: 56, minHeight: '100vh' }}>
           {/* ── 左侧边栏 ── */}
           <Sider
             width={220}
@@ -103,7 +177,7 @@ export default function AdminLayout() {
             className="admin-sider"
             style={{
               background: 'var(--admin-sider-bg)',
-              position: 'fixed', left: 0, top: 0, bottom: 0,
+              position: 'fixed', left: 0, top: 56, bottom: 0,
               overflow: 'hidden', zIndex: 100,
               borderRight: '1px solid var(--admin-border)',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -111,43 +185,24 @@ export default function AdminLayout() {
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* Logo 区域 */}
-              <div style={{
-                minHeight: 50, display: 'flex', alignItems: 'center',
-                justifyContent: siderCollapsed ? 'center' : 'space-between',
-                padding: siderCollapsed ? '0' : '0 12px 0 16px',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 8,
-                    background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 3px 10px rgba(37,99,235,0.3)',
-                    flexShrink: 0,
-                  }}>
-                    <SafetyOutlined style={{ fontSize: 17, color: '#fff' }} />
-                  </div>
-                  {!siderCollapsed && (
-                    <span style={{
-                      fontSize: 15, fontWeight: 700,
-                      color: 'var(--admin-text)', lineHeight: 1.2,
-                    }}>管理后台</span>
-                  )}
-                </div>
-                {!siderCollapsed && (
+              {/* 展开/折叠按钮 */}
+              {!siderCollapsed && (
+                <div style={{
+                  padding: '10px 16px',
+                  display: 'flex', justifyContent: 'flex-end',
+                }}>
                   <div
                     onClick={() => setSiderCollapsed(!siderCollapsed)}
                     style={{
                       display: 'flex', justifyContent: 'center', alignItems: 'center',
                       width: 24, height: 24, borderRadius: 4,
                       cursor: 'pointer', color: 'var(--admin-text-tertiary)', fontSize: 12,
-                      transition: 'all 0.15s',
                     }}
                   >
                     <MenuFoldOutlined />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* 内容占位 */}
               <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }} />
@@ -209,39 +264,16 @@ export default function AdminLayout() {
             marginLeft: siderCollapsed ? 56 : 220,
             background: 'var(--admin-bg)',
             transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-            minHeight: '100vh',
+            minHeight: 'calc(100vh - 56px)',
           }}>
             <Content
               className="admin-content"
               style={{
                 padding: '24px',
-                minHeight: 'calc(100vh)',
+                minHeight: 'calc(100vh - 56px)',
                 background: 'transparent',
               }}
             >
-              {/* 页面标题 */}
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 12,
-                    background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontSize: 20,
-                    boxShadow: '0 4px 14px rgba(37,99,235,0.25)',
-                  }}>
-                    <SafetyOutlined />
-                  </div>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--admin-text)', lineHeight: 1.3 }}>
-                      管理后台
-                    </h2>
-                    <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--admin-text-tertiary)' }}>
-                      智汇系统管理中心
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               <AdminDashboard embedded />
             </Content>
           </Layout>
