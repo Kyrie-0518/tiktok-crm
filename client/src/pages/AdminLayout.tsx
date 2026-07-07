@@ -264,7 +264,8 @@ export default function AdminLayout() {
                 background: '#fff',
                 borderRadius: 12,
                 padding: 20,
-                minHeight: `calc(100vh - ${HEADER_H}px)`,
+                margin: 24,
+                minHeight: `calc(100vh - ${HEADER_H}px - 48px)`,
                 boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
               }}>
                 <ActiveComponent />
