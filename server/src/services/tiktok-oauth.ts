@@ -263,11 +263,11 @@ export async function testConnection(accessToken: string, shopCipher?: string) {
     throw new Error(`缺少 shop_cipher，无法测试订单 API (已尝试 shops: ${errors.join('; ')})`);
   }
 
-  // Try 2: 获取订单列表（page_size 在 URL 参数中，与官方 SDK 一致）
+  // Try 2: 获取订单列表（POST body 传 page_size，新版接口要求）
   try {
     const result = await apiCall('/order/202309/orders/search', accessToken,
-      { shop_cipher: shopCipher, page_size: '1' },
-      { method: 'POST' },
+      { shop_cipher: shopCipher },
+      { method: 'POST', body: { page_size: 1 } },
     );
     return { endpoint: 'orders', data: result };
   } catch (e: any) { errors.push(`orders: ${e.message}`); }
