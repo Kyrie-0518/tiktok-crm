@@ -116,7 +116,7 @@ export default function AuditLogs() {
   ];
 
   return (
-    <div>
+    <div style={{ padding: 24 }}>
       {/* 标题 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
