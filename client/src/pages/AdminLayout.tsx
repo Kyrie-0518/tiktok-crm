@@ -255,9 +255,9 @@ export default function AdminLayout() {
             <Content
               className="admin-content"
               style={{
-                padding: 0,
+                padding: '20px',
                 minHeight: `calc(100vh - ${HEADER_H}px)`,
-                background: '#fff',
+                background: '#f5f3f0',
               }}
             >
               <ActiveComponent />
