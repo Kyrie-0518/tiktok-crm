@@ -125,6 +125,7 @@ function AppLayout() {
   const location = useLocation();
   // 检测是否在AI工作室页面
   const isInAIStudio = location.pathname.startsWith('/ai-studio');
+  const isInAdmin = location.pathname.startsWith('/admin');
   const [searchParams] = React.useMemo(() => {
     // 简单解析 URL search params
     const params = new URLSearchParams(location.search);
@@ -360,7 +361,7 @@ function AppLayout() {
         width={220}
         collapsedWidth={56}
         collapsible
-        collapsed={siderCollapsed || isInAIStudio}
+        collapsed={siderCollapsed || isInAIStudio || isInAdmin}
         trigger={null}
         style={{
           background: 'var(--bo-sider-bg)',
@@ -369,9 +370,9 @@ function AppLayout() {
           borderRight: '1px solid var(--bo-sider-border)',
           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           display: 'flex', flexDirection: 'column',
-          // AI工作室页面隐藏主侧边栏
-          visibility: isInAIStudio ? 'hidden' : 'visible',
-          pointerEvents: isInAIStudio ? 'none' : 'auto',
+          // AI工作室 / 管理后台页面隐藏主侧边栏
+          visibility: (isInAIStudio || isInAdmin) ? 'hidden' : 'visible',
+          pointerEvents: (isInAIStudio || isInAdmin) ? 'none' : 'auto',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -670,13 +671,13 @@ function AppLayout() {
 
       {/* ═══ 主内容区（无 Header） ═══ */}
       <Layout style={{
-        marginLeft: isInAIStudio ? 0 : (siderCollapsed ? 56 : 220),
-        background: isInAIStudio ? 'transparent' : 'var(--bo-content-bg)',
+        marginLeft: (isInAIStudio || isInAdmin) ? 0 : (siderCollapsed ? 56 : 220),
+        background: (isInAIStudio || isInAdmin) ? 'transparent' : 'var(--bo-content-bg)',
         transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <Content style={{
-          padding: isInAIStudio ? 0 : '20px',
-          height: isInAIStudio ? '100%' : '100vh', overflow: 'auto',
+          padding: (isInAIStudio || isInAdmin) ? 0 : '20px',
+          height: (isInAIStudio || isInAdmin) ? '100%' : '100vh', overflow: 'auto',
           background: 'transparent',
         }}>
           <Routes>
