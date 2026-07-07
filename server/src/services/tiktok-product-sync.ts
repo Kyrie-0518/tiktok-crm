@@ -393,6 +393,47 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
   ).get(platform, sourcePid) as any;
   if (!existing) return;
 
+  // DEBUG: 打印详情接口关键字段结构
+  console.log('[ProductSync] 详情接口字段:', {
+    id: detail.product_id || detail.id,
+    title: detail.title || detail.product_name,
+    price: detail.price,
+    stock_info: detail.stock_info,
+    main_image: detail.main_image,
+    has_images: Array.isArray(detail.images),
+    has_image_list: Array.isArray(detail.image_list),
+  });
+
+  // 解析详情接口中的价格/库存/图片/重量
+  const sellPrice = parseFloat(detail.price?.sale_price || detail.sale_price || '0') || 0;
+  const originalPrice = parseFloat(detail.price?.original_price || detail.original_price || String(sellPrice)) || sellPrice;
+  const stock = (detail.stock_info?.stock_num ?? detail.stock_info?.available_stock ?? detail.inventory?.quantity ?? detail.stock ?? 0);
+  const image = detail.main_image?.thumb_url || detail.main_image?.url ||
+    (Array.isArray(detail.images) && detail.images[0]?.thumb_url) ||
+    (Array.isArray(detail.images) && detail.images[0]?.url) ||
+    (Array.isArray(detail.image_list) && detail.image_list[0]?.thumb_url) ||
+    (Array.isArray(detail.image_list) && detail.image_list[0]?.url) ||
+    detail.image || '';
+  const description = detail.description || '';
+  const categoryName = detail.category?.name || detail.category_name || '';
+  const weight = parseFloat(detail.package_weight || detail.weight || '0') || 0;
+  const status = PRODUCT_STATUS_MAP[detail.status] || 'active';
+
+  // 更新主表字段（图片、价格、库存、描述、类目、重量、状态）
+  db.prepare(`
+    UPDATE products SET
+      sell_price = COALESCE(NULLIF(?, 0), sell_price),
+      original_price = COALESCE(NULLIF(?, 0), original_price),
+      stock = COALESCE(NULLIF(?, -1), stock),
+      image = COALESCE(NULLIF(?, ''), image),
+      description = COALESCE(NULLIF(?, ''), description),
+      category_name = COALESCE(NULLIF(?, ''), category_name),
+      weight = COALESCE(NULLIF(?, 0), weight),
+      status = COALESCE(NULLIF(?, ''), status),
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(sellPrice, originalPrice, stock, image, description, categoryName, weight, status, existing.id);
+
   // 合并详情数据到 extra_data
   let extra: any = {};
   try { extra = JSON.parse(existing.extra_data || '{}'); } catch { /* ignore */ }
