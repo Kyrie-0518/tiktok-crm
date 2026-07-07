@@ -255,7 +255,7 @@ export default function AdminLayout() {
             <Content
               className="admin-content"
               style={{
-                padding: 24,
+                padding: 0,
                 minHeight: `calc(100vh - ${HEADER_H}px)`,
                 background: 'var(--admin-bg)',
               }}
@@ -263,8 +263,8 @@ export default function AdminLayout() {
               <div style={{
                 background: '#fff',
                 borderRadius: 12,
-                padding: 24,
-                minHeight: 'calc(100vh - 64px - 48px)',
+                padding: 20,
+                minHeight: `calc(100vh - ${HEADER_H}px)`,
                 boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
               }}>
                 <ActiveComponent />
