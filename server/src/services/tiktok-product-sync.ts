@@ -85,12 +85,26 @@ export async function syncShopProducts(
       const resp = await api.searchProducts(params);
       const productList = resp?.data?.products || resp?.data?.product_list || [];
 
+      // DEBUG: 打印第一个产品的关键字段结构，用于排查字段名
+      if (productList.length > 0 && page === 0) {
+        const first = productList[0];
+        console.log('[ProductSync] 首个产品字段:', {
+          id: first.product_id || first.id,
+          title: first.title || first.product_name,
+          price_keys: first.price ? Object.keys(first.price) : null,
+          stock_keys: first.stock_info ? Object.keys(first.stock_info) : null,
+          image_keys: first.main_image ? Object.keys(first.main_image) : (Array.isArray(first.images) ? 'images[]' : null),
+          has_image_list: Array.isArray(first.image_list),
+          sku_count: Array.isArray(first.skus) ? first.skus.length : 0,
+        });
+      }
+
       if (productList.length === 0) break;
 
       for (const product of productList) {
         try {
           // 先保存基础信息
-          const result = saveProduct(db, product, shopId, platform);
+          const result = saveProduct(db, product, shopId, platform, shop.name);
           if (result === 'created') created++;
           else if (result === 'updated') updated++;
           else { skipped++; continue; }
@@ -279,6 +293,7 @@ function saveProduct(
   product: any,
   shopId: number,
   platform: string,
+  shopName?: string,
 ): 'created' | 'updated' | 'skipped' {
   const sourcePid = String(product.product_id || product.id || '').trim();
   if (!sourcePid) return 'skipped';
@@ -289,8 +304,14 @@ function saveProduct(
   const status = PRODUCT_STATUS_MAP[product.status] || 'active';
   const sellPrice = parseFloat(product.price?.sale_price || product.sale_price || '0') || 0;
   const originalPrice = parseFloat(product.price?.original_price || product.original_price || String(sellPrice)) || sellPrice;
-  const stock = (product.stock_info?.stock_num || product.inventory?.quantity || product.stock || 0);
-  const image = product.main_image?.thumb_url || product.main_image?.url || product.image || '';
+  const stock = (product.stock_info?.stock_num ?? product.stock_info?.available_stock ?? product.inventory?.quantity ?? product.stock ?? 0);
+  // TikTok 搜索列表可能返回 images 数组，取第一张作为 main_image
+  const image = product.main_image?.thumb_url || product.main_image?.url ||
+    (Array.isArray(product.images) && product.images[0]?.thumb_url) ||
+    (Array.isArray(product.images) && product.images[0]?.url) ||
+    (Array.isArray(product.image_list) && product.image_list[0]?.thumb_url) ||
+    (Array.isArray(product.image_list) && product.image_list[0]?.url) ||
+    product.image || '';
   const description = product.description || '';
   const categoryName = product.category?.name || product.category_name || '';
   const weight = parseFloat(product.package_weight || product.weight || '0') || 0;
@@ -330,6 +351,7 @@ function saveProduct(
     );
 
     saveProductSkus(db, existing.id, product);
+    if (shopName) saveProductShops(db, existing.id, shopName);
     return 'updated';
   } else {
     const result = db.prepare(`
@@ -345,8 +367,20 @@ function saveProduct(
       platform, sourcePid, extraData,
     );
 
-    saveProductSkus(db, result.lastInsertRowid as number, product);
+    const newProductId = result.lastInsertRowid as number;
+    saveProductSkus(db, newProductId, product);
+    if (shopName) saveProductShops(db, newProductId, shopName);
     return 'created';
+  }
+}
+
+/**
+ * 关联产品到店铺
+ */
+function saveProductShops(db: any, productId: number, shopName: string) {
+  const existing = db.prepare('SELECT id FROM product_shops WHERE product_id = ? AND shop_name = ?').get(productId, shopName);
+  if (!existing) {
+    db.prepare('INSERT INTO product_shops (product_id, shop_name, shop_price) VALUES (?, ?, ?)').run(productId, shopName, 0);
   }
 }
 
@@ -411,8 +445,11 @@ function saveProductSkus(db: any, productId: number, product: any) {
     const skuCode = sku.seller_sku || sku.sku_code || skuId || '';
     const specName = sku.sku_name || sku.spec_name || '';
     const skuPrice = parseFloat(sku.price?.sale_price || sku.sale_price || '0') || 0;
-    const skuStock = sku.stock_info?.stock_num || sku.stock || 0;
-    const skuImage = sku.sku_image?.thumb_url || sku.sku_image?.url || sku.image || '';
+    const skuStock = sku.stock_info?.stock_num ?? sku.stock_info?.available_stock ?? sku.stock ?? 0;
+    const skuImage = sku.sku_image?.thumb_url || sku.sku_image?.url ||
+      (Array.isArray(sku.images) && sku.images[0]?.thumb_url) ||
+      (Array.isArray(sku.images) && sku.images[0]?.url) ||
+      sku.image || '';
 
     const existing = db.prepare(
       'SELECT id FROM product_skus WHERE product_id = ? AND sku_code = ?'

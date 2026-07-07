@@ -294,12 +294,12 @@ export default function Products() {
       ),
     },
     {
-      title: '产品重量',
-      dataIndex: 'weight',
-      width: 100,
-      render: (weight: number) => {
-        if (!weight) return <span style={{ color: '#999' }}>-</span>;
-        return <span style={{ color: '#333', fontSize: 13, fontWeight: 500 }}>{weight}g</span>;
+      title: '价格',
+      dataIndex: 'sell_price',
+      width: 110,
+      render: (price: number) => {
+        if (!price) return <span style={{ color: '#999' }}>-</span>;
+        return <span style={{ color: '#333', fontSize: 14, fontWeight: 600 }}>RM {price.toFixed(2)}</span>;
       },
     },
     {
@@ -322,15 +322,6 @@ export default function Products() {
             <div style={{ color: '#999', fontSize: 11 }}>总库存</div>
           </div>
         );
-      },
-    },
-    {
-      title: '达人佣金',
-      width: 100,
-      render: (_: any, record: any) => {
-        const c = record.commission || 0;
-        if (!c) return <span style={{ color: '#999' }}>-</span>;
-        return <span style={{ color: '#eb2f96', fontWeight: 600 }}>{c}%</span>;
       },
     },
     {

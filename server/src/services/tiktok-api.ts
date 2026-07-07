@@ -61,7 +61,9 @@ export class TikTokAPI {
     }
 
     try {
-      return JSON.parse(text);
+      const json = JSON.parse(text);
+      console.log(`[TikTokAPI] ← code=${json.code}, message=${json.message || json.msg || 'OK'}`);
+      return json;
     } catch {
       return text;
     }
