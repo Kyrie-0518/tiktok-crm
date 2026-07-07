@@ -23,6 +23,7 @@ import Influencers from './pages/Influencers';
 import ShopManagement from './pages/ShopManagement';
 import OrderManagement from './pages/OrderManagement';
 import SystemSettings from './pages/SystemSettings';
+import AdminDashboard from './pages/AdminDashboard';
 import AIStudioLayout from './pages/AIStudioLayout';
 import SkiisWorkbody from './pages/SkiisWorkbody';
 
@@ -60,6 +61,13 @@ const MENU_GROUPS = [
       { key: '/ai-studio', icon: <RobotOutlined />, label: 'AI 工作室' },
     ],
   },
+  {
+    key: 'group-admin',
+    label: '管理后台',
+    items: [
+      { key: '/admin', icon: <SafetyOutlined />, label: '管理后台' },
+    ],
+  },
 ];
 
 // 系统设置菜单 — 侧边栏底部独立区域，点击跳转 /system-settings?tab=xxx
@@ -93,6 +101,8 @@ function buildMenuItems() {
 // 打平所有菜单项 key（用于 selectedKeys 匹配）
 const allMenuKeys: string[] = [];
 for (const g of MENU_GROUPS) for (const i of g.items) allMenuKeys.push(i.key);
+allMenuKeys.push('/admin');
+allMenuKeys.push('/system-settings');
 
 // ═══════════════════════════════════════════
 // 权限 & 路由工具
@@ -149,6 +159,7 @@ function AppLayout() {
 
   const getSelectedKeys = (): string[] => {
     const path = location.pathname;
+    if (path === '/admin') return ['/admin'];
     if (allMenuKeys.includes(path)) return [path];
     for (const k of allMenuKeys) {
       if (path.startsWith(k + '/')) return [k];
@@ -452,98 +463,6 @@ function AppLayout() {
           </div>
         )}
 
-        {/* ── 系统设置（紧贴底部） ── */}
-        {!siderCollapsed && (
-          <div style={{ marginTop: 'auto' }}>
-            <div style={{ borderTop: '1px solid var(--bo-bottom-section-border)', margin: '0 12px', paddingTop: 6 }}>
-              <div style={{
-                fontSize: 10.5, fontWeight: 600, letterSpacing: 0.3,
-                color: 'var(--bo-group-label-color)',
-                paddingLeft: 16, marginBottom: 2, lineHeight: 1.4,
-              }}>系统</div>
-              {SYSTEM_BOTTOM_MENUS.map(item => (
-                <div key={item.key}
-                  onClick={() => navigate(`/system-settings?tab=${item.tabKey}`)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '5px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
-                    color: location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey
-                      ? 'var(--bo-bottom-item-active-color)' : 'var(--bo-bottom-item-color)',
-                    fontWeight: (location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey) ? 600 : 400,
-                    background: (location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey)
-                      ? 'var(--bo-bottom-item-active-bg)' : 'transparent',
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    if (!(location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey))
-                      e.currentTarget.style.background = 'var(--bo-bottom-item-hover-bg)';
-                  }}
-                  onMouseLeave={e => {
-                    if (!(location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey))
-                      e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <span style={{ fontSize: 14, flexShrink: 0 }}>{item.icon}</span>
-                  {item.label}
-                </div>
-              ))}
-            </div>
-
-            {isDevOrAdmin && (
-              <div style={{ borderTop: '1px solid var(--bo-bottom-section-border)', margin: '0 12px', paddingTop: 4, paddingBottom: 2 }}>
-                <div style={{
-                  fontSize: 10.5, fontWeight: 600, letterSpacing: 0.3,
-                  color: 'var(--bo-group-label-color)',
-                  paddingLeft: 16, marginBottom: 2, lineHeight: 1.4,
-                }}>权限</div>
-                {ADMIN_BOTTOM_MENUS.map(item => (
-                  <div key={item.key}
-                    onClick={() => navigate(`/system-settings?tab=${item.tabKey}`)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '5px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
-                      color: location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey
-                        ? 'var(--bo-bottom-item-active-color)' : 'var(--bo-bottom-item-color)',
-                      fontWeight: (location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey) ? 600 : 400,
-                      background: (location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey)
-                        ? 'var(--bo-bottom-item-active-bg)' : 'transparent',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <span style={{ fontSize: 14, flexShrink: 0 }}>{item.icon}</span>
-                    {item.label}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 折叠态底部图标 */}
-        {siderCollapsed && (
-          <>
-            <div style={{ borderTop: '1px solid var(--bo-collapse-border)', margin: '0 8px' }} />
-            <div style={{ padding: '4px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              {[...SYSTEM_BOTTOM_MENUS, ...(isDevOrAdmin ? ADMIN_BOTTOM_MENUS : [])].map(item => (
-                <Tooltip key={item.key} title={item.label} placement="right">
-                  <div
-                    onClick={() => navigate(`/system-settings?tab=${item.tabKey}`)}
-                    style={{
-                      fontSize: 15, cursor: 'pointer', padding: 4, borderRadius: 4,
-                      color: (location.pathname === '/system-settings' && searchParams.get('tab') === item.tabKey)
-                        ? 'var(--bo-primary)' : 'var(--bo-group-label-color)',
-                      transition: 'all 0.15s',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    {item.icon}
-                  </div>
-                </Tooltip>
-              ))}
-            </div>
-          </>
-        )}
-
         {/* ── 用户区域（企业级） ── */}
         <div style={{
           marginTop: 'auto',
@@ -728,6 +647,7 @@ function AppLayout() {
             <Route path="/finance" element={<PermRouteGuard permKey="finance"><Finance /></PermRouteGuard>} />
             <Route path="/influencers" element={<PermRouteGuard permKey="influencers"><Influencers /></PermRouteGuard>} />
             <Route path="/system-settings" element={<SystemSettings />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/skiis-workbody" element={<SkiisWorkbody />} />
             <Route path="/ai-studio/*" element={<AIStudioLayout />} />
 
