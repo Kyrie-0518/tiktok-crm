@@ -68,7 +68,10 @@ export function buildSignedRequest(
   const pathname = `/${category}/${apiVersion}/${endpoint}`;
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const bodyStr = body && Object.keys(body).length > 0 ? JSON.stringify(body) : '';
+  // 签名必须包含实际发送的 body（POST 即使没过滤参数也传 {}）
+  const hasBody = body && Object.keys(body).length > 0;
+  const actualBody = hasBody ? body : {};
+  const bodyStr = JSON.stringify(actualBody);
 
   // 构建 query 参数（app_key、timestamp 必传）
   const allParams: Record<string, string> = {
