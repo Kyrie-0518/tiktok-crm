@@ -33,10 +33,25 @@ function sign(params: Record<string, string>, path: string, body?: any): string 
     .join('');
   let str = `${path}${sorted}`;
   // 官方规则：只有非空 body 才参与签名（Object.keys(body).length > 0）
-  if (body && typeof body === 'object' && Object.keys(body).length > 0) {
-    str += JSON.stringify(body);
+  const bodyJson = (body && typeof body === 'object' && Object.keys(body).length > 0)
+    ? JSON.stringify(body) : undefined;
+  if (bodyJson) {
+    str += bodyJson;
   }
-  return crypto.createHmac('sha256', appSecret).update(`${appSecret}${str}${appSecret}`).digest('hex');
+
+  const raw = `${appSecret}${str}${appSecret}`;
+  const signValue = crypto.createHmac('sha256', appSecret).update(raw).digest('hex');
+
+  // ⚠️ 调试日志：部署后查看服务器日志，直接定位签名差异
+  console.log('=== SIGN DEBUG ===');
+  console.log('path:', path);
+  console.log('sorted:', sorted);
+  console.log('body:', bodyJson || '(none)');
+  console.log('raw:', raw);
+  console.log('sign:', signValue);
+  console.log('==================');
+
+  return signValue;
 }
 
 // ── 通用 API 调用 ──
