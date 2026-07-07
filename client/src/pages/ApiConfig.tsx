@@ -250,7 +250,7 @@ export default function ApiConfig() {
   };
 
   return (
-    <div>
+    <div style={{ padding: 24 }}>
       {/* 页面标题 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
