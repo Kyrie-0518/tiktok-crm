@@ -84,7 +84,7 @@ const CARDS: AdminCard[] = [
   },
 ];
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const roleKey = useAuthStore((s) => s.roleKey);
   const isDevOrAdmin = roleKey === 'developer' || roleKey === 'manager';
@@ -92,29 +92,31 @@ export default function AdminDashboard() {
   const visibleCards = CARDS.filter(c => !c.adminOnly || isDevOrAdmin);
 
   return (
-    <div style={{ padding: '24px 28px' }}>
-      {/* 页面标题 */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 20,
-            boxShadow: '0 4px 14px rgba(37,99,235,0.25)',
-          }}>
-            <SafetyOutlined />
-          </div>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--bo-text-primary)', lineHeight: 1.3 }}>
-              管理后台
-            </h2>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--bo-text-tertiary)' }}>
-              系统配置、权限控制与审计日志管理中心
-            </p>
+    <div style={{ padding: embedded ? '0' : '24px 28px' }}>
+      {/* 页面标题（独立使用场景显示） */}
+      {!embedded && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 20,
+              boxShadow: '0 4px 14px rgba(37,99,235,0.25)',
+            }}>
+              <SafetyOutlined />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--bo-text-primary)', lineHeight: 1.3 }}>
+                管理后台
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--bo-text-tertiary)' }}>
+                智汇系统管理中心
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 卡片网格 */}
       <div style={{

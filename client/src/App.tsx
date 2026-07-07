@@ -23,7 +23,7 @@ import Influencers from './pages/Influencers';
 import ShopManagement from './pages/ShopManagement';
 import OrderManagement from './pages/OrderManagement';
 import SystemSettings from './pages/SystemSettings';
-import AdminDashboard from './pages/AdminDashboard';
+import AdminLayout from './pages/AdminLayout';
 import AIStudioLayout from './pages/AIStudioLayout';
 import SkiisWorkbody from './pages/SkiisWorkbody';
 
@@ -687,7 +687,7 @@ function AppLayout() {
             <Route path="/finance" element={<PermRouteGuard permKey="finance"><Finance /></PermRouteGuard>} />
             <Route path="/influencers" element={<PermRouteGuard permKey="influencers"><Influencers /></PermRouteGuard>} />
             <Route path="/system-settings" element={<SystemSettings />} />
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/*" element={<AdminLayout />} />
             <Route path="/skiis-workbody" element={<SkiisWorkbody />} />
             <Route path="/ai-studio/*" element={<AIStudioLayout />} />
 
