@@ -61,13 +61,6 @@ const MENU_GROUPS = [
       { key: '/ai-studio', icon: <RobotOutlined />, label: 'AI 工作室' },
     ],
   },
-  {
-    key: 'group-admin',
-    label: '管理后台',
-    items: [
-      { key: '/admin', icon: <SafetyOutlined />, label: '管理后台' },
-    ],
-  },
 ];
 
 // 系统设置菜单 — 侧边栏底部独立区域，点击跳转 /system-settings?tab=xxx
@@ -461,6 +454,53 @@ function AppLayout() {
               <MenuUnfoldOutlined />
             </div>
           </div>
+        )}
+
+        {/* ── 管理后台入口（紧贴底部用户区） ── */}
+        {!siderCollapsed && (
+          <div style={{ margin: '0 12px', padding: '4px 0' }}>
+            <div
+              onClick={() => navigate('/admin')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '5px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                color: location.pathname === '/admin'
+                  ? 'var(--bo-bottom-item-active-color)' : 'var(--bo-bottom-item-color)',
+                fontWeight: location.pathname === '/admin' ? 600 : 400,
+                background: location.pathname === '/admin'
+                  ? 'var(--bo-bottom-item-active-bg)' : 'transparent',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                if (location.pathname !== '/admin')
+                  e.currentTarget.style.background = 'var(--bo-bottom-item-hover-bg)';
+              }}
+              onMouseLeave={e => {
+                if (location.pathname !== '/admin')
+                  e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ fontSize: 14, flexShrink: 0 }}><SafetyOutlined /></span>
+              管理后台
+            </div>
+          </div>
+        )}
+        {siderCollapsed && (
+          <Tooltip key="admin-collapsed" title="管理后台" placement="right">
+            <div
+              onClick={() => navigate('/admin')}
+              style={{
+                fontSize: 15, cursor: 'pointer', padding: 4, borderRadius: 4,
+                marginBottom: 2,
+                color: location.pathname === '/admin'
+                  ? 'var(--bo-primary)' : 'var(--bo-group-label-color)',
+                transition: 'all 0.15s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <SafetyOutlined />
+            </div>
+          </Tooltip>
         )}
 
         {/* ── 用户区域（企业级） ── */}

@@ -169,15 +169,8 @@ export default function AdminDashboard() {
                 <div style={{
                   fontSize: 15, fontWeight: 600,
                   color: 'var(--bo-text-primary)',
-                  marginBottom: 4,
                 }}>
                   {card.title}
-                </div>
-                <div style={{
-                  fontSize: 12.5, color: 'var(--bo-text-tertiary)',
-                  lineHeight: 1.5,
-                }}>
-                  {card.desc}
                 </div>
               </div>
               <div style={{
