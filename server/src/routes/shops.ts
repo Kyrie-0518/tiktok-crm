@@ -18,20 +18,16 @@ router.get('/', authMiddleware, (_req: Request, res: Response) => {
   const extraCols = ['sync_enabled', 'product_sync_enabled', 'app_key', 'api_version', 'refresh_token', 'token_expires_at', 'open_id']
     .filter(c => cols.includes(c));
   const selectCols = [...safeCols, ...extraCols].join(', ');
-  // 单独查询 access_token 以判断授权状态，但不在返回体中暴露原始值
-  const shops = db.prepare(`SELECT ${selectCols}, access_token FROM tiktok_shops ORDER BY id ASC`).all() as any[];
+  const shops = db.prepare(`SELECT ${selectCols} FROM tiktok_shops ORDER BY id ASC`).all() as any[];
   // 掩码处理敏感信息
-  const masked = shops.map((s: any) => {
-    const { access_token, ...rest } = s;
-    return {
-      ...rest,
-      _has_credentials: !!(access_token && access_token.length > 0),
-      _has_app_key: !!(s.app_key && s.app_key.length > 0),
-      _token_valid: s.token_expires_at ? new Date(s.token_expires_at) > new Date() : false,
-      _app_key_masked: s.app_key ? s.app_key.slice(0, 4) + '****' + s.app_key.slice(-4) : '',
-      _refresh_token_exists: !!(s.refresh_token && s.refresh_token.length > 0),
-    };
-  });
+  const masked = shops.map((s: any) => ({
+    ...s,
+    _has_credentials: !!(s.access_token && s.access_token.length > 0),
+    _has_app_key: !!(s.app_key && s.app_key.length > 0),
+    _token_valid: s.token_expires_at ? new Date(s.token_expires_at) > new Date() : false,
+    _app_key_masked: s.app_key ? s.app_key.slice(0, 4) + '****' + s.app_key.slice(-4) : '',
+    _refresh_token_exists: !!(s.refresh_token && s.refresh_token.length > 0),
+  }));
   res.json(masked);
 });
 
