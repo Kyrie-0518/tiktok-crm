@@ -428,6 +428,13 @@ function initTables() {
       );
     `);
   }
+  // 兼容旧表：补全缺失列
+  const oiCols = db.prepare("SELECT name FROM pragma_table_info('order_items')").all() as { name: string }[];
+  const oiColNames = oiCols.map(c => c.name);
+  if (!oiColNames.includes('sku')) db.exec("ALTER TABLE order_items ADD COLUMN sku TEXT DEFAULT ''");
+  if (!oiColNames.includes('item_status')) db.exec("ALTER TABLE order_items ADD COLUMN item_status TEXT DEFAULT 'pending'");
+  if (!oiColNames.includes('image_url')) db.exec("ALTER TABLE order_items ADD COLUMN image_url TEXT DEFAULT ''");
+  if (!oiColNames.includes('spec_name')) db.exec("ALTER TABLE order_items ADD COLUMN spec_name TEXT DEFAULT ''");
 
   // Migrate: roles table
   if (!tableList.some(t => t.name === 'roles')) {
