@@ -20,6 +20,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 # 安装 tsx 用于直接运行 TypeScript
 RUN npm install -g tsx
 
+# 缓存破坏器 — 通过 --build-arg CACHEBUST=$(date +%s) 让 COPY 层失效
+# 但不会影响 npm install 缓存（前面的层）
+ARG CACHEBUST=0
+
 # 复制源码
 COPY . .
 
