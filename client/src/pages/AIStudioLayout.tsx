@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Layout, Menu, Button, Typography, theme } from 'antd';
+import { Layout, Menu, Button, Typography, Avatar } from 'antd';
 import {
   RobotOutlined, PieChartOutlined, AreaChartOutlined,
   VideoCameraOutlined, SettingOutlined, PictureOutlined,
@@ -9,6 +9,7 @@ import {
   BarChartOutlined, UserOutlined, ThunderboltOutlined,
   ArrowLeftOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
 } from '@ant-design/icons';
+import { useAuthStore } from '../stores/authStore';
 import AIStudio from './AIStudio';
 import AIAnalysis from './AIAnalysis';
 import SkiisAnalysis from './SkiisAnalysis';
@@ -27,9 +28,22 @@ import UserCenter from './UserCenter';
 const { Sider, Content } = Layout;
 const { Text } = Typography;
 
-// ═══════════════════════════════════════════
-// AI 工作室专属菜单
-// ═══════════════════════════════════════════
+const HEADER_H = 64;
+
+const ROLE_COLOR: Record<string, string> = {
+  developer: '#2563eb',
+  manager: '#d97706',
+  staff: '#059669',
+  viewer: '#6b7280',
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  developer: '开发者',
+  manager: '管理员',
+  staff: '运营人员',
+  viewer: '访客',
+};
+
 const STUDIO_MENU_GROUPS = [
   {
     key: 'group-overview',
@@ -71,7 +85,6 @@ const STUDIO_MENU_GROUPS = [
   },
 ];
 
-// 构建 menu items
 function buildStudioMenuItems() {
   const result: any[] = [];
   for (const group of STUDIO_MENU_GROUPS) {
@@ -96,14 +109,12 @@ function buildStudioMenuItems() {
 const allStudioKeys: string[] = [];
 for (const g of STUDIO_MENU_GROUPS) for (const i of g.items) allStudioKeys.push(i.key);
 
-// ═══════════════════════════════════════════
-// AI 工作室布局组件
-// ═══════════════════════════════════════════
 export default function AIStudioLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [siderCollapsed, setSiderCollapsed] = React.useState(false);
-  const { token } = theme.useToken();
+  const username = useAuthStore((s) => s.username);
+  const roleKey = useAuthStore((s) => s.roleKey);
 
   const menuItems = React.useMemo(() => buildStudioMenuItems(), []);
 
@@ -114,7 +125,6 @@ export default function AIStudioLayout() {
   const getSelectedKeys = (): string[] => {
     const path = location.pathname;
     if (path === '/ai-studio') return ['/ai-studio'];
-    // 按路径长度降序排列，优先匹配更长的路径（避免 /ai-studio 吞掉子路径）
     const sorted = [...allStudioKeys].sort((a, b) => b.length - a.length);
     for (const k of sorted) {
       if (path === k || path.startsWith(k + '/')) return [k];
@@ -122,13 +132,13 @@ export default function AIStudioLayout() {
     return ['/ai-studio'];
   };
 
-  const handleBack = () => {
-    navigate('/dashboard');
-  };
+  const handleBack = () => navigate('/dashboard');
+
+  const avatarText = (username || 'User').slice(0, 1).toUpperCase();
+  const userRoleLabel = ROLE_LABEL[roleKey || 'staff'];
 
   return (
     <>
-      {/* ═══ AI 工作室样式 ═══ */}
       <style>{`
         :root {
           --studio-primary: #7B61FF;
@@ -169,20 +179,9 @@ export default function AIStudioLayout() {
           --studio-bottom-item-active-color: #a78bfa;
         }
 
-        /* ── 工作室布局容器 ── */
-        .studio-layout {
-          min-height: 100vh;
-        }
-        .studio-layout .ant-layout {
-          background: transparent;
-        }
+        .studio-layout .ant-layout { background: transparent; }
+        .studio-sider { box-shadow: 2px 0 8px rgba(0,0,0,0.04) !important; }
 
-        /* ── 侧边栏样式 ── */
-        .studio-sider {
-          box-shadow: 2px 0 8px rgba(0,0,0,0.04) !important;
-        }
-
-        /* ── 工作室菜单样式 ── */
         .studio-layout .ant-menu-item-group-title {
           padding: 14px 16px 6px 18px !important;
           font-size: 11px; line-height: 1.4;
@@ -191,17 +190,17 @@ export default function AIStudioLayout() {
           padding-top: 10px !important;
         }
         .studio-layout .ant-menu-inline .ant-menu-item {
-          height: 38px !important;
-          line-height: 38px !important;
+          height: 42px !important;
+          line-height: 42px !important;
           margin: 2px 10px !important;
           padding-inline: 12px !important;
           border-radius: 8px !important;
-          font-size: 13.5px;
+          font-size: 14px;
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
         .studio-layout .ant-menu-light .ant-menu-item .anticon,
         .studio-layout .ant-menu-dark .ant-menu-item .anticon {
-          color: #94a3b8 !important; font-size: 15px; transition: color 0.2s;
+          color: #94a3b8 !important; font-size: 16px; transition: color 0.2s;
         }
         [data-theme='dark'] .studio-layout .ant-menu-dark .ant-menu-item .anticon {
           color: #6b7280 !important;
@@ -232,185 +231,202 @@ export default function AIStudioLayout() {
           color: var(--studio-selected-color) !important;
         }
 
-        /* ── 内容区滚动条美化 ── */
-        .studio-content::-webkit-scrollbar {
-          width: 6px;
-        }
-        .studio-content::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .studio-content::-webkit-scrollbar-thumb {
-          background: #d1d5db;
-          border-radius: 3px;
-        }
-        .studio-content::-webkit-scrollbar-thumb:hover {
-          background: #9ca3af;
-        }
+        .studio-content::-webkit-scrollbar { width: 6px; }
+        .studio-content::-webkit-scrollbar-track { background: transparent; }
+        .studio-content::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        .studio-content::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
       `}</style>
 
-      <div className="studio-layout">
-      <Layout style={{ minHeight: '100vh', background: 'var(--studio-bg)' }}>
-        {/* ── 左侧边栏 ── */}
-        <Sider
-          width={220}
-          collapsedWidth={56}
-          collapsible
-          collapsed={siderCollapsed}
-          trigger={null}
-          className="studio-sider"
-          style={{
-            background: 'var(--studio-sider-bg)',
-            position: 'fixed', left: 0, top: 0, bottom: 0,
-            overflow: 'hidden', zIndex: 100,
-            borderRight: '1px solid var(--studio-border)',
-            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-            display: 'flex', flexDirection: 'column',
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Logo 区域 */}
+      <div className="studio-layout" style={{ minHeight: '100vh' }}>
+        {/* ═══════ 顶部横栏 ═══════ */}
+        <div style={{
+          height: HEADER_H,
+          background: 'var(--studio-sider-bg)',
+          borderBottom: '1px solid var(--studio-border)',
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 24px 0 20px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          {/* 左侧 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              minHeight: 50, display: 'flex', alignItems: 'center',
-              justifyContent: siderCollapsed ? 'center' : 'space-between',
-              padding: siderCollapsed ? '0' : '0 12px 0 16px',
+              width: 36, height: 36, borderRadius: 10,
+              background: 'linear-gradient(135deg, #7B61FF, #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 10px rgba(123,97,255,0.25)',
+              flexShrink: 0,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 8,
-                  background: 'linear-gradient(135deg, #7B61FF, #8b5cf6)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 3px 10px rgba(123,97,255,0.3)',
-                  flexShrink: 0,
-                }}>
-                  <ThunderboltOutlined style={{ fontSize: 17, color: '#fff' }} />
-                </div>
-                {!siderCollapsed && (
-                  <span style={{
-                    fontSize: 15, fontWeight: 700,
-                    color: 'var(--studio-text)', lineHeight: 1.2,
-                  }}>AI 工作室</span>
-                )}
-              </div>
-              {!siderCollapsed && (
-                <div
-                  onClick={() => setSiderCollapsed(!siderCollapsed)}
-                  style={{
-                    display: 'flex', justifyContent: 'center', alignItems: 'center',
-                    width: 24, height: 24, borderRadius: 4,
-                    cursor: 'pointer', color: 'var(--studio-text-tertiary)', fontSize: 12,
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <MenuFoldOutlined />
-                </div>
-              )}
+              <ThunderboltOutlined style={{ color: '#fff', fontSize: 18 }} />
             </div>
-
-            {/* 主菜单 */}
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
-              <Menu
-                mode="inline"
-                selectedKeys={getSelectedKeys()}
-                items={menuItems}
-                onClick={handleMenuClick}
-                inlineCollapsed={siderCollapsed}
-                inlineIndent={14}
-                style={{
-                  borderRight: 0,
-                  background: 'var(--studio-sider-bg)',
-                  paddingTop: 2,
-                }}
-                theme="light"
-              />
-            </div>
-
-            {/* 折叠展开按钮 */}
-            {siderCollapsed && (
-              <div style={{ borderTop: '1px solid var(--studio-border)', padding: '6px 0' }}>
-                <div
-                  onClick={() => setSiderCollapsed(!siderCollapsed)}
-                  style={{
-                    display: 'flex', justifyContent: 'center', alignItems: 'center',
-                    padding: '4px 0', borderRadius: 4,
-                    cursor: 'pointer', color: 'var(--studio-text-tertiary)', fontSize: 13,
-                  }}
-                >
-                  <MenuUnfoldOutlined />
-                </div>
-              </div>
-            )}
-
-            {/* 返回主系统按钮 */}
-            <div style={{
-              borderTop: '1px solid var(--studio-border)',
-              padding: siderCollapsed ? '8px 0' : '8px 12px',
-              backgroundColor: 'var(--studio-sider-bg)',
-            }}>
-              {siderCollapsed ? (
-                <div
-                  onClick={handleBack}
-                  style={{
-                    display: 'flex', justifyContent: 'center', cursor: 'pointer',
-                    color: 'var(--studio-text-tertiary)', fontSize: 16, padding: '4px 0',
-                  }}
-                  title="返回主系统"
-                >
-                  <ArrowLeftOutlined />
-                </div>
-              ) : (
-                <Button
-                  type="text"
-                  icon={<ArrowLeftOutlined />}
-                  onClick={handleBack}
-                  style={{
-                    width: '100%', justifyContent: 'flex-start',
-                    color: 'var(--studio-bottom-item-color)',
-                    borderRadius: 8, paddingLeft: 8,
-                    fontSize: 13,
-                  }}
-                >
-                  <Text style={{ fontSize: 13, color: 'var(--studio-bottom-item-color)' }}>返回主系统</Text>
-                </Button>
-              )}
+            <div>
+              <div style={{
+                fontSize: 16, fontWeight: 700,
+                color: 'var(--studio-text)', lineHeight: 1.3,
+              }}>AI 工作室</div>
+              <div style={{
+                fontSize: 12, color: 'var(--studio-text-tertiary)',
+                lineHeight: 1.3,
+              }}>AI 智能创作中心</div>
             </div>
           </div>
-        </Sider>
 
-        {/* ── 内容区 ── */}
-        <Layout style={{
-          marginLeft: siderCollapsed ? 56 : 220,
-          background: 'var(--studio-bg)',
-          transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-          minHeight: '100vh',
-        }}>
-          <Content
-            className="studio-content"
+          {/* 右侧 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Text style={{
+              fontSize: 14, color: 'var(--studio-text-secondary)',
+              fontWeight: 500,
+            }}>{userRoleLabel}</Text>
+            <Avatar
+              size={32}
+              style={{
+                background: ROLE_COLOR[roleKey || 'staff'],
+                color: '#fff', fontWeight: 600, fontSize: 14,
+              }}
+            >{avatarText}</Avatar>
+          </div>
+        </div>
+
+        <Layout style={{ paddingTop: HEADER_H, minHeight: '100vh', background: 'var(--studio-bg)' }}>
+          {/* 左侧边栏 */}
+          <Sider
+            width={220}
+            collapsedWidth={56}
+            collapsible
+            collapsed={siderCollapsed}
+            trigger={null}
+            className="studio-sider"
             style={{
-              padding: '24px',
-              minHeight: 'calc(100vh)',
-              background: 'transparent',
+              background: 'var(--studio-sider-bg)',
+              position: 'fixed', left: 0, top: HEADER_H, bottom: 0,
+              overflow: 'hidden', zIndex: 100,
+              borderRight: '1px solid var(--studio-border)',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              display: 'flex', flexDirection: 'column',
             }}
           >
-            <Routes>
-              <Route index element={<AIStudio />} />
-              <Route path="ai-analysis" element={<AIAnalysis />} />
-              <Route path="skiis" element={<SkiisAnalysis />} />
-              <Route path="seedance" element={<SeedanceVideoGenerator />} />
-              <Route path="video-models" element={<VideoModelConfig />} />
-              <Route path="material-library" element={<MaterialLibrary />} />
-              <Route path="raw-materials" element={<RawMaterials />} />
-              <Route path="ad-bills" element={<AdBills />} />
-              <Route path="product-multi" element={<ProductMulti />} />
-              <Route path="operate-material" element={<OperateMaterial />} />
-              <Route path="product-promotion" element={<ProductPromotion />} />
-              <Route path="problem-orders" element={<ProblemOrders />} />
-              <Route path="data-reports" element={<DataReports />} />
-              <Route path="user-center" element={<UserCenter />} />
-              <Route path="*" element={<Navigate to="/ai-studio" replace />} />
-            </Routes>
-          </Content>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* 展开/折叠按钮 */}
+              {!siderCollapsed && (
+                <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <div
+                    onClick={() => setSiderCollapsed(!siderCollapsed)}
+                    style={{
+                      display: 'flex', justifyContent: 'center', alignItems: 'center',
+                      width: 24, height: 24, borderRadius: 4,
+                      cursor: 'pointer', color: 'var(--studio-text-tertiary)', fontSize: 12,
+                    }}
+                  >
+                    <MenuFoldOutlined />
+                  </div>
+                </div>
+              )}
+
+              {/* 主菜单 */}
+              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
+                <Menu
+                  mode="inline"
+                  selectedKeys={getSelectedKeys()}
+                  items={menuItems}
+                  onClick={handleMenuClick}
+                  inlineCollapsed={siderCollapsed}
+                  inlineIndent={14}
+                  style={{
+                    borderRight: 0,
+                    background: 'var(--studio-sider-bg)',
+                    paddingTop: 2,
+                  }}
+                  theme="light"
+                />
+              </div>
+
+              {/* 折叠展开按钮 */}
+              {siderCollapsed && (
+                <div style={{ borderTop: '1px solid var(--studio-border)', padding: '6px 0' }}>
+                  <div
+                    onClick={() => setSiderCollapsed(!siderCollapsed)}
+                    style={{
+                      display: 'flex', justifyContent: 'center', alignItems: 'center',
+                      padding: '4px 0', borderRadius: 4,
+                      cursor: 'pointer', color: 'var(--studio-text-tertiary)', fontSize: 13,
+                    }}
+                  >
+                    <MenuUnfoldOutlined />
+                  </div>
+                </div>
+              )}
+
+              {/* 返回主系统按钮 */}
+              <div style={{
+                borderTop: '1px solid var(--studio-border)',
+                padding: siderCollapsed ? '8px 0' : '8px 12px',
+                backgroundColor: 'var(--studio-sider-bg)',
+              }}>
+                {siderCollapsed ? (
+                  <div
+                    onClick={handleBack}
+                    style={{
+                      display: 'flex', justifyContent: 'center', cursor: 'pointer',
+                      color: 'var(--studio-text-tertiary)', fontSize: 16, padding: '4px 0',
+                    }}
+                    title="返回主系统"
+                  >
+                    <ArrowLeftOutlined />
+                  </div>
+                ) : (
+                  <Button
+                    type="text"
+                    icon={<ArrowLeftOutlined />}
+                    onClick={handleBack}
+                    style={{
+                      width: '100%', justifyContent: 'flex-start',
+                      color: 'var(--studio-bottom-item-color)',
+                      borderRadius: 8, paddingLeft: 8,
+                      fontSize: 14,
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: 'var(--studio-bottom-item-color)' }}>返回主系统</Text>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Sider>
+
+          {/* 内容区 */}
+          <Layout style={{
+            marginLeft: siderCollapsed ? 56 : 220,
+            background: 'var(--studio-bg)',
+            transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            minHeight: `calc(100vh - ${HEADER_H}px)`,
+          }}>
+            <Content
+              className="studio-content"
+              style={{
+                padding: '24px',
+                minHeight: `calc(100vh - ${HEADER_H}px)`,
+                background: 'transparent',
+              }}
+            >
+              <Routes>
+                <Route index element={<AIStudio />} />
+                <Route path="ai-analysis" element={<AIAnalysis />} />
+                <Route path="skiis" element={<SkiisAnalysis />} />
+                <Route path="seedance" element={<SeedanceVideoGenerator />} />
+                <Route path="video-models" element={<VideoModelConfig />} />
+                <Route path="material-library" element={<MaterialLibrary />} />
+                <Route path="raw-materials" element={<RawMaterials />} />
+                <Route path="ad-bills" element={<AdBills />} />
+                <Route path="product-multi" element={<ProductMulti />} />
+                <Route path="operate-material" element={<OperateMaterial />} />
+                <Route path="product-promotion" element={<ProductPromotion />} />
+                <Route path="problem-orders" element={<ProblemOrders />} />
+                <Route path="data-reports" element={<DataReports />} />
+                <Route path="user-center" element={<UserCenter />} />
+                <Route path="*" element={<Navigate to="/ai-studio" replace />} />
+              </Routes>
+            </Content>
+          </Layout>
         </Layout>
-      </Layout>
       </div>
     </>
   );

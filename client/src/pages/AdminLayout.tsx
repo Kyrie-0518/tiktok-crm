@@ -28,6 +28,8 @@ const ROLE_LABEL: Record<string, string> = {
   viewer: '访客',
 };
 
+const HEADER_H = 64;
+
 // 管理后台菜单项
 const ADMIN_MENU_ITEMS = [
   { key: '/admin/settings', icon: <SettingOutlined />, label: '系统配置' },
@@ -35,23 +37,18 @@ const ADMIN_MENU_ITEMS = [
   { key: '/admin/audit', icon: <AuditOutlined />, label: '操作日志' },
 ];
 
-// 组件映射
 const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/admin/settings': Settings,
   '/admin/permissions': UserPermissions,
   '/admin/audit': AuditLogs,
 };
 
-// ═══════════════════════════════════════════
-// 管理后台布局组件（独立页面，带顶部横栏）
-// ═══════════════════════════════════════════
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const username = useAuthStore((s) => s.username);
   const roleKey = useAuthStore((s) => s.roleKey);
 
-  // 获取当前选中菜单
   const getSelectedKey = (): string => {
     for (const item of ADMIN_MENU_ITEMS) {
       if (location.pathname === item.key || location.pathname.startsWith(item.key + '/')) {
@@ -64,9 +61,7 @@ export default function AdminLayout() {
   const activeKey = getSelectedKey();
   const ActiveComponent = COMPONENT_MAP[activeKey] || Settings;
 
-  const handleBack = () => {
-    navigate('/dashboard');
-  };
+  const handleBack = () => navigate('/dashboard');
 
   const avatarText = (username || 'User').slice(0, 1).toUpperCase();
   const userRoleLabel = ROLE_LABEL[roleKey || 'staff'];
@@ -107,25 +102,29 @@ export default function AdminLayout() {
           --admin-bottom-item-active-color: #60a5fa;
         }
 
-        .admin-layout .ant-layout {
-          background: transparent;
-        }
+        .admin-layout .ant-layout { background: transparent; }
+        .admin-sider { box-shadow: 2px 0 8px rgba(0,0,0,0.04) !important; }
 
-        .admin-sider {
-          box-shadow: 2px 0 8px rgba(0,0,0,0.04) !important;
-        }
-
-        /* 菜单样式 */
         .admin-menu .ant-menu-item {
-          height: 38px !important;
-          line-height: 38px !important;
+          height: 42px !important;
+          line-height: 42px !important;
           margin: 2px 8px !important;
           padding-inline: 12px !important;
           border-radius: 8px !important;
-          font-size: 13.5px;
+          font-size: 14px !important;
+        }
+        .admin-menu .ant-menu-item .anticon {
+          font-size: 16px !important;
+          color: #94a3b8;
+        }
+        .admin-menu .ant-menu-item:hover .anticon {
+          color: var(--admin-primary) !important;
         }
         .admin-menu .ant-menu-item:hover {
           background: rgba(37,99,235,0.06) !important;
+        }
+        .admin-menu .ant-menu-item-selected .anticon {
+          color: var(--admin-selected-color) !important;
         }
         .admin-menu .ant-menu-item-selected {
           background: rgba(37,99,235,0.10) !important;
@@ -134,115 +133,79 @@ export default function AdminLayout() {
         }
         .admin-menu .ant-menu-item-selected::after { display: none !important; }
 
-        .admin-content::-webkit-scrollbar {
-          width: 6px;
-        }
-        .admin-content::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .admin-content::-webkit-scrollbar-thumb {
-          background: #d1d5db;
-          border-radius: 3px;
-        }
-        .admin-content::-webkit-scrollbar-thumb:hover {
-          background: #9ca3af;
-        }
+        .admin-content::-webkit-scrollbar { width: 6px; }
+        .admin-content::-webkit-scrollbar-track { background: transparent; }
+        .admin-content::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        .admin-content::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
       `}</style>
 
       <div className="admin-layout" style={{ minHeight: '100vh' }}>
-        {/* ═══════════════════════════════════════════
-           ── 顶部横栏（Header） ──
-           ═══════════════════════════════════════════ */}
+        {/* ═══════ 顶部横栏 ═══════ */}
         <div style={{
-          height: 56,
+          height: HEADER_H,
           background: 'var(--admin-sider-bg)',
           borderBottom: '1px solid var(--admin-border)',
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 20px 0 16px',
+          padding: '0 24px 0 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
-          {/* ── 左侧：图标 + 标题 + 副标题 ── */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* 左侧 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 30, height: 30, borderRadius: 8,
+              width: 36, height: 36, borderRadius: 10,
               background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+              boxShadow: '0 2px 10px rgba(37,99,235,0.25)',
               flexShrink: 0,
             }}>
-              <SafetyOutlined style={{ color: '#fff', fontSize: 16 }} />
+              <SafetyOutlined style={{ color: '#fff', fontSize: 18 }} />
             </div>
             <div>
               <div style={{
-                fontSize: 15, fontWeight: 700,
+                fontSize: 16, fontWeight: 700,
                 color: 'var(--admin-text)', lineHeight: 1.3,
-              }}>
-                管理后台
-              </div>
+              }}>管理后台</div>
               <div style={{
-                fontSize: 11, color: 'var(--admin-text-tertiary)',
-                marginTop: 1, lineHeight: 1.3,
-              }}>
-                智汇系统管理中心
-              </div>
+                fontSize: 12, color: 'var(--admin-text-tertiary)',
+                lineHeight: 1.3,
+              }}>智汇系统管理中心</div>
             </div>
           </div>
 
-          {/* ── 右侧：用户角色 + 头像 ── */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* 右侧 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Text style={{
-              fontSize: 13, color: 'var(--admin-text-secondary)',
-              fontWeight: 500, lineHeight: 1,
-            }}>
-              {userRoleLabel}
-            </Text>
+              fontSize: 14, color: 'var(--admin-text-secondary)',
+              fontWeight: 500,
+            }}>{userRoleLabel}</Text>
             <Avatar
-              size={28}
+              size={32}
               style={{
                 background: ROLE_COLOR[roleKey || 'staff'],
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: 13,
-                flexShrink: 0,
+                color: '#fff', fontWeight: 600, fontSize: 14,
               }}
-            >
-              {avatarText}
-            </Avatar>
+            >{avatarText}</Avatar>
           </div>
         </div>
 
-        <Layout style={{ paddingTop: 56, minHeight: '100vh' }}>
-          {/* ── 左侧边栏（无折叠功能） ── */}
+        <Layout style={{ paddingTop: HEADER_H, minHeight: '100vh' }}>
+          {/* 左侧边栏 */}
           <Sider
             width={220}
-            collapsible
             trigger={null}
             className="admin-sider"
             style={{
               background: 'var(--admin-sider-bg)',
-              position: 'fixed', left: 0, top: 56, bottom: 0,
+              position: 'fixed', left: 0, top: HEADER_H, bottom: 0,
               overflow: 'hidden', zIndex: 100,
               borderRight: '1px solid var(--admin-border)',
               display: 'flex', flexDirection: 'column',
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* 标题 */}
-              <div style={{
-                minHeight: 50, display: 'flex', alignItems: 'center',
-                padding: '0 16px',
-              }}>
-                <span style={{
-                  fontSize: 15, fontWeight: 700,
-                  color: 'var(--admin-text)', lineHeight: 1.2,
-                }}>
-                  管理后台
-                </span>
-              </div>
-
-              {/* 菜单 */}
-              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
+              {/* 菜单（直接开始，无标题） */}
+              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: 8 }}>
                 <Menu
                   mode="inline"
                   selectedKeys={[activeKey]}
@@ -253,15 +216,15 @@ export default function AdminLayout() {
                   }))}
                   onClick={({ key }) => navigate(key)}
                   className="admin-menu"
-                  style={{ borderRight: 0, paddingTop: 2 }}
+                  style={{ borderRight: 0 }}
                   theme="light"
                 />
               </div>
 
-              {/* 返回主系统按钮 */}
+              {/* 返回主系统 */}
               <div style={{
                 borderTop: '1px solid var(--admin-border)',
-                padding: '8px 12px',
+                padding: '10px 12px',
                 backgroundColor: 'var(--admin-sider-bg)',
               }}>
                 <Button
@@ -271,28 +234,27 @@ export default function AdminLayout() {
                   style={{
                     width: '100%', justifyContent: 'flex-start',
                     color: 'var(--admin-bottom-item-color)',
-                    borderRadius: 8, paddingLeft: 8,
-                    fontSize: 13,
+                    borderRadius: 8, paddingLeft: 8, fontSize: 14,
                   }}
                 >
-                  <Text style={{ fontSize: 13, color: 'var(--admin-bottom-item-color)' }}>返回主系统</Text>
+                  <Text style={{ fontSize: 14, color: 'var(--admin-bottom-item-color)' }}>返回主系统</Text>
                 </Button>
               </div>
             </div>
           </Sider>
 
-          {/* ── 内容区 ── */}
+          {/* 内容区 */}
           <Layout style={{
             marginLeft: 220,
-            background: 'var(--admin-bg)',
-            minHeight: 'calc(100vh - 56px)',
+            background: '#fff',
+            minHeight: `calc(100vh - ${HEADER_H}px)`,
           }}>
             <Content
               className="admin-content"
               style={{
-                padding: '24px',
-                minHeight: 'calc(100vh - 56px)',
-                background: 'transparent',
+                padding: 0,
+                minHeight: `calc(100vh - ${HEADER_H}px)`,
+                background: '#fff',
               }}
             >
               <ActiveComponent />
