@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: 部署
-FROM nginx:stable-alpine
+FROM nginx:1.27-alpine
 # 复制构建产物
 COPY --from=builder /app/dist /usr/share/nginx/html
 # 复制静态资源
