@@ -40,7 +40,11 @@ export default function SystemSettings() {
     || TAB_ITEMS[0].component;
 
   return (
-    <div>
+    <div style={{
+      padding: '20px 24px',
+      background: 'var(--bo-content-bg)',
+      minHeight: 'calc(100vh - 40px)',
+    }}>
       <div style={{ marginBottom: 16 }}>
         <Tabs
           activeKey={activeTab}
@@ -59,7 +63,7 @@ export default function SystemSettings() {
         />
       </div>
 
-      <div style={{ minHeight: 400 }}>
+      <div style={{ flex: 1 }}>
         <ActiveComponent />
       </div>
     </div>

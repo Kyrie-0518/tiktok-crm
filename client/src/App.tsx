@@ -125,6 +125,7 @@ function AppLayout() {
   const location = useLocation();
   // 检测是否在AI工作室页面
   const isInAIStudio = location.pathname.startsWith('/ai-studio');
+  const isSystemSettings = location.pathname === '/system-settings';
   const [searchParams] = React.useMemo(() => {
     // 简单解析 URL search params
     const params = new URLSearchParams(location.search);
@@ -675,7 +676,7 @@ function AppLayout() {
         transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <Content style={{
-          padding: isInAIStudio ? 0 : '20px',
+          padding: isInAIStudio ? 0 : (isSystemSettings ? 0 : '20px'),
           height: isInAIStudio ? '100%' : '100vh', overflow: 'auto',
           background: 'transparent',
         }}>

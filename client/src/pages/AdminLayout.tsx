@@ -249,15 +249,15 @@ export default function AdminLayout() {
           {/* 内容区 */}
           <Layout style={{
             marginLeft: 220,
-            background: '#fff',
+            background: 'var(--admin-bg)',
             minHeight: `calc(100vh - ${HEADER_H}px)`,
           }}>
             <Content
               className="admin-content"
               style={{
-                padding: 0,
+                padding: 24,
                 minHeight: `calc(100vh - ${HEADER_H}px)`,
-                background: '#fff',
+                background: 'var(--admin-bg)',
               }}
             >
               <ActiveComponent />
