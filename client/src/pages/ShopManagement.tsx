@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   Card, Button, Space, Modal, Form, Input, Select, Tag, message,
   Popconfirm, Row, Col, Empty, Spin, Tooltip,
-  Switch, Alert,
+  Switch,
 } from 'antd';
 import {
   SyncOutlined, DeleteOutlined, ShopOutlined,
   ApiOutlined, LinkOutlined, CloudDownloadOutlined, AppstoreOutlined,
-  KeyOutlined, ReloadOutlined, SafetyCertificateOutlined,
+  ReloadOutlined, SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 import { useHasPerm } from '../stores/authStore';
@@ -222,7 +222,6 @@ export default function ShopManagement() {
   };
 
   const getTokenBadge = (shop: any) => {
-    if (!shop._has_credentials) return <Tag color="default">未授权</Tag>;
     if (shop._token_valid === false) return <Tag color="error">Token已过期</Tag>;
     return <Tag color="green">Token有效</Tag>;
   };
@@ -309,9 +308,6 @@ export default function ShopManagement() {
                     )}
                     {canEdit && (
                       <>
-                        {!shop._has_credentials && (
-                          <Tooltip title="重新授权TikTok"><Button size="small" type="link" icon={<KeyOutlined />} onClick={e => { e.stopPropagation(); handleStartOAuth(); }}>授权</Button></Tooltip>
-                        )}
                         <Button size="small" onClick={e => { e.stopPropagation(); handleOpenModal(shop); }}>编辑</Button>
                         <Popconfirm title="确认解绑此店铺？" onConfirm={e => { e?.stopPropagation(); handleDelete(shop.id); }}>
                           <Button size="small" danger icon={<DeleteOutlined />} onClick={e => e.stopPropagation()}>解绑</Button>
@@ -367,9 +363,6 @@ export default function ShopManagement() {
             <Switch checkedChildren="开" unCheckedChildren="关" />
           </Form.Item>
 
-          {editShop && !editShop._has_credentials && (
-            <Alert type="warning" message="该店铺尚未通过 TikTok 授权，建议使用「一键授权」绑定" style={{ marginTop: 8, borderRadius: 8 }} />
-          )}
         </Form>
       </Modal>
     </div>

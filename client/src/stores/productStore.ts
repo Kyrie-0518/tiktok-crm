@@ -131,8 +131,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
   fetchShops: async () => {
     const { data } = await api.get('/shops');
     set({ shopList: data.map((s: any) => s.name) });
-    // Also cache TikTok shops for sync
-    set({ tiktokShops: data.filter((s: any) => s.access_token || s.shop_cipher).map((s: any) => ({
+    // All shops are OAuth-created, all can sync
+    set({ tiktokShops: data.filter((s: any) => s.shop_id).map((s: any) => ({
       id: s.id,
       name: s.name,
       region: s.region || '',
@@ -143,7 +143,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
 
   fetchTikTokShops: async () => {
     const { data } = await api.get('/shops');
-    set({ tiktokShops: data.filter((s: any) => s.access_token || s.shop_cipher).map((s: any) => ({
+    set({ tiktokShops: data.filter((s: any) => s.shop_id).map((s: any) => ({
       id: s.id,
       name: s.name,
       region: s.region || '',
