@@ -1,6 +1,8 @@
 /**
  * TikTok Shop Partner Center API 客户端
- * 封装订单、商品、店铺等常用 API 调用
+ * 封装订单、商品、店铺等的完整 API 调用
+ * 
+ * API 版本覆盖：202309 ~ 202606（共 18 个版本，54 个商品 API 方法）
  */
 import { buildSignedRequest, TikTokAuth } from '../utils/tiktok-sign';
 
@@ -15,19 +17,21 @@ export class TikTokAPI {
     return this.auth.api_version || '202309';
   }
 
-  // ─── 通用请求方法 ──────────────────────────────
+  // ═══════════════════════════════════════════════
+  //  通用请求方法
+  // ═══════════════════════════════════════════════
 
   private async request(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
     queryParams?: Record<string, string>,
     body?: Record<string, any>,
+    apiVersionOverride?: string,
   ): Promise<any> {
-    const { url, headers } = buildSignedRequest(this.auth, endpoint, queryParams, body);
+    const { url, headers } = buildSignedRequest(this.auth, endpoint, queryParams, body, apiVersionOverride);
 
     const fetchOptions: RequestInit = { method, headers };
-    // POST 请求只有 body 非空才发（官方 SDK 不发送空 body）
-    if (method === 'POST' && body && Object.keys(body).length > 0) {
+    if (method !== 'GET' && body && Object.keys(body).length > 0) {
       fetchOptions.body = JSON.stringify(body);
     }
 
@@ -40,11 +44,7 @@ export class TikTokAPI {
     try {
       res = await fetch(url, fetchOptions);
     } catch (fetchErr: any) {
-      console.error(`[TikTokAPI] ❌ fetch() 底层失败:`);
-      console.error(`  URL: ${url}`);
-      console.error(`  message: ${fetchErr.message}`);
-      console.error(`  cause:`, fetchErr.cause ? JSON.stringify(fetchErr.cause) : 'none');
-      console.error(`  code: ${fetchErr.code || 'none'}`);
+      console.error(`[TikTokAPI] ❌ fetch() 底层失败:`, fetchErr.message);
       throw new Error(`网络连接失败: ${fetchErr.message || fetchErr} (${url})`);
     }
 
@@ -55,7 +55,7 @@ export class TikTokAPI {
       try {
         const errJson = JSON.parse(text);
         errMsg = errJson.message || errJson.msg || errMsg;
-      } catch {}
+      } catch { /* ignore parse error */ }
       console.error(`[TikTokAPI] ❌ HTTP ${res.status}:`, text.slice(0, 500));
       throw new Error(`[${res.status}] ${errMsg}`);
     }
@@ -67,23 +67,33 @@ export class TikTokAPI {
     }
   }
 
-  private get(endpoint: string, queryParams?: Record<string, string>) {
-    return this.request('GET', endpoint, queryParams);
+  private get(endpoint: string, queryParams?: Record<string, string>, apiVersionOverride?: string) {
+    return this.request('GET', endpoint, queryParams, undefined, apiVersionOverride);
   }
 
-  private post(endpoint: string, body?: Record<string, any>, queryParams?: Record<string, string>) {
-    return this.request('POST', endpoint, queryParams, body);
+  private post(endpoint: string, body?: Record<string, any>, queryParams?: Record<string, string>, apiVersionOverride?: string) {
+    return this.request('POST', endpoint, queryParams, body, apiVersionOverride);
   }
 
-  // ─── 订单 API ──────────────────────────────────
+  private put(endpoint: string, body?: Record<string, any>, queryParams?: Record<string, string>, apiVersionOverride?: string) {
+    return this.request('PUT', endpoint, queryParams, body, apiVersionOverride);
+  }
 
-  /** 获取订单详情 — 文档页面: get-order-detail-202309 */
+  private del(endpoint: string, queryParams?: Record<string, string>, apiVersionOverride?: string) {
+    return this.request('DELETE', endpoint, queryParams, undefined, apiVersionOverride);
+  }
+
+  // ═══════════════════════════════════════════════
+  //  订单 API（V202309）
+  // ═══════════════════════════════════════════════
+
+  /** 获取订单详情 */
   async getOrderDetail(orderIds: string[]) {
     const ids = orderIds.join(',');
     return this.get('orders', { ids });
   }
 
-  /** 搜索/获取订单列表 — 严格匹配官方 SDK OrdersSearchPost */
+  /** 搜索/获取订单列表 */
   async getOrderList(params: {
     order_status?: string;
     page_size?: number;
@@ -99,7 +109,6 @@ export class TikTokAPI {
     buyer_user_id?: string;
     [key: string]: any;
   }) {
-    // 官方 SDK: page_size / sort_* / page_token 在 URL 参数中
     const queryParams: Record<string, string> = {};
     if (params.page_size) queryParams['page_size'] = String(params.page_size);
     if (params.page_token) queryParams['page_token'] = params.page_token;
@@ -108,7 +117,6 @@ export class TikTokAPI {
     if (params.sort_field) queryParams['sort_field'] = params.sort_field;
     if (params.sort_order) queryParams['sort_order'] = params.sort_order;
 
-    // 官方 SDK: 过滤参数在 POST body 中 (GetOrderListRequestBody)
     const body: Record<string, any> = {};
     if (params.order_status) body['order_status'] = params.order_status;
     if (params.create_time_from) body['create_time_ge'] = params.create_time_from;
@@ -125,33 +133,679 @@ export class TikTokAPI {
     );
   }
 
-  /** 获取订单价格详情 (需要 202407+) */
+  /** 获取订单价格详情 (V202407+) */
   async getPriceDetail(orderId: string) {
     return this.get(`orders/${orderId}/price_detail`);
   }
 
-  // ─── 商品 API ──────────────────────────────────
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202309（核心：33 个方法）
+  // ═══════════════════════════════════════════════
+
+  // ── 品牌 ─────────────────────────────────────
+
+  /** 获取品牌列表 */
+  async getBrands(params: {
+    page_size: number;
+    category_id?: string;
+    is_authorized?: boolean;
+    brand_name?: string;
+    page_token?: string;
+    category_version?: string;
+  }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.category_id) qs['category_id'] = params.category_id;
+    if (params.is_authorized !== undefined) qs['is_authorized'] = String(params.is_authorized);
+    if (params.brand_name) qs['brand_name'] = params.brand_name;
+    if (params.page_token) qs['page_token'] = params.page_token;
+    if (params.category_version) qs['category_version'] = params.category_version;
+    return this.get('brands', qs);
+  }
+
+  /** 创建自定义品牌 */
+  async createCustomBrand(body: Record<string, any>) {
+    return this.post('brands', body);
+  }
+
+  // ── 类目 ─────────────────────────────────────
+
+  /** 获取类目列表 */
+  async getCategories(params: {
+    locale?: string;
+    keyword?: string;
+    category_version?: string;
+    listing_platform?: string;
+    include_prohibited_categories?: boolean;
+  } = {}) {
+    const qs: Record<string, string> = {};
+    if (params.locale) qs['locale'] = params.locale;
+    if (params.keyword) qs['keyword'] = params.keyword;
+    if (params.category_version) qs['category_version'] = params.category_version;
+    if (params.listing_platform) qs['listing_platform'] = params.listing_platform;
+    if (params.include_prohibited_categories !== undefined) qs['include_prohibited_categories'] = String(params.include_prohibited_categories);
+    return this.get('categories', qs);
+  }
+
+  /** 推荐类目 */
+  async recommendCategory(body: Record<string, any>) {
+    return this.post('categories/recommend', body);
+  }
+
+  /** 获取类目属性 */
+  async getCategoryAttributes(categoryId: string, params: { locale?: string; category_version?: string } = {}) {
+    const qs: Record<string, string> = {};
+    if (params.locale) qs['locale'] = params.locale;
+    if (params.category_version) qs['category_version'] = params.category_version;
+    return this.get(`categories/${categoryId}/attributes`, qs);
+  }
+
+  /** 获取类目规则 */
+  async getCategoryRules(categoryId: string, params: { category_version?: string; locale?: string } = {}) {
+    const qs: Record<string, string> = {};
+    if (params.category_version) qs['category_version'] = params.category_version;
+    if (params.locale) qs['locale'] = params.locale;
+    return this.get(`categories/${categoryId}/rules`, qs);
+  }
+
+  // ── 全球类目 ─────────────────────────────────
+
+  /** 获取全球类目列表 */
+  async getGlobalCategories(params: { locale?: string; keyword?: string; category_version?: string } = {}) {
+    const qs: Record<string, string> = {};
+    if (params.locale) qs['locale'] = params.locale;
+    if (params.keyword) qs['keyword'] = params.keyword;
+    if (params.category_version) qs['category_version'] = params.category_version;
+    return this.get('global_categories', qs);
+  }
+
+  /** 推荐全球类目 */
+  async recommendGlobalCategories(body: Record<string, any>) {
+    return this.post('global_categories/recommend', body);
+  }
+
+  /** 获取全球类目属性 */
+  async getGlobalCategoryAttributes(categoryId: string, params: { locale?: string; category_version?: string } = {}) {
+    const qs: Record<string, string> = {};
+    if (params.locale) qs['locale'] = params.locale;
+    if (params.category_version) qs['category_version'] = params.category_version;
+    return this.get(`categories/${categoryId}/global_attributes`, qs);
+  }
+
+  /** 获取全球类目规则 */
+  async getGlobalCategoryRules(categoryId: string, params: { category_version?: string; locale?: string } = {}) {
+    const qs: Record<string, string> = {};
+    if (params.category_version) qs['category_version'] = params.category_version;
+    if (params.locale) qs['locale'] = params.locale;
+    return this.get(`categories/${categoryId}/global_rules`, qs);
+  }
+
+  // ── 上架条件 ─────────────────────────────────
+
+  /** 检查店铺上架先决条件 */
+  async checkListingPrerequisites() {
+    return this.get('prerequisites');
+  }
+
+  // ── 本地商品 CRUD ─────────────────────────────
 
   /** 搜索商品 */
-  async searchProducts(params: Record<string, any>) {
-    return this.post('products/search', params);
+  async searchProducts(params: {
+    page_size: number;
+    page_token?: string;
+    category_version?: string;
+    search_status?: string;
+    update_time_from?: number;
+    update_time_to?: number;
+    create_time_from?: number;
+    create_time_to?: number;
+    [key: string]: any;
+  }, options?: { apiVersion?: string }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    if (params.category_version) qs['category_version'] = params.category_version;
+
+    const body: Record<string, any> = {};
+    if (params.search_status) body['search_status'] = params.search_status;
+    if (params.update_time_from) body['update_time_ge'] = params.update_time_from;
+    if (params.update_time_to) body['update_time_lt'] = params.update_time_to;
+    if (params.create_time_from) body['create_time_ge'] = params.create_time_from;
+    if (params.create_time_to) body['create_time_lt'] = params.create_time_to;
+
+    return this.post('products/search', body, qs, options?.apiVersion);
   }
 
   /** 获取商品详情 */
-  async getProductDetail(productId: string) {
-    return this.get(`products/${productId}`);
+  async getProductDetail(productId: string, params: {
+    return_under_review_version?: boolean;
+    return_draft_version?: boolean;
+    locale?: string;
+  } = {}) {
+    const qs: Record<string, string> = {};
+    if (params.return_under_review_version) qs['return_under_review_version'] = String(true);
+    if (params.return_draft_version) qs['return_draft_version'] = String(true);
+    if (params.locale) qs['locale'] = params.locale;
+    return this.get(`products/${productId}`, Object.keys(qs).length ? qs : undefined);
   }
 
-  // ─── 店铺 API ──────────────────────────────────
+  /** 创建商品 */
+  async createProduct(body: Record<string, any>) {
+    return this.post('products', body);
+  }
 
-  /** 
-   * 获取授权店铺列表 (DEPRECATED: 此方法路径错误)
-   * 正确的 API 路径是 /authorization/202309/shops，不走 CATEGORY_MAP 映射
-   * 请使用 tiktok-oauth.ts 中的 getAuthorizedShops(accessToken) 函数
-   */
+  /** 全量编辑商品 */
+  async editProduct(productId: string, body: Record<string, any>) {
+    return this.put(`products/${productId}`, body);
+  }
+
+  /** 局部编辑商品 */
+  async partialEditProduct(productId: string, body: Record<string, any>) {
+    return this.post(`products/${productId}/partial_edit`, body);
+  }
+
+  /** 上架商品 */
+  async activateProduct(body: { product_ids: string[] }) {
+    return this.post('products/activate', body);
+  }
+
+  /** 下架商品 */
+  async deactivateProduct(body: { product_ids: string[] }) {
+    return this.post('products/deactivate', body);
+  }
+
+  /** 删除商品 */
+  async deleteProducts(body: { product_ids: string[] }) {
+    return this.request('DELETE', 'products', undefined, body);
+  }
+
+  /** 恢复商品 */
+  async recoverProducts(body: { product_ids: string[] }) {
+    return this.post('products/recover', body);
+  }
+
+  /** 上架检查 */
+  async checkProductListing(body: Record<string, any>, isDiagnosisRequired?: boolean) {
+    const qs: Record<string, string> = {};
+    if (isDiagnosisRequired !== undefined) qs['is_diagnosis_required'] = String(isDiagnosisRequired);
+    return this.post('products/listing_check', body, Object.keys(qs).length ? qs : undefined);
+  }
+
+  // ── 库存 ─────────────────────────────────────
+
+  /** 更新商品库存 */
+  async updateInventory(productId: string, body: { skus: Array<{ sku_id: string; stock_num: number }> }) {
+    return this.post(`products/${productId}/inventory/update`, body);
+  }
+
+  /** 搜索库存 */
+  async searchInventory(params: { page_size: number; page_token?: string; search_status?: string }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    const body: Record<string, any> = {};
+    if (params.search_status) body['search_status'] = params.search_status;
+    return this.post('inventory/search', body, qs);
+  }
+
+  // ── 价格 ─────────────────────────────────────
+
+  /** 更新商品价格 */
+  async updatePrice(productId: string, body: { skus: Array<{ sku_id: string; sale_price: number; original_price?: number }> }) {
+    return this.post(`products/${productId}/prices/update`, body);
+  }
+
+  // ── 图片/文件 ────────────────────────────────
+
+  /** 上传商品图片（URL 模式） */
+  async uploadImage(body: { url: string; use_case?: string }) {
+    const qs: Record<string, string> = {};
+    if (body.use_case) qs['use_case'] = body.use_case;
+    return this.post('images/upload', { data: { url: body.url } }, qs);
+  }
+
+  /** 上传商品文件（URL 模式） */
+  async uploadFile(body: { url: string; name?: string }) {
+    const qs: Record<string, string> = {};
+    if (body.name) qs['name'] = body.name;
+    return this.post('files/upload', { data: { url: body.url } }, qs);
+  }
+
+  // ── 全球商品 ─────────────────────────────────
+
+  /** 搜索全球商品 */
+  async searchGlobalProducts(params: {
+    page_size: number;
+    page_token?: string;
+    search_status?: string;
+    update_time_from?: number;
+    update_time_to?: number;
+  }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    const body: Record<string, any> = {};
+    if (params.search_status) body['search_status'] = params.search_status;
+    if (params.update_time_from) body['update_time_ge'] = params.update_time_from;
+    if (params.update_time_to) body['update_time_lt'] = params.update_time_to;
+    return this.post('global_products/search', body, qs);
+  }
+
+  /** 创建全球商品 */
+  async createGlobalProduct(body: Record<string, any>) {
+    return this.post('global_products', body);
+  }
+
+  /** 获取全球商品详情 */
+  async getGlobalProduct(globalProductId: string) {
+    return this.get(`global_products/${globalProductId}`);
+  }
+
+  /** 编辑全球商品 */
+  async editGlobalProduct(globalProductId: string, body: Record<string, any>) {
+    return this.put(`global_products/${globalProductId}`, body);
+  }
+
+  /** 删除全球商品 */
+  async deleteGlobalProducts(body: { global_product_ids: string[] }) {
+    return this.request('DELETE', 'global_products', undefined, body);
+  }
+
+  /** 更新全球商品库存 */
+  async updateGlobalInventory(globalProductId: string, body: Record<string, any>) {
+    return this.post(`global_products/${globalProductId}/inventory/update`, body);
+  }
+
+  /** 发布全球商品到店铺 */
+  async publishGlobalProduct(globalProductId: string, body: { shop_cipher: string }) {
+    return this.post(`global_products/${globalProductId}/publish`, body);
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202312
+  // ═══════════════════════════════════════════════
+
+  /** V202312 搜索商品 */
+  async searchProductsV202312(params: {
+    page_size: number;
+    page_token?: string;
+    search_status?: string;
+    [key: string]: any;
+  }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    const body: Record<string, any> = {};
+    if (params.search_status) body['search_status'] = params.search_status;
+    return this.post('products/search', body, qs, '202312');
+  }
+
+  /** V202312 搜索全球商品 */
+  async searchGlobalProductsV202312(params: {
+    page_size: number;
+    page_token?: string;
+    [key: string]: any;
+  }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.post('global_products/search', params, qs, '202312');
+  }
+
+  /** V202312 检查上架先决条件 */
+  async checkListingPrerequisitesV202312() {
+    return this.get('prerequisites', undefined, '202312');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202401
+  // ═══════════════════════════════════════════════
+
+  /** V202401 获取上架 schema */
+  async getListingSchemas(params: { category_ids: string; locale?: string; category_version?: string }) {
+    const qs: Record<string, string> = { category_ids: params.category_ids };
+    if (params.locale) qs['locale'] = params.locale;
+    if (params.category_version) qs['category_version'] = params.category_version;
+    return this.get('listing_schemas', qs, '202401');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202404
+  // ═══════════════════════════════════════════════
+
+  /** V202404 图片优化 */
+  async optimizeImage(body: { urls: string[] }) {
+    return this.post('images/optimize', body, undefined, '202404');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202405（诊断与 SEO）
+  // ═══════════════════════════════════════════════
+
+  /** V202405 商品诊断 */
+  async getProductDiagnoses(productIds: string[]) {
+    const qs: Record<string, string> = { product_ids: productIds.join(',') };
+    return this.get('products/diagnoses', qs, '202405');
+  }
+
+  /** V202405 商品 SEO 关键词 */
+  async getProductSeoWords(productIds: string[]) {
+    const qs: Record<string, string> = { product_ids: productIds.join(',') };
+    return this.get('products/seo_words', qs, '202405');
+  }
+
+  /** V202405 商品优化建议 */
+  async getProductSuggestions(productIds: string[]) {
+    const qs: Record<string, string> = { product_ids: productIds.join(',') };
+    return this.get('products/suggestions', qs, '202405');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202407（上架 Schema + 类目升级）
+  // ═══════════════════════════════════════════════
+
+  /** V202407 获取上架 schema */
+  async getListingSchemasV202407(params: { category_ids: string; locale?: string; category_version?: string }) {
+    const qs: Record<string, string> = { category_ids: params.category_ids };
+    if (params.locale) qs['locale'] = params.locale;
+    if (params.category_version) qs['category_version'] = params.category_version;
+    return this.get('listing_schemas', qs, '202407');
+  }
+
+  /** V202407 类目升级任务 */
+  async createCategoryUpgradeTask(body: Record<string, any>) {
+    return this.post('products/category_upgrade_task', body, undefined, '202407');
+  }
+
+  /** V202407 尺码表搜索 */
+  async searchSizeCharts(params: {
+    page_size: number;
+    page_token?: string;
+    locales?: string;
+    [key: string]: any;
+  }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    if (params.locales) qs['locales'] = params.locales;
+    return this.post('sizecharts/search', params, qs, '202407');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202409（合规：制造商/责任人）
+  // ═══════════════════════════════════════════════
+
+  /** V202409 搜索合规制造商 */
+  async searchManufacturers(params: { page_size: number; page_token?: string }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.post('compliance/manufacturers/search', params, qs, '202409');
+  }
+
+  /** V202409 创建合规制造商 */
+  async createManufacturer(body: Record<string, any>) {
+    return this.post('compliance/manufacturers', body, undefined, '202409');
+  }
+
+  /** V202409 局部编辑制造商 */
+  async partialEditManufacturer(manufacturerId: string, body: Record<string, any>) {
+    return this.post(`compliance/manufacturers/${manufacturerId}/partial_edit`, body, undefined, '202409');
+  }
+
+  /** V202409 搜索合规责任人 */
+  async searchResponsiblePersons(params: { page_size: number; page_token?: string }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.post('compliance/responsible_persons/search', params, qs, '202409');
+  }
+
+  /** V202409 创建合规责任人 */
+  async createResponsiblePerson(body: Record<string, any>) {
+    return this.post('compliance/responsible_persons', body, undefined, '202409');
+  }
+
+  /** V202409 局部编辑责任人 */
+  async partialEditResponsiblePerson(responsiblePersonId: string, body: Record<string, any>) {
+    return this.post(`compliance/responsible_persons/${responsiblePersonId}/partial_edit`, body, undefined, '202409');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202411
+  // ═══════════════════════════════════════════════
+
+  /** V202411 诊断优化 */
+  async diagnoseOptimize(body: { product_id: string }) {
+    return this.post('products/diagnose_optimize', body, undefined, '202411');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202501（合规搜索 V2）
+  // ═══════════════════════════════════════════════
+
+  /** V202501 搜索制造商 */
+  async searchManufacturersV202501(params: { page_size: number; page_token?: string }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.post('compliance/manufacturers/search', params, qs, '202501');
+  }
+
+  /** V202501 搜索责任人 */
+  async searchResponsiblePersonsV202501(params: { page_size: number; page_token?: string }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.post('compliance/responsible_persons/search', params, qs, '202501');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202502
+  // ═══════════════════════════════════════════════
+
+  /** V202502 搜索商品 */
+  async searchProductsV202502(params: {
+    page_size: number;
+    page_token?: string;
+    search_status?: string;
+    [key: string]: any;
+  }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    const body: Record<string, any> = {};
+    if (params.search_status) body['search_status'] = params.search_status;
+    return this.post('products/search', body, qs, '202502');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202505（图片翻译）
+  // ═══════════════════════════════════════════════
+
+  /** V202505 创建图片翻译任务 */
+  async createImageTranslationTask(body: { image_urls: string[]; target_locale: string }) {
+    return this.post('images/translation_tasks', body, undefined, '202505');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202506（图片翻译查询）
+  // ═══════════════════════════════════════════════
+
+  /** V202506 查询图片翻译任务 */
+  async getImageTranslationTasks(translationTaskIds: string[]) {
+    const qs: Record<string, string> = { translation_task_ids: translationTaskIds.join(',') };
+    return this.get('images/translation_tasks', qs, '202506');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202507（全球复制）
+  // ═══════════════════════════════════════════════
+
+  /** V202507 获取全球上架规则 */
+  async getGlobalListingRules() {
+    return this.get('global_listing_rules', undefined, '202507');
+  }
+
+  /** V202507 全球复制商品 */
+  async globalReplicateProduct(productId: string, body: { shops: Array<{ shop_cipher: string; region: string }> }) {
+    return this.post(`products/${productId}/global_replicate`, body, undefined, '202507');
+  }
+
+  /** V202507 获取已复制商品列表 */
+  async getReplicatedProducts(productId: string) {
+    return this.get(`products/${productId}/replicated_products`, undefined, '202507');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202509（编辑增强）
+  // ═══════════════════════════════════════════════
+
+  /** V202509 局部编辑全球商品 */
+  async partialEditGlobalProduct(globalProductId: string, body: Record<string, any>) {
+    return this.put(`global_products/${globalProductId}/partial_edit`, body, undefined, '202509');
+  }
+
+  /** V202509 编辑商品 */
+  async editProductV202509(productId: string, body: Record<string, any>) {
+    return this.put(`products/${productId}`, body, undefined, '202509');
+  }
+
+  /** V202509 局部编辑商品 */
+  async partialEditProductV202509(productId: string, body: Record<string, any>) {
+    return this.post(`products/${productId}/partial_edit`, body, undefined, '202509');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202601（合规审核调研）
+  // ═══════════════════════════════════════════════
+
+  /** V202601 合规审核调研 */
+  async auditComplianceResearch(params: {
+    page_size: number;
+    page_token?: string;
+    category_asset_cipher: string;
+  }) {
+    const qs: Record<string, string> = {
+      page_size: String(params.page_size),
+      category_asset_cipher: params.category_asset_cipher,
+    };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.post('compliance/auditing/research', undefined, qs, '202601');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202602（推荐包裹）
+  // ═══════════════════════════════════════════════
+
+  /** V202602 推荐包裹 */
+  async recommendPackages(params: { page_size: number; page_token?: string }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.post('packages/recommend', params, qs, '202602');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202604（申诉/商机/GPA升级）
+  // ═══════════════════════════════════════════════
+
+  /** V202604 提交申诉 */
+  async submitAppeal(body: Record<string, any>) {
+    return this.post('appeals/submit', body, undefined, '202604');
+  }
+
+  /** V202604 库存运营设置 */
+  async setInventoryOperationSettings(body: Record<string, any>) {
+    return this.post('inventory/operation/settings', body, undefined, '202604');
+  }
+
+  /** V202604 查询商机 */
+  async queryOpportunities(params: {
+    page_size: number;
+    page_token?: string;
+    locale: string;
+    [key: string]: any;
+  }) {
+    const qs: Record<string, string> = {
+      page_size: String(params.page_size),
+      locale: params.locale,
+    };
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.post('opportunities/query', params, qs, '202604');
+  }
+
+  /** V202604 获取商机详情 */
+  async getOpportunity(opportunityId: string, params: { locale: string }) {
+    const qs: Record<string, string> = { locale: params.locale };
+    return this.get(`opportunities/${opportunityId}`, qs, '202604');
+  }
+
+  /** V202604 提交商机 */
+  async submitOpportunity(opportunityId: string, body: Record<string, any>) {
+    return this.post(`opportunities/${opportunityId}/submit`, body, undefined, '202604');
+  }
+
+  /** V202604 获取商机提交记录 */
+  async getOpportunitySubmissions(params: {
+    status?: string;
+    opportunity_id?: string;
+    product_id?: string;
+    submit_time_ge?: string;
+    submit_time_lt?: string;
+    page_token?: string;
+    page_size: number;
+  }) {
+    const qs: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.status) qs['status'] = params.status;
+    if (params.opportunity_id) qs['opportunity_id'] = params.opportunity_id;
+    if (params.product_id) qs['product_id'] = params.product_id;
+    if (params.submit_time_ge) qs['submit_time_ge'] = params.submit_time_ge;
+    if (params.submit_time_lt) qs['submit_time_lt'] = params.submit_time_lt;
+    if (params.page_token) qs['page_token'] = params.page_token;
+    return this.get('opportunities/submissions', qs, '202604');
+  }
+
+  /** V202604 GPA 升级任务 */
+  async createGpaUpgradeTask(body: Record<string, any>) {
+    return this.post('products/gpa_upgrade_task', body, undefined, '202604');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202605（SKPP）
+  // ═══════════════════════════════════════════════
+
+  /** V202605 搜索 SKPP */
+  async searchSkpps(params: { locale: string; [key: string]: any }) {
+    const qs: Record<string, string> = { locale: params.locale };
+    return this.post('skpps/search', params, qs, '202605');
+  }
+
+  /** V202605 获取 SKPP 详情 */
+  async getSkpp(productId: string, params: { locale: string }) {
+    const qs: Record<string, string> = { locale: params.locale };
+    return this.get(`skpps/${productId}`, qs, '202605');
+  }
+
+  /** V202605 SKPP 汇总 */
+  async getSkppsSum() {
+    return this.get('skpps/sum', undefined, '202605');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  商品 API — V202606（SKPP v2）
+  // ═══════════════════════════════════════════════
+
+  /** V202606 搜索 SKPP */
+  async searchSkppsV202606(params: { locale: string; [key: string]: any }) {
+    const qs: Record<string, string> = { locale: params.locale };
+    return this.post('skpps/search', params, qs, '202606');
+  }
+
+  /** V202606 获取 SKPP 详情 */
+  async getSkppV202606(productId: string, params: { locale: string }) {
+    const qs: Record<string, string> = { locale: params.locale };
+    return this.get(`skpps/${productId}`, qs, '202606');
+  }
+
+  /** V202606 SKPP 汇总 */
+  async getSkppsSumV202606() {
+    return this.get('skpps/sum', undefined, '202606');
+  }
+
+  // ═══════════════════════════════════════════════
+  //  店铺 API
+  // ═══════════════════════════════════════════════
+
+  /** @deprecated 请使用 tiktok-oauth.ts 中的 getAuthorizedShops() */
   async getAuthorizedShops() {
-    // TODO: 修复 CATEGORY_MAP 使其支持 authorization 类别
-    // 当前路径错误，返回 shop/get_authorized_shop 在 TikTok API 中不存在
     return this.get('shop/get_authorized_shop');
   }
 
@@ -160,26 +814,26 @@ export class TikTokAPI {
     return this.get('shop/get_info');
   }
 
-  // ─── 物流 API ──────────────────────────────────
+  // ═══════════════════════════════════════════════
+  //  物流 API
+  // ═══════════════════════════════════════════════
 
-  /** 获取物流信息 */
   async getShippingInfo(orderId: string) {
     return this.get(`logistics/${orderId}`);
   }
 
-  /** 获取物流提供商列表 */
   async getShippingProviders() {
     return this.get('logistics/shipping_providers');
   }
 
-  // ─── 财务 API ──────────────────────────────────
+  // ═══════════════════════════════════════════════
+  //  财务 API
+  // ═══════════════════════════════════════════════
 
-  /** 获取结算单 */
   async getSettlements(params: Record<string, any>) {
     return this.get('finance/settlements', params);
   }
 
-  /** 获取订单交易记录 */
   async getOrderTransactions(params: Record<string, any>) {
     return this.get('finance/order_transactions', params);
   }

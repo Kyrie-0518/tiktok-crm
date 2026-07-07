@@ -62,14 +62,17 @@ const CATEGORY_MAP: Record<string, string> = {
   finance: 'finance',
 };
 
-/** 生成完整的请求 URL 和请求头（官方 SDK 格式） */
+/** 生成完整的请求 URL 和请求头（官方 SDK 格式）
+ * @param apiVersionOverride 可选：覆盖 auth.api_version，用于调用不同版本 API
+ */
 export function buildSignedRequest(
   auth: TikTokAuth,
   endpoint: string,
   queryParams?: Record<string, string>,
   body?: Record<string, any>,
+  apiVersionOverride?: string,
 ): { url: string; headers: Record<string, string> } {
-  const apiVersion = auth.api_version || '202309';
+  const apiVersion = apiVersionOverride || auth.api_version || '202309';
   // 从 endpoint 推断 API category（orders → order, products → product 等）
   const rawCategory = endpoint.split('/')[0] || endpoint;
   const category = CATEGORY_MAP[rawCategory] || rawCategory;

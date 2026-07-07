@@ -31,6 +31,7 @@ import { startAutoBackup } from './utils/backup';
 import { startAuditLogCleanup } from './middleware/audit';
 import auditLogRoutes from './routes/audit-logs';
 import aiStudioRoutes from './routes/ai-studio';
+import productsTiktokRoutes from './routes/products-tiktok';
 import getDb from './db';
 
 // ── 启动时强制检查 tiktok_shops 表结构迁移 ──
@@ -89,6 +90,7 @@ app.use('/api/ai-channels', aiChannelsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/ai-studio', aiStudioRoutes);
+app.use('/api/products-tiktok', productsTiktokRoutes);
 
 
 // Serve uploaded images
