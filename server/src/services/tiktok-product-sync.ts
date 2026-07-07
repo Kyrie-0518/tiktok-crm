@@ -302,22 +302,21 @@ function saveProduct(
   if (!name) return 'skipped';
 
   const status = PRODUCT_STATUS_MAP[product.status] || 'active';
-  const sellPrice = parseFloat(product.price?.sale_price || product.sale_price || '0') || 0;
+  const sellPrice = parseFloat(product.skus?.[0]?.price?.sale_price || product.price?.sale_price || product.sale_price || '0') || 0;
   const originalPrice = parseFloat(product.price?.original_price || product.original_price || String(sellPrice)) || sellPrice;
   const stock = (product.stock_info?.stock_num ?? product.stock_info?.available_stock ?? product.inventory?.quantity ?? product.stock ?? 0);
-  // TikTok 搜索列表可能返回 images 数组，取第一张作为 main_image
-  const image = product.main_image?.thumb_url || product.main_image?.url ||
-    (Array.isArray(product.images) && product.images[0]?.thumb_url) ||
-    (Array.isArray(product.images) && product.images[0]?.url) ||
-    (Array.isArray(product.image_list) && product.image_list[0]?.thumb_url) ||
-    (Array.isArray(product.image_list) && product.image_list[0]?.url) ||
+  // TikTok API 实际字段：main_images[] 数组，每项有 urls[] 和 thumb_urls[]
+  const firstImg = Array.isArray(product.main_images) && product.main_images[0];
+  const image = (firstImg ? (firstImg.thumb_urls?.[0] || firstImg.urls?.[0]) : '') ||
+    product.main_image?.thumb_url || product.main_image?.url ||
     product.image || '';
   const description = product.description || '';
-  const categoryName = product.category?.name || product.category_name || '';
-  const weight = parseFloat(product.package_weight || product.weight || '0') || 0;
+  const categoryName = Array.isArray(product.category_chains) && product.category_chains[0]?.name ||
+    product.category?.name || product.category_name || '';
+  const weight = parseFloat(product.package_weight?.value || product.package_weight || product.weight || '0') || 0;
   const brands = product.brand || product.brands || null;
-  const categories = product.category?.chain || product.categories || [];
-  const images = product.images || [];
+  const categories = product.category?.chain || product.category_chains || product.categories || [];
+  const images = product.main_images || product.images || [];
   const extraData = JSON.stringify({
     categories,
     images,
@@ -393,30 +392,38 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
   ).get(platform, sourcePid) as any;
   if (!existing) return;
 
-  // DEBUG: 打印详情接口关键字段结构
+  // DEBUG: 打印详情接口关键字段结构（实际字段名）
   console.log('[ProductSync] 详情接口字段:', {
-    id: detail.product_id || detail.id,
-    title: detail.title || detail.product_name,
-    price: detail.price,
-    stock_info: detail.stock_info,
-    main_image: detail.main_image,
-    has_images: Array.isArray(detail.images),
-    has_image_list: Array.isArray(detail.image_list),
+    id: detail.id,
+    title: detail.title,
+    has_main_images: Array.isArray(detail.main_images),
+    has_skus: Array.isArray(detail.skus),
+    sku_count: Array.isArray(detail.skus) ? detail.skus.length : 0,
+    first_sku_price: Array.isArray(detail.skus) && detail.skus[0]?.price?.sale_price,
+    first_sku_inv: Array.isArray(detail.skus) && detail.skus[0]?.inventory?.[0]?.quantity,
   });
 
-  // 解析详情接口中的价格/库存/图片/重量
-  const sellPrice = parseFloat(detail.price?.sale_price || detail.sale_price || '0') || 0;
-  const originalPrice = parseFloat(detail.price?.original_price || detail.original_price || String(sellPrice)) || sellPrice;
-  const stock = (detail.stock_info?.stock_num ?? detail.stock_info?.available_stock ?? detail.inventory?.quantity ?? detail.stock ?? 0);
-  const image = detail.main_image?.thumb_url || detail.main_image?.url ||
-    (Array.isArray(detail.images) && detail.images[0]?.thumb_url) ||
-    (Array.isArray(detail.images) && detail.images[0]?.url) ||
-    (Array.isArray(detail.image_list) && detail.image_list[0]?.thumb_url) ||
-    (Array.isArray(detail.image_list) && detail.image_list[0]?.url) ||
-    detail.image || '';
+  // 解析详情接口（TikTok API JSON 返回 snake_case 字段名）
+  // 图片：main_images[] -> 第一张图的 thumb_urls[0] 或 urls[0]
+  const firstMainImg = Array.isArray(detail.main_images) && detail.main_images[0];
+  const image = firstMainImg
+    ? (firstMainImg.thumb_urls?.[0] || firstMainImg.urls?.[0] || '')
+    : '';
+  // 价格：取第一个 SKU 的 price.sale_price
+  const firstSku = Array.isArray(detail.skus) ? detail.skus[0] : null;
+  const sellPrice = parseFloat(firstSku?.price?.sale_price || '0') || 0;
+  // 库存：所有 SKU 的所有仓库 inventory 求和
+  const stock = Array.isArray(detail.skus)
+    ? detail.skus.reduce((sum: number, sku: any) => sum + (Array.isArray(sku.inventory)
+      ? sku.inventory.reduce((s: number, inv: any) => s + (inv.quantity || 0), 0)
+      : 0), 0)
+    : 0;
   const description = detail.description || '';
-  const categoryName = detail.category?.name || detail.category_name || '';
-  const weight = parseFloat(detail.package_weight || detail.weight || '0') || 0;
+  // 类目链：category_chains 是数组，取第一个的 name
+  const firstCat = Array.isArray(detail.category_chains) && detail.category_chains[0];
+  const categoryName = firstCat?.name || '';
+  // 重量：从 package_weight 中取
+  const weight = parseFloat(detail.package_weight?.value || detail.package_weight || '0') || 0;
   const status = PRODUCT_STATUS_MAP[detail.status] || 'active';
 
   // 更新主表字段（图片、价格、库存、描述、类目、重量、状态）
@@ -450,7 +457,7 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
   if (detail.attributes?.length) extra.attributes = detail.attributes;
 
   // 追加图片（完整列表）
-  if (detail.images?.length) extra.images = detail.images;
+  if (detail.main_images?.length) extra.images = detail.main_images;
 
   // 追加视频
   if (detail.videos?.length) extra.videos = detail.videos;
@@ -482,14 +489,20 @@ function saveProductSkus(db: any, productId: number, product: any) {
   if (skuList.length === 0) return;
 
   for (const sku of skuList) {
-    const skuId = String(sku.sku_id || sku.id || '').trim();
+    const skuId = String(sku.id || sku.sku_id || '').trim();
     const skuCode = sku.seller_sku || sku.sku_code || skuId || '';
-    const specName = sku.sku_name || sku.spec_name || '';
+    const specName = sku.sku_name || sku.spec_name ||
+      (Array.isArray(sku.sales_attributes) ? sku.sales_attributes.map((a: any) => a.value_name || a.name).join('/') : '');
     const skuPrice = parseFloat(sku.price?.sale_price || sku.sale_price || '0') || 0;
-    const skuStock = sku.stock_info?.stock_num ?? sku.stock_info?.available_stock ?? sku.stock ?? 0;
-    const skuImage = sku.sku_image?.thumb_url || sku.sku_image?.url ||
-      (Array.isArray(sku.images) && sku.images[0]?.thumb_url) ||
-      (Array.isArray(sku.images) && sku.images[0]?.url) ||
+    const skuStock = Array.isArray(sku.inventory)
+      ? sku.inventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0)
+      : (sku.stock_info?.stock_num ?? sku.stock_info?.available_stock ?? sku.stock ?? 0);
+    // SKU 图片：优先 sales_attributes 中的图片，其次 main_images
+    const firstSalesAttr = Array.isArray(sku.sales_attributes) && sku.sales_attributes[0];
+    const skuImg = firstSalesAttr?.sku_img?.urls?.[0] || firstSalesAttr?.sku_img?.thumb_urls?.[0] || '';
+    const skuImage = skuImg ||
+      (Array.isArray(sku.images) && sku.images[0]?.urls?.[0]) ||
+      (Array.isArray(sku.images) && sku.images[0]?.thumb_urls?.[0]) ||
       sku.image || '';
 
     const existing = db.prepare(
