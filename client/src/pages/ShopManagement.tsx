@@ -1,22 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Card, Button, Space, Modal, Form, Input, Select, Tag, message,
-  Popconfirm, Statistic, Row, Col, Empty, Spin, Tooltip, DatePicker,
-  Divider, Switch, Alert, Badge,
+  Popconfirm, Row, Col, Empty, Spin, Tooltip,
+  Switch, Alert,
 } from 'antd';
 import {
-  PlusOutlined, SyncOutlined, DeleteOutlined, ShopOutlined,
-  ShoppingCartOutlined, DollarOutlined, BarChartOutlined,
+  SyncOutlined, DeleteOutlined, ShopOutlined,
   ApiOutlined, LinkOutlined, CloudDownloadOutlined, AppstoreOutlined,
   KeyOutlined, ReloadOutlined, SafetyCertificateOutlined,
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import * as echarts from 'echarts';
 import api from '../api';
 import { useHasPerm } from '../stores/authStore';
-
-const BRAND_COLOR = '#2563eb';
-const { RangePicker } = DatePicker;
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   active:   { label: '运营中', color: 'success' },
@@ -29,23 +23,15 @@ const REGION_MAP: Record<string, string> = {
   ID: '印度尼西亚', VN: '越南', GB: '英国', US: '美国',
 };
 
-const METRIC_COLORS = ['#2563eb', '#52c41a', '#fa8c16', '#eb2f96'];
-
 export default function ShopManagement() {
   const canEdit = useHasPerm('shops', 'edit');
   const [shops, setShops] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [selectedShop, setSelectedShop] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editShop, setEditShop] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [refreshLoading, setRefreshLoading] = useState<Record<number, boolean>>({});
   const [form] = Form.useForm();
-  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
 
   const loadShops = async () => {
     setLoading(true);
@@ -59,28 +45,9 @@ export default function ShopManagement() {
     }
   };
 
-  const loadStats = async (shopId?: number) => {
-    setStatsLoading(true);
-    try {
-      const params: any = {};
-      if (shopId) params.shop_id = shopId;
-      if (dateRange) {
-        params.date_from = dateRange[0].format('YYYY-MM-DD');
-        params.date_to = dateRange[1].format('YYYY-MM-DD');
-      }
-      const res = await api.get('/shops/stats', { params });
-      setStats(res.data);
-    } catch {
-      message.error('加载统计数据失败');
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
   // Init
   useEffect(() => {
     loadShops();
-    loadStats();
   }, []);
 
   // Handle TikTok OAuth callback (two modes)
@@ -96,7 +63,6 @@ export default function ShopManagement() {
       window.history.replaceState({}, '', '/shops');
       message.success(`TikTok 店铺授权成功！`);
       loadShops();
-      loadStats();
       return;
     }
     if (authResult === 'error') {
@@ -123,7 +89,6 @@ export default function ShopManagement() {
         message.success(`TikTok 店铺「${res.data.shop_name}」已重新授权！`);
       }
       loadShops();
-      loadStats();
     } catch (e: any) {
       message.error(e.response?.data?.error || '授权处理失败');
     } finally {
@@ -131,65 +96,12 @@ export default function ShopManagement() {
     }
   };
 
-  // ECharts init
-  useEffect(() => {
-    if (!chartRef.current) return;
-    if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current);
-    }
-    const observer = new ResizeObserver(() => chartInstance.current?.resize());
-    observer.observe(chartRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  // Update chart
-  useEffect(() => {
-    if (!chartInstance.current || !stats) return;
-    const trend = stats.trend || [];
-    const isSingleDay = stats.filtered?.is_single_day;
-    if (trend.length === 0) { chartInstance.current.clear(); return; }
-
-    const xData = trend.map((d: any) => isSingleDay ? (d.time_point?.split(' ')[1] || '') : (d.time_point || ''));
-    const series: any[] = [{
-      name: 'GMV', type: 'line', yAxisIndex: 0, smooth: true,
-      data: trend.map((d: any) => d.gmv || 0),
-      itemStyle: { color: METRIC_COLORS[0] }, lineStyle: { width: 2 },
-      areaStyle: { color: 'rgba(37,99,235,0.1)' },
-    }];
-    if (isSingleDay && trend.some((d: any) => d.prev_gmv > 0)) {
-      series.push({
-        name: '昨日GMV', type: 'line', yAxisIndex: 0, smooth: true,
-        data: trend.map((d: any) => d.prev_gmv || 0),
-        itemStyle: { color: '#94a3b8' }, lineStyle: { width: 2 },
-      });
-    }
-    if (trend.some((d: any) => d.item_count > 0)) series.push({ name: '成交件数', type: 'line', yAxisIndex: 1, smooth: true, data: trend.map((d: any) => d.item_count || 0), itemStyle: { color: METRIC_COLORS[1] }, lineStyle: { width: 2 } });
-    if (trend.some((d: any) => d.order_count > 0)) series.push({ name: '订单数', type: 'line', yAxisIndex: 1, smooth: true, data: trend.map((d: any) => d.order_count || 0), itemStyle: { color: METRIC_COLORS[2] }, lineStyle: { width: 2 } });
-    if (trend.some((d: any) => d.sku_count > 0)) series.push({ name: 'SKU数', type: 'line', yAxisIndex: 1, smooth: true, data: trend.map((d: any) => d.sku_count || 0), itemStyle: { color: METRIC_COLORS[3] }, lineStyle: { width: 2 } });
-
-    chartInstance.current.setOption({
-      title: { text: isSingleDay ? '今日GMV趋势（小时）' : 'GMV趋势', textStyle: { fontSize: 13, fontWeight: 500, color: '#666' } },
-      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: (p: any) => !Array.isArray(p) || p.length === 0 ? '' : `<div style="font-weight:600;margin-bottom:4px">${p[0].axisValue}</div>${p.map((x: any) => `<div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#666">${x.seriesName}</span><span style="font-weight:600">${Number(x.value).toLocaleString()}</span></div>`).join('')}` },
-      legend: { data: series.map(s => s.name), bottom: 0, icon: 'roundRect' },
-      grid: { left: 50, right: 50, top: 40, bottom: 50 },
-      xAxis: { type: 'category', data: xData, axisLabel: { fontSize: 11, color: '#999' }, axisLine: { lineStyle: { color: '#e8e8e8' } } },
-      yAxis: [{ type: 'value', name: 'GMV (RM)', position: 'left', axisLine: { show: true, lineStyle: { color: METRIC_COLORS[0] } }, splitLine: { lineStyle: { color: '#f0f0f0' } } }, { type: 'value', name: '数量', position: 'right', axisLine: { show: true, lineStyle: { color: '#94a3b8' } }, splitLine: { show: false } }],
-      series,
-    }, true);
-  }, [stats]);
-
-  const handleShopClick = (shopId: number) => {
-    const next = selectedShop === shopId ? null : shopId;
-    setSelectedShop(next);
-    loadStats(next || undefined);
-  };
-
   const handleSync = async (e: React.MouseEvent, shopId: number) => {
     e.stopPropagation();
     try {
       const res = await api.post(`/shops/${shopId}/sync`);
       message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`);
-      loadShops(); loadStats(selectedShop || undefined);
+      loadShops();
     } catch (e: any) {
       message.error(e.response?.data?.errors?.[0] || '同步失败');
     }
@@ -213,7 +125,7 @@ export default function ShopManagement() {
       const res = await api.post(`/shops/${shopId}/sync-all`);
       const s = res.data.summary;
       message.success({ content: `同步完成：产品${s.products_created + s.products_updated} 订单${s.orders_created + s.orders_updated}`, key: 'sync-all' });
-      loadShops(); loadStats(selectedShop || undefined);
+      loadShops();
     } catch (e: any) {
       message.error({ content: e.response?.data?.errors?.[0] || '同步失败', key: 'sync-all' });
     }
@@ -254,7 +166,6 @@ export default function ShopManagement() {
     try {
       await api.delete(`/shops/${shopId}`);
       message.success('已解绑');
-      if (selectedShop === shopId) { setSelectedShop(null); loadStats(); }
       loadShops();
     } catch (e: any) {
       message.error(e.response?.data?.error || '解绑失败');
@@ -310,10 +221,6 @@ export default function ShopManagement() {
     }
   };
 
-  const filtered = stats?.filtered;
-  const isSingleDay = filtered?.is_single_day;
-  const selectedShopName = selectedShop ? shops.find(s => s.id === selectedShop)?.name : null;
-
   const getTokenBadge = (shop: any) => {
     if (!shop._has_credentials) return <Tag color="default">未授权</Tag>;
     if (shop._token_valid === false) return <Tag color="error">Token已过期</Tag>;
@@ -330,7 +237,7 @@ export default function ShopManagement() {
           </div>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>店铺管理</h2>
-            <span style={{ fontSize: 12, color: '#999' }}>一键授权绑定 TikTok 店铺 · 数据同步 · 统计概览</span>
+            <span style={{ fontSize: 12, color: '#999' }}>一键授权绑定 TikTok 店铺 · 数据同步</span>
           </div>
         </div>
         {canEdit && (
@@ -365,17 +272,15 @@ export default function ShopManagement() {
         {shops.length === 0 && !authLoading ? (
           <Empty description="暂无绑定店铺，点击右上角「一键授权 TikTok Shop」开始" />
         ) : (
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Row gutter={[16, 16]}>
             {shops.map(shop => (
               <Col key={shop.id} xs={24} sm={12} md={8} lg={6}>
                 <Card
                   hoverable
                   style={{
-                    cursor: 'pointer',
-                    border: selectedShop === shop.id ? `2px solid ${BRAND_COLOR}` : '1px solid #e8e8e8',
+                    border: '1px solid #e8e8e8',
                     borderRadius: 10,
                   }}
-                  onClick={() => handleShopClick(shop.id)}
                   styles={{ body: { padding: 16 } }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -419,65 +324,6 @@ export default function ShopManagement() {
             ))}
           </Row>
         )}
-      </Spin>
-
-      {/* Stats Dashboard */}
-      <Spin spinning={statsLoading}>
-        <Card
-          title={
-            <Space>
-              <BarChartOutlined style={{ color: BRAND_COLOR }} />
-              {selectedShopName ? `数据看板 — ${selectedShopName}` : '数据看板（全部店铺）'}
-            </Space>
-          }
-          extra={
-            <Space>
-              <RangePicker value={dateRange} onChange={(v) => { setDateRange(v as any); loadStats(selectedShop || undefined); }}
-                format="YYYY/MM/DD" allowClear placeholder={['开始日期', '结束日期']} style={{ width: 260 }} />
-              <Select placeholder="选择店铺" value={selectedShop} allowClear style={{ width: 160 }}
-                onChange={(v) => { setSelectedShop(v || null); loadStats(v || undefined); }}
-                options={shops.map(s => ({ value: s.id, label: s.name }))} />
-            </Space>
-          }
-          style={{ marginBottom: 16, borderRadius: 10 }}
-        >
-          <Row gutter={[16, 16]}>
-            <Col xs={12} sm={8} md={6}><Statistic title="GMV" value={filtered?.gmv || 0} prefix="RM" precision={2} valueStyle={{ color: METRIC_COLORS[0], fontSize: 20 }} /></Col>
-            <Col xs={12} sm={8} md={6}><Statistic title="成交件数" value={filtered?.item_count || 0} valueStyle={{ color: METRIC_COLORS[1], fontSize: 20 }} /></Col>
-            <Col xs={12} sm={8} md={6}><Statistic title="SKU订单数" value={filtered?.sku_count || 0} valueStyle={{ color: METRIC_COLORS[2], fontSize: 20 }} /></Col>
-            <Col xs={12} sm={8} md={6}><Statistic title="订单数" value={filtered?.order_count || 0} prefix={<ShoppingCartOutlined style={{ fontSize: 16 }} />} valueStyle={{ color: METRIC_COLORS[3], fontSize: 20 }} /></Col>
-          </Row>
-          <Row gutter={[16, 8]} style={{ marginTop: 16 }}>
-            {[
-              { label: '待发货', value: stats?.pending_ship, color: '#faad14' },
-              { label: '申请取消', value: stats?.cancel_requested, color: '#ff4d4f' },
-              { label: '退货/退款', value: stats?.refund_requested, color: '#ff4d4f' },
-              { label: '今日GMV', value: stats?.today?.gmv, color: BRAND_COLOR, prefix: 'RM' },
-              { label: '今日订单', value: stats?.today?.order_count, color: '#52c41a' },
-            ].map(item => (
-              <Col key={item.label} xs="auto">
-                <Tag color={item.color} style={{ fontSize: 12, padding: '2px 10px' }}>
-                  {item.label}: <strong>{typeof item.value === 'number' ? item.value.toLocaleString() : '—'}</strong>
-                  {item.prefix === 'RM' && item.value ? ` ${Number(item.value).toFixed(2)}` : ''}
-                </Tag>
-              </Col>
-            ))}
-          </Row>
-          <div style={{ marginTop: 24 }}>
-            {stats?.trend?.length > 0 ? (
-              <div ref={chartRef} style={{ width: '100%', height: 320 }} />
-            ) : (
-              <div style={{ textAlign: 'center', color: '#ccc', padding: 40 }}>
-                <DollarOutlined style={{ fontSize: 32 }} /><div style={{ marginTop: 8, fontSize: 13 }}>暂无趋势数据</div>
-              </div>
-            )}
-          </div>
-          {filtered?.date_from && filtered?.date_to && (
-            <div style={{ textAlign: 'center', fontSize: 12, color: '#999', marginTop: 8 }}>
-              {isSingleDay ? `查看日期: ${filtered.date_from}（小时粒度）` : `查看区间: ${filtered.date_from} ~ ${filtered.date_to}`}
-            </div>
-          )}
-        </Card>
       </Spin>
 
       {/* Edit Modal — 仅编辑基本信息，不含 API 凭证 */}
