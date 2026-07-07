@@ -39,7 +39,18 @@ function generateSign(
   signString = `${appSecret}${signString}${appSecret}`;
 
   // Step 6: HMAC-SHA256
-  return crypto.createHmac('sha256', appSecret).update(signString).digest('hex');
+  const signValue = crypto.createHmac('sha256', appSecret).update(signString).digest('hex');
+
+  // ⚠️ 调试日志：部署后查看服务器日志
+  console.log('=== SIGN DEBUG (tiktok-api.ts) ===');
+  console.log('pathname:', pathname);
+  console.log('paramString:', paramString);
+  console.log('bodyStr:', bodyStr || '(none)');
+  console.log('raw:', signString);
+  console.log('sign:', signValue);
+  console.log('===================================');
+
+  return signValue;
 }
 
 /** endpoint 前缀到官方 API category 的映射（SDK 单数/复数不一致） */
