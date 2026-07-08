@@ -158,102 +158,83 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
       if (!pageToken) break;
     }
 
-    // 5. 更新同步时间
-    db.prepare("UPDATE tiktok_shops SET last_synced_at = datetime('now') WHERE id = ?").run(shopId);
-
-  } catch (e: any) {
-    errors.push(`API 调用失败: ${e.message}`);
+  // 6. 修复缺失商品明细的旧订单（已同步但 order_items 为空的订单）
+  const fixed = await fixMissingOrderItems(db, api, shopId);
+  if (fixed > 0) {
+    console.log(`[order-sync] 额外修复 ${fixed} 条旧订单的商品明细`);
   }
 
-  return { created, updated, errors };
+  // 7. 更新同步时间
+  db.prepare("UPDATE tiktok_shops SET last_synced_at = datetime('now') WHERE id = ?").run(shopId);
+
+  return { created, updated, itemsFixed: fixed, errors };
 }
 
-/** 解析并保存单个订单到本地数据库 */
-function saveOrder(db: any, order: any, shopId: number): 'created' | 'updated' | 'skipped' {
-  const orderNo = order.id || order.order_id || '';
-  if (!orderNo) return 'skipped';
+/** 修复缺失商品明细的订单（已同步但 order_items 为空的旧订单） */
+async function fixMissingOrderItems(db: any, api: TikTokAPI, shopId: number): Promise<number> {
+  // 找出该店铺下所有 order_items 为空的订单
+  const missingOrders = db.prepare(`
+    SELECT o.id, o.order_no
+    FROM orders o
+    LEFT JOIN order_items oi ON o.id = oi.order_id
+    WHERE o.shop_id = ? AND oi.id IS NULL
+    ORDER BY o.id DESC
+  `).all(shopId) as any[];
 
-  // 提取基本信息
-  const buyerName = order.buyer_name || order.recipient_address?.name || '';
-  const buyerPhone = order.buyer_phone || order.recipient_address?.phone || '';
-  const status = STATUS_MAP[order.status] || 'pending';
-  const logisticsStatus = LOGISTICS_MAP[order.status] || '';
-  const trackingNo = order.tracking_number || order.package_info?.tracking_number || '';
-  const carrier = order.shipping_provider_name || order.package_info?.carrier || '';
-  const actualAmount = parseFloat(order.total_amount || order.payment?.total_amount || '0') || 0;
-  const currency = order.currency || 'MYR';
-  const orderTime = order.create_time 
-    ? toUtc8(order.create_time)
-    : (order.created_time || new Date().toISOString().replace('Z', ''));
-  const updateTime = order.update_time
-    ? toUtc8(order.update_time)
-    : orderTime;
+  if (missingOrders.length === 0) return 0;
+  console.log(`[fixMissingOrderItems] 店铺 ${shopId} 发现 ${missingOrders.length} 条订单缺失商品明细`);
 
-  // 收款状态
-  let paymentStatus = 'unpaid';
-  if (order.payment_status === 'PAID' || order.payment?.status === 'PAID') paymentStatus = 'paid';
-  else if (order.payment_status === 'PARTIAL_PAID') paymentStatus = 'partial';
+  let fixed = 0;
+  const batchSize = 50;
+  for (let i = 0; i < missingOrders.length; i += batchSize) {
+    const batch = missingOrders.slice(i, i + batchSize);
+    const orderIds = batch.map((o: any) => o.order_no).filter(Boolean);
+    if (orderIds.length === 0) continue;
 
-  // 检查是否已存在
-  const existing = db.prepare('SELECT id, status, actual_amount FROM orders WHERE order_no = ?').get(orderNo) as any;
+    try {
+      const detailResp = await api.getOrderDetail(orderIds);
+      const detailList = detailResp?.data?.orders
+                     || detailResp?.data?.order_list
+                     || detailResp?.data?.order_detail_list
+                     || [];
 
-  if (existing) {
-    // 更新
-    db.prepare(`
-      UPDATE orders SET
-        shop_id = ?, buyer_name = ?, buyer_phone = ?, status = ?,
-        payment_status = ?, logistics_status = ?, tracking_no = ?, carrier = ?,
-        actual_amount = ?, currency = ?, order_time = ?, updated_at = ?
-      WHERE id = ?
-    `).run(
-      shopId, buyerName, buyerPhone, status,
-      paymentStatus, logisticsStatus, trackingNo, carrier,
-      actualAmount, currency, orderTime, updateTime,
-      existing.id
-    );
+      const idMap = Object.fromEntries(batch.map((o: any) => [o.order_no, o.id]));
+      for (const d of detailList) {
+        const did = d.id || d.order_id || '';
+        const localId = idMap[did];
+        if (!localId) continue;
 
-    // 更新 order_items
-    saveOrderItems(db, existing.id, order);
+        const items =
+          (d.line_item_list?.length ? d.line_item_list : undefined)
+          || d.package_list?.[0]?.item_list
+          || (d.order_line_list?.length ? d.order_line_list : undefined)
+          || (d.order_lines?.length ? d.order_lines : undefined)
+          || (d.line_items?.length ? d.line_items : undefined)
+          || (d.item_list?.length ? d.item_list : undefined)
+          || (d.items?.length ? d.items : undefined)
+          || [];
 
-    return 'updated';
-  } else {
-    // 创建新订单
-    const result = db.prepare(`
-      INSERT INTO orders (order_no, shop_id, buyer_name, buyer_phone, status,
-        payment_status, logistics_status, tracking_no, carrier,
-        actual_amount, currency, order_time, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      orderNo, shopId, buyerName, buyerPhone, status,
-      paymentStatus, logisticsStatus, trackingNo, carrier,
-      actualAmount, currency, orderTime, orderTime, updateTime
-    );
-
-    // 保存订单明细
-    saveOrderItems(db, result.lastInsertRowid as number, order);
-
-    return 'created';
+        if (items.length > 0) {
+          saveOrderItemsToDb(db, localId, items);
+          fixed++;
+        }
+      }
+    } catch (e: any) {
+      console.error(`[fixMissingOrderItems] 批次 ${Math.floor(i / batchSize) + 1} 失败: ${e.message}`);
+    }
   }
+  console.log(`[fixMissingOrderItems] 完成: 修复 ${fixed} 条订单`);
+  return fixed;
 }
 
-/** 保存订单明细（order_items） */
-function saveOrderItems(db: any, orderId: number, order: any) {
-  // 安全提取商品明细，避免空数组截断 || 短路
-  const items =
-    (order.line_item_list?.length ? order.line_item_list : undefined)
-    || order.package_list?.[0]?.item_list
-    || (order.order_line_list?.length ? order.order_line_list : undefined)
-    || (order.order_lines?.length ? order.order_lines : undefined)
-    || (order.line_items?.length ? order.line_items : undefined)
-    || (order.items?.length ? order.items : undefined)
-    || (order.item_list?.length ? order.item_list : undefined)
-    || [];
-  if (items.length === 0) {
-    console.log(`[saveOrderItems] 订单 ${orderId} 无商品明细，跳过`);
+/** 保存商品明细到数据库（items 为已提取的数组） */
+function saveOrderItemsToDb(db: any, orderId: number, items: any[]) {
+  if (!items || items.length === 0) {
+    console.log(`[saveOrderItemsToDb] 订单 ${orderId} 无商品明细，跳过`);
     return;
   }
 
-  console.log(`[saveOrderItems] 订单 ${orderId} 准备写入 ${items.length} 条商品明细`);
+  console.log(`[saveOrderItemsToDb] 订单 ${orderId} 准备写入 ${items.length} 条商品明细`);
 
   // 先删除旧明细再重新插入
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
@@ -267,7 +248,6 @@ function saveOrderItems(db: any, orderId: number, order: any) {
   for (const item of items) {
     const productName = item.product_name || item.productName || item.name || '';
     const sku = item.sku_id || item.skuId || item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
-    // TikTok API 价格可能是嵌套对象 item_price.amount；sale_price 可能为0，用 original_price/retail_price 回退
     const rawPrice = item.sale_price || item.salePrice || item.original_price || item.retail_price || item.price || item.item_price?.amount || item.unit_price || '0';
     const unitPrice = parseFloat(typeof rawPrice === 'string' ? rawPrice : String(rawPrice)) || 0;
     const quantity = item.quantity || item.qty || 1;
@@ -276,7 +256,6 @@ function saveOrderItems(db: any, orderId: number, order: any) {
     const imageUrl = item.sku_image || item.skuImage || item.image_url || item.imageUrl || item.item_image || '';
     const specName = item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
 
-    // 尝试匹配本地产品（product_skus 列名是 sku_code）
     let productId: number | null = null;
     if (sku) {
       const localSku = db.prepare('SELECT product_id FROM product_skus WHERE sku_code = ? LIMIT 1').get(sku) as any;
@@ -290,19 +269,13 @@ function saveOrderItems(db: any, orderId: number, order: any) {
     try {
       insert.run(orderId, productId, productName, sku, unitPrice, quantity, subtotal, itemStatus, imageUrl, specName);
       insertedCount++;
-      console.log(`[saveOrderItems] 订单 ${orderId} 插入成功: ${productName} ×${quantity}`);
     } catch (insertErr: any) {
-      console.error(`[saveOrderItems] 订单 ${orderId} 插入商品明细失败: ${insertErr.message}`);
-      console.error(`  参数: productName=${productName}, sku=${sku}, unitPrice=${unitPrice}, quantity=${quantity}, subtotal=${subtotal}, itemStatus=${itemStatus}, imageUrl=${imageUrl}, specName=${specName}`);
+      console.error(`[saveOrderItemsToDb] 订单 ${orderId} 插入失败: ${insertErr.message}`);
     }
   }
 
-  // 验证写入
   const savedCount = db.prepare('SELECT COUNT(*) as c FROM order_items WHERE order_id = ?').get(orderId) as any;
-  console.log(`[saveOrderItems] 订单 ${orderId} 写入完成: 预期 ${insertedCount} 条, 实际 ${savedCount?.c || 0} 条`);
-  if (savedCount?.c !== insertedCount) {
-    console.warn(`[saveOrderItems] 订单 ${orderId} 预期写入 ${insertedCount} 条，实际 ${savedCount?.c || 0} 条`);
-  }
+  console.log(`[saveOrderItemsToDb] 订单 ${orderId} 写入完成: 预期 ${insertedCount} 条, 实际 ${savedCount?.c || 0} 条`);
 }
 
 /** 凭证连通性测试 */

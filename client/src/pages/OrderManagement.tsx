@@ -500,8 +500,9 @@ export default function OrderManagement() {
     if (!shopId) return;
     setSyncLoading(true);
     try {
-      const res = await api.post(`/shops/${shopId}/sync`, {}, { timeout: 120000 });
-      message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`);
+      const res = await api.post(`/shops/${shopId}/sync`, {}, { timeout: 300000 });
+      const fixed = res.data.itemsFixed ? ` 修复商品明细${res.data.itemsFixed}` : '';
+      message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}${fixed}` : `部分失败：${res.data.errors?.join(',')}`);
       loadData();
     } catch (e: any) {
       message.error(e.response?.data?.errors?.[0] || '同步失败');
@@ -537,22 +538,6 @@ export default function OrderManagement() {
       loadData();
     } catch (e: any) {
       message.error({ content: e.response?.data?.errors?.[0] || '同步失败', key: 'sync-all' });
-    } finally {
-      setSyncLoading(false);
-      setSyncModalOpen(false);
-    }
-  };
-
-  const handleResyncItems = async (shopId: number) => {
-    if (!shopId) return;
-    setSyncLoading(true);
-    message.loading({ content: '补全商品明细中，请耐心等待...', key: 'resync-items', duration: 0 });
-    try {
-      const res = await api.post(`/shops/${shopId}/resync-items`, {}, { timeout: 300000 });
-      message.success({ content: `补全完成：共处理 ${res.data.processed} 条订单`, key: 'resync-items' });
-      loadData();
-    } catch (e: any) {
-      message.error({ content: e.response?.data?.errors?.[0] || '补全失败', key: 'resync-items' });
     } finally {
       setSyncLoading(false);
       setSyncModalOpen(false);
@@ -1049,7 +1034,7 @@ export default function OrderManagement() {
       >
         <div style={{ padding: '8px 0 16px' }}>
           <p style={{ color: '#666', fontSize: 13, marginBottom: 16 }}>
-            选择要同步的 TikTok 店铺，系统将自动拉取最新订单数据。若旧订单缺少商品明细，可使用"补全商品明细"修复。
+            选择要同步的 TikTok 店铺，系统将自动拉取最新订单，并自动修复旧订单缺失的商品明细。
           </p>
           <Select
             placeholder="选择店铺"
@@ -1063,9 +1048,6 @@ export default function OrderManagement() {
             <Button onClick={() => setSyncModalOpen(false)}>取消</Button>
             <Button icon={<SyncOutlined />} loading={syncLoading} onClick={() => handleSyncOrders(syncShopId!)} disabled={!syncShopId}>
               同步订单
-            </Button>
-            <Button type="primary" loading={syncLoading} onClick={() => handleResyncItems(syncShopId!)} disabled={!syncShopId}>
-              补全商品明细
             </Button>
           </Space>
         </div>
