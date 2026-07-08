@@ -500,7 +500,7 @@ export default function OrderManagement() {
     if (!shopId) return;
     setSyncLoading(true);
     try {
-      const res = await api.post(`/shops/${shopId}/sync`);
+      const res = await api.post(`/shops/${shopId}/sync`, {}, { timeout: 120000 });
       message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`);
       loadData();
     } catch (e: any) {
@@ -515,7 +515,7 @@ export default function OrderManagement() {
     if (!shopId) return;
     setSyncLoading(true);
     try {
-      const res = await api.post(`/shops/${shopId}/sync-products`);
+      const res = await api.post(`/shops/${shopId}/sync-products`, {}, { timeout: 120000 });
       message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`);
       loadData();
     } catch (e: any) {
@@ -531,7 +531,7 @@ export default function OrderManagement() {
     setSyncLoading(true);
     message.loading({ content: '全量同步中...', key: 'sync-all' });
     try {
-      const res = await api.post(`/shops/${shopId}/sync-all`);
+      const res = await api.post(`/shops/${shopId}/sync-all`, {}, { timeout: 180000 });
       const s = res.data.summary;
       message.success({ content: `同步完成：产品${s.products_created + s.products_updated} 订单${s.orders_created + s.orders_updated}`, key: 'sync-all' });
       loadData();
