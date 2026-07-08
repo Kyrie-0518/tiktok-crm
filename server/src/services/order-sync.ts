@@ -105,10 +105,21 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
           for (const d of detailList) {
             const did = d.id || d.order_id || '';
             if (did) {
+              // 安全提取商品明细，避免空数组截断 || 短路
+              const items =
+                (d.line_item_list?.length ? d.line_item_list : undefined)
+                || d.package_list?.[0]?.item_list
+                || (d.order_line_list?.length ? d.order_line_list : undefined)
+                || (d.order_lines?.length ? d.order_lines : undefined)
+                || (d.line_items?.length ? d.line_items : undefined)
+                || (d.item_list?.length ? d.item_list : undefined)
+                || (d.items?.length ? d.items : undefined)
+                || [];
               detailMap[did] = {
                 ...d,
-                line_items: d.line_item_list || d.package_list?.[0]?.item_list || d.order_line_list || d.order_lines || d.line_items || d.item_list || d.items || [],
+                line_items: items,
               };
+              console.log(`[order-sync] 订单 ${did} 提取商品明细 ${items.length} 件`);
             }
           }
           console.log(`[order-sync] 成功解析 ${Object.keys(detailMap).length} 条订单详情`);
@@ -227,13 +238,15 @@ function saveOrder(db: any, order: any, shopId: number): 'created' | 'updated' |
 
 /** 保存订单明细（order_items） */
 function saveOrderItems(db: any, orderId: number, order: any) {
-  const items = order.line_item_list
-    || (order.package_list?.[0]?.item_list)
-    || order.order_line_list
-    || order.order_lines
-    || order.line_items
-    || order.items
-    || order.item_list
+  // 安全提取商品明细，避免空数组截断 || 短路
+  const items =
+    (order.line_item_list?.length ? order.line_item_list : undefined)
+    || order.package_list?.[0]?.item_list
+    || (order.order_line_list?.length ? order.order_line_list : undefined)
+    || (order.order_lines?.length ? order.order_lines : undefined)
+    || (order.line_items?.length ? order.line_items : undefined)
+    || (order.items?.length ? order.items : undefined)
+    || (order.item_list?.length ? order.item_list : undefined)
     || [];
   if (items.length === 0) {
     return; // 无商品明细，静默跳过

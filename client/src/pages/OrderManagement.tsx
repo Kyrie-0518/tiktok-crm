@@ -741,7 +741,7 @@ export default function OrderManagement() {
         const items = r.items || [];
         if (!items.length) return <span style={{ color: '#ccc' }}>无商品信息</span>;
         const item = items[0];
-        const imgSrc = item.sku_image || item.product_image || '';
+        const imgSrc = item.sku_image || item.product_image || item.image_url || '';
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 44 }}>
             {/* Left: Square image */}
