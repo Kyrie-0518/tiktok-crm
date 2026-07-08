@@ -101,7 +101,7 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
               const detailResp = await api.getOrderDetail([orderId]);
               const detail = detailResp?.data?.orders?.[0] || detailResp?.data?.order_list?.[0];
               if (detail) {
-                orderDetail = { ...order, ...detail, line_items: detail.line_items || detail.item_list || detail.items || order.line_items };
+                orderDetail = { ...order, ...detail, line_items: detail.order_lines || detail.line_items || detail.item_list || detail.items || order.line_items };
               }
             } catch (detailErr: any) {
               console.warn(`[order-sync] 获取订单 ${orderId} 详情失败: ${detailErr.message}`);
@@ -201,7 +201,7 @@ function saveOrder(db: any, order: any, shopId: number): 'created' | 'updated' |
 
 /** 保存订单明细（order_items） */
 function saveOrderItems(db: any, orderId: number, order: any) {
-  const items = order.line_items || order.items || order.item_list || [];
+  const items = order.order_lines || order.line_items || order.items || order.item_list || [];
   if (items.length === 0) {
     console.warn(`[saveOrderItems] 订单 ${orderId} 没有商品信息，原始字段:`, Object.keys(order).filter(k => k.includes('item') || k.includes('sku') || k.includes('product')));
     return;
