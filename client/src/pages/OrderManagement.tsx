@@ -1025,7 +1025,7 @@ export default function OrderManagement() {
 
       {/* Sync TikTok Modal */}
       <Modal
-        title={<Space><SyncOutlined style={{ color: BRAND_COLOR }} /><span>同步 TikTok</span></Space>}
+        title={<Space><SyncOutlined style={{ color: BRAND_COLOR }} /><span>同步 TikTok 订单</span></Space>}
         open={syncModalOpen}
         onCancel={() => setSyncModalOpen(false)}
         footer={null}
@@ -1033,7 +1033,7 @@ export default function OrderManagement() {
       >
         <div style={{ padding: '8px 0 16px' }}>
           <p style={{ color: '#666', fontSize: 13, marginBottom: 16 }}>
-            选择要同步的 TikTok 店铺，系统将自动拉取最新订单与产品数据。
+            选择要同步的 TikTok 店铺，系统将自动拉取最新订单数据。
           </p>
           <Select
             placeholder="选择店铺"
@@ -1047,12 +1047,6 @@ export default function OrderManagement() {
             <Button onClick={() => setSyncModalOpen(false)}>取消</Button>
             <Button icon={<SyncOutlined />} loading={syncLoading} onClick={() => handleSyncOrders(syncShopId!)} disabled={!syncShopId}>
               同步订单
-            </Button>
-            <Button icon={<AppstoreOutlined />} loading={syncLoading} onClick={() => handleSyncProducts(syncShopId!)} disabled={!syncShopId}>
-              同步产品
-            </Button>
-            <Button type="primary" icon={<CloudDownloadOutlined />} loading={syncLoading} onClick={() => handleSyncAll(syncShopId!)} disabled={!syncShopId}>
-              全量同步
             </Button>
           </Space>
         </div>
