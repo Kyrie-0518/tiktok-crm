@@ -848,7 +848,6 @@ export default function OrderManagement() {
           activeKey={statusTab}
           onChange={k => { setStatusTab(k); setPage(1); }}
           items={tabItems}
-          tabBarExtraContent={tabBarRight}
           style={{ padding: '0 16px' }}
         />
 
@@ -876,50 +875,71 @@ export default function OrderManagement() {
             <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
             <Button icon={<ExportOutlined />} onClick={() => message.info('导出功能开发中')}>导出</Button>
           </Space>
-          {canEdit && (
-            !batchMode ? (
-              <Button
-                icon={<BorderOutlined />}
-                onClick={toggleBatchMode}
-                style={{ borderColor: '#faad14', color: '#faad14' }}
-              >
-                批量操作
-              </Button>
-            ) : (
-              <Space>
-                <Dropdown
-                  menu={{
-                    items: [
-                      { key: 'page', label: '全选当页' },
-                      { key: 'all', label: `全选全部 (${total})` },
-                    ],
-                    onClick: ({ key }) => {
-                      if (key === 'page') selectCurrentPage();
-                      else selectAllOrders();
-                    },
-                  }}
+          <Space>
+            {canEdit && (
+              <>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={loadData}
+                  style={{ borderColor: '#faad14', color: '#faad14' }}
+                >刷新</Button>
+                <Button
+                  icon={<SyncOutlined />}
+                  onClick={() => setSyncModalOpen(true)}
+                  style={{ borderColor: '#faad14', color: '#faad14' }}
+                >同步订单</Button>
+                <Button
+                  icon={<RobotOutlined />}
+                  onClick={() => setAiImportOpen(true)}
+                  style={{ borderColor: '#faad14', color: '#faad14' }}
+                >AI 导入订单</Button>
+              </>
+            )}
+            {canEdit && (
+              !batchMode ? (
+                <Button
+                  icon={<BorderOutlined />}
+                  onClick={toggleBatchMode}
+                  style={{ borderColor: '#faad14', color: '#faad14' }}
                 >
-                  <Button icon={<CheckSquareOutlined />} loading={selectAllLoading}>
-                    全选 <span style={{ fontSize: 12, color: '#999', marginLeft: 2 }}>▾</span>
-                  </Button>
-                </Dropdown>
-                <Popconfirm
-                  title={selectedAll
-                    ? `确认删除全部 ${total} 个订单？此操作不可撤销！`
-                    : `确认删除 ${selectedOrderIds.size} 个订单？`}
-                  onConfirm={handleBatchDelete}
-                  okText="确认删除"
-                  okType="danger"
-                  disabled={selectedOrderIds.size === 0}
-                >
-                  <Button danger icon={<DeleteOutlined />} disabled={selectedOrderIds.size === 0} loading={batchDeleting}>
-                    删除 ({displaySelectedCount})
-                  </Button>
-                </Popconfirm>
-                <Button onClick={exitBatchMode}>取消</Button>
-              </Space>
-            )
-          )}
+                  批量操作
+                </Button>
+              ) : (
+                <Space>
+                  <Dropdown
+                    menu={{
+                      items: [
+                        { key: 'page', label: '全选当页' },
+                        { key: 'all', label: `全选全部 (${total})` },
+                      ],
+                      onClick: ({ key }) => {
+                        if (key === 'page') selectCurrentPage();
+                        else selectAllOrders();
+                      },
+                    }}
+                  >
+                    <Button icon={<CheckSquareOutlined />} loading={selectAllLoading}>
+                      全选 <span style={{ fontSize: 12, color: '#999', marginLeft: 2 }}>▾</span>
+                    </Button>
+                  </Dropdown>
+                  <Popconfirm
+                    title={selectedAll
+                      ? `确认删除全部 ${total} 个订单？此操作不可撤销！`
+                      : `确认删除 ${selectedOrderIds.size} 个订单？`}
+                    onConfirm={handleBatchDelete}
+                    okText="确认删除"
+                    okType="danger"
+                    disabled={selectedOrderIds.size === 0}
+                  >
+                    <Button danger icon={<DeleteOutlined />} disabled={selectedOrderIds.size === 0} loading={batchDeleting}>
+                      删除 ({displaySelectedCount})
+                    </Button>
+                  </Popconfirm>
+                  <Button onClick={exitBatchMode}>取消</Button>
+                </Space>
+              )
+            )}
+          </Space>
         </div>
 
         {/* Table */}
