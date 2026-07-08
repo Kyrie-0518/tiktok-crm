@@ -1,0 +1,212 @@
+- generic [active] [ref=f4e1]:
+  - navigation [ref=f4e2]:
+    - generic [ref=f4e3]:
+      - generic [ref=f4e4]:
+        - text: 
+        - link "智能管理系统 - 让投放更轻松" [ref=f4e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f4e6]:
+            - img [ref=f4e7]
+            - generic [ref=f4e8]: 智能管理系统 - 让投放更轻松
+      - generic [ref=f4e11] [cursor=pointer]:
+        - generic [ref=f4e12]: "1"
+        - generic [ref=f4e13]:
+          - generic [ref=f4e14]: "18211486493"
+          - generic [ref=f4e15]: 用户
+        - generic [ref=f4e16]: 
+  - generic [ref=f4e17]:
+    - generic [ref=f4e18]:
+      - generic [ref=f4e19]:
+        - generic [ref=f4e21]: TK
+        - heading "GMV Max 管理系统" [level=6] [ref=f4e22]
+      - navigation [ref=f4e23]:
+        - generic [ref=f4e25]:
+          - generic [ref=f4e26]: 
+          - text: 服务期已结束，请购买套餐继续使用全部功能
+          - link "立即续费购买" [ref=f4e27] [cursor=pointer]:
+            - /url: /purchase
+        - link " 控制面板" [ref=f4e29] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=f4e30]: 
+          - generic [ref=f4e31]: 控制面板
+        - link " 账户授权" [ref=f4e33] [cursor=pointer]:
+          - /url: /auth
+          - generic [ref=f4e34]: 
+          - generic [ref=f4e35]: 账户授权
+        - link " GMVMAX大屏" [ref=f4e37] [cursor=pointer]:
+          - /url: /gmvmaxdashboard
+          - generic [ref=f4e38]: 
+          - generic [ref=f4e39]: GMVMAX大屏
+        - link " 系列管理" [ref=f4e41] [cursor=pointer]:
+          - /url: /campaigns
+          - generic [ref=f4e42]: 
+          - generic [ref=f4e43]: 系列管理
+        - link " 规则管理" [ref=f4e45] [cursor=pointer]:
+          - /url: /rules
+          - generic [ref=f4e46]: 
+          - generic [ref=f4e47]: 规则管理
+        - link " 规则日志" [ref=f4e49] [cursor=pointer]:
+          - /url: /rule_monitor
+          - generic [ref=f4e50]: 
+          - generic [ref=f4e51]: 规则日志
+        - link " 广告账户" [ref=f4e53] [cursor=pointer]:
+          - /url: /advertisers
+          - generic [ref=f4e54]: 
+          - generic [ref=f4e55]: 广告账户
+        - link " 店铺管理" [ref=f4e57] [cursor=pointer]:
+          - /url: /stores
+          - generic [ref=f4e58]: 
+          - generic [ref=f4e59]: 店铺管理
+        - link " 素材管理" [ref=f4e61] [cursor=pointer]:
+          - /url: /identities
+          - generic [ref=f4e62]: 
+          - generic [ref=f4e63]: 素材管理
+        - link " 白名单管理" [ref=f4e65] [cursor=pointer]:
+          - /url: /whitelists
+          - generic [ref=f4e66]: 
+          - generic [ref=f4e67]: 白名单管理
+        - link " 购买套餐" [ref=f4e69] [cursor=pointer]:
+          - /url: /purchase
+          - generic [ref=f4e70]: 
+          - generic [ref=f4e71]: 购买套餐
+        - link " 我的订单" [ref=f4e73] [cursor=pointer]:
+          - /url: /orders
+          - generic [ref=f4e74]: 
+          - generic [ref=f4e75]: 我的订单
+        - link " 币种设置" [ref=f4e77] [cursor=pointer]:
+          - /url: /currency_setting
+          - generic [ref=f4e78]: 
+          - generic [ref=f4e79]: 币种设置
+        - link " 账户资料" [ref=f4e81] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=f4e82]: 
+          - generic [ref=f4e83]: 账户资料
+        - link " 飞书通知" [ref=f4e85] [cursor=pointer]:
+          - /url: /feishu_config
+          - generic [ref=f4e86]: 
+          - generic [ref=f4e87]: 飞书通知
+        - link " 利润计算" [ref=f4e89] [cursor=pointer]:
+          - /url: /profit_calculator
+          - generic [ref=f4e90]: 
+          - generic [ref=f4e91]: 利润计算
+      - button " 收起菜单" [ref=f4e93] [cursor=pointer]:
+        - generic [ref=f4e94]: 
+        - generic [ref=f4e95]: 收起菜单
+    - generic [ref=f4e98]:
+      - generic [ref=f4e99]:
+        - generic [ref=f4e100]:
+          - generic [ref=f4e102]: 
+          - generic [ref=f4e103]:
+            - heading "规则执行监控" [level=1] [ref=f4e104]
+            - paragraph [ref=f4e105]: 实时监控自动化规则的执行状态和操作记录
+        - generic [ref=f4e106]:
+          - button " 导出日志" [ref=f4e107] [cursor=pointer]:
+            - generic [ref=f4e108]: 
+            - generic [ref=f4e109]: 导出日志
+          - button " 刷新数据" [ref=f4e110] [cursor=pointer]:
+            - generic [ref=f4e111]: 
+            - generic [ref=f4e112]: 刷新数据
+      - generic [ref=f4e113]:
+        - generic [ref=f4e114]:
+          - generic [ref=f4e116]: 
+          - generic [ref=f4e117]:
+            - generic [ref=f4e118]: 今天执行总数
+            - generic [ref=f4e119]: "0"
+        - generic [ref=f4e120]:
+          - generic [ref=f4e122]: 
+          - generic [ref=f4e123]:
+            - generic [ref=f4e124]: 今天成功
+            - generic [ref=f4e125]: "0"
+        - generic [ref=f4e126]:
+          - generic [ref=f4e128]: 
+          - generic [ref=f4e129]:
+            - generic [ref=f4e130]: 今天失败
+            - generic [ref=f4e131]: "0"
+        - generic [ref=f4e132]:
+          - generic [ref=f4e134]: 
+          - generic [ref=f4e135]:
+            - generic [ref=f4e136]: 近7天总执行
+            - generic [ref=f4e137]: "0"
+        - generic [ref=f4e138]:
+          - generic [ref=f4e140]: 
+          - generic [ref=f4e141]:
+            - generic [ref=f4e142]: 近7天成功
+            - generic [ref=f4e143]: "0"
+        - generic [ref=f4e144]:
+          - generic [ref=f4e146]: 
+          - generic [ref=f4e147]:
+            - generic [ref=f4e148]: 近7天失败
+            - generic [ref=f4e149]: "0"
+      - generic [ref=f4e150]:
+        - generic [ref=f4e151]:
+          - generic [ref=f4e152]: 
+          - generic [ref=f4e153]: 执行趋势与分布（中国时间）
+        - generic [ref=f4e154]:
+          - generic [ref=f4e156]:
+            - generic [ref=f4e157]: 
+            - generic [ref=f4e158]: 最近24小时执行趋势
+          - generic [ref=f4e162]:
+            - generic [ref=f4e163]: 
+            - generic [ref=f4e164]: 最近24小时操作类型分布
+      - generic [ref=f4e167]:
+        - generic [ref=f4e169]:
+          - generic [ref=f4e170]:
+            - generic [ref=f4e171]: 
+            - heading "规则执行记录" [level=3] [ref=f4e172]
+            - generic [ref=f4e173]: 0 条记录
+          - generic [ref=f4e174]:
+            - generic [ref=f4e175]:
+              - generic [ref=f4e176]: 日期范围：
+              - textbox [ref=f4e177]:
+                - /placeholder: 开始日期
+                - text: 2026-07-01
+              - generic [ref=f4e178]: 至
+              - textbox [ref=f4e179]:
+                - /placeholder: 结束日期
+                - text: 2026-07-08
+              - button "应用" [ref=f4e180] [cursor=pointer]
+              - button "重置" [ref=f4e181] [cursor=pointer]
+            - textbox "搜索店铺、系列或规则..." [ref=f4e182]
+            - combobox [ref=f4e183]:
+              - option "全部状态" [selected]
+              - option "成功"
+              - option "失败"
+            - combobox [ref=f4e184]:
+              - option "全部操作" [selected]
+              - option "💰 更新预算"
+              - option "▶️ 启用系列"
+              - option "⏸️ 暂停系列"
+              - option "📊 更新ROI"
+              - option "✏️ 修改名称"
+              - option "🗑️ 批量移除视频"
+              - option "🎬 批量移除自制"
+              - option "🤝 批量移除联盟"
+              - option "✅ 批量加回创意"
+              - option "🎬 批量加回自制"
+              - option "🤝 批量加回联盟"
+              - option "🎯 按条件移除"
+              - option "🎯 按条件加回"
+              - option "🗑️ 删除商品"
+              - option "📌 创建加热"
+              - option "📌 删除加热"
+        - table [ref=f4e186]:
+          - rowgroup [ref=f4e187]:
+            - row "店铺/系列信息 执行时间 规则信息 操作类型 修改值 执行状态 触发条件 详情" [ref=f4e188]:
+              - columnheader "店铺/系列信息" [ref=f4e189]
+              - columnheader "执行时间" [ref=f4e190]
+              - columnheader "规则信息" [ref=f4e191]
+              - columnheader "操作类型" [ref=f4e192]
+              - columnheader "修改值" [ref=f4e193]
+              - columnheader "执行状态" [ref=f4e194]
+              - columnheader "触发条件" [ref=f4e195]
+              - columnheader "详情" [ref=f4e196]
+          - rowgroup [ref=f4e197]:
+            - row " 正在加载数据 请稍候..." [ref=f4e198]:
+              - cell " 正在加载数据 请稍候..." [ref=f4e199]:
+                - generic [ref=f4e200]:
+                  - generic [ref=f4e202]: 
+                  - generic [ref=f4e203]:
+                    - heading "正在加载数据" [level=5] [ref=f4e204]
+                    - paragraph [ref=f4e205]: 请稍候...
+      - generic [ref=f4e207]: 显示 0 条记录
+  - text: 
