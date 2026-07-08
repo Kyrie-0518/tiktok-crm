@@ -435,8 +435,6 @@ export default function OrderManagement() {
   // Modals
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState<any>(null);
-  const [editStatusOrder, setEditStatusOrder] = useState<any>(null);
-  const [editStatusModal, setEditStatusModal] = useState(false);
   const [aiImportOpen, setAiImportOpen] = useState(false);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [syncShopId, setSyncShopId] = useState<number | undefined>(undefined);
@@ -446,7 +444,6 @@ export default function OrderManagement() {
   const [selectedAll, setSelectedAll] = useState(false);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [selectAllLoading, setSelectAllLoading] = useState(false);
-  const [statusForm] = Form.useForm();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -621,28 +618,7 @@ export default function OrderManagement() {
     }
   };
 
-  const handleOpenEditStatus = (order: any) => {
-    setEditStatusOrder(order);
-    statusForm.setFieldsValue({
-      status: order.status,
-      logistics_status: order.logistics_status,
-      tracking_no: order.tracking_no,
-      carrier: order.carrier,
-      remark: order.remark,
-    });
-    setEditStatusModal(true);
-  };
 
-  const handleUpdateStatus = async (values: any) => {
-    try {
-      await api.put(`/orders/${editStatusOrder.id}`, values);
-      message.success('状态已更新');
-      setEditStatusModal(false);
-      loadData();
-    } catch (e: any) {
-      message.error(e.response?.data?.error || '更新失败');
-    }
-  };
 
   // Status tabs — 操作按钮内嵌在右侧
   const tabBarRight = (
@@ -711,7 +687,7 @@ export default function OrderManagement() {
                 fontSize: 12, color: '#999',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
-                {item.sku || item.spec_name || '-'}{items.length > 1 ? ` 等${items.length}件` : ''}
+                {item.sku_name || item.spec_name || item.sku || '-'}{items.length > 1 ? ` 等${items.length}件` : ''}
               </div>
             </div>
           </div>
@@ -721,14 +697,18 @@ export default function OrderManagement() {
     {
       title: '订单编号',
       dataIndex: 'order_no',
-      width: 160,
-      render: (v: string) => <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>{v}</span>,
+      width: 180,
+      render: (v: string) => <span style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 700, color: '#000' }}>{v}</span>,
     },
     {
       title: '买家',
       dataIndex: 'buyer_name',
-      width: 100,
-      render: (v: string) => v || <span style={{ color: '#ccc' }}>-</span>,
+      width: 120,
+      render: (v: string) => (
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 120 }}>
+          {v || <span style={{ color: '#ccc' }}>-</span>}
+        </span>
+      ),
     },
     {
       title: '实付金额',
@@ -740,7 +720,16 @@ export default function OrderManagement() {
       title: '状态',
       dataIndex: 'status',
       width: 100,
-      render: (v: string) => <Tag color={ORDER_STATUS[v]?.color || 'default'}>{ORDER_STATUS[v]?.label || v}</Tag>,
+      render: (v: string) => {
+        const statusMap: Record<string, { label: string; color: string }> = {
+          ...ORDER_STATUS,
+          processing: { label: '处理中', color: 'blue' },
+          unshipped: { label: '未发货', color: 'default' },
+          awaiting_collection: { label: '待揽收', color: 'warning' },
+        };
+        const s = statusMap[v] || { label: v, color: 'default' };
+        return <Tag color={s.color}>{s.label}</Tag>;
+      },
     },
     {
       title: '店铺',
@@ -751,23 +740,23 @@ export default function OrderManagement() {
     {
       title: '下单时间',
       dataIndex: 'order_time',
-      width: 130,
-      render: (v: string) => v?.slice(0, 16),
+      width: 140,
+      render: (v: string) => v ? v.replace('T', ' ').slice(0, 16) : '-',
     },
     {
       title: '物流',
       dataIndex: 'tracking_no',
-      width: 130,
+      width: 160,
       render: (v: string, r: any) => v ? (
         <Tooltip title={`${r.carrier || ''} ${v}`}>
-          <span style={{ fontSize: 12 }}>{v.slice(0, 12)}{v.length > 12 ? '…' : ''}</span>
+          <span style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{v.slice(0, 18)}{v.length > 18 ? '…' : ''}</span>
         </Tooltip>
       ) : <span style={{ color: '#ccc' }}>-</span>,
     },
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 120,
       fixed: 'right' as const,
       render: (_: any, r: any) => {
         if (batchMode) {
@@ -787,12 +776,9 @@ export default function OrderManagement() {
           <Space size="small">
             <Button size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(r)}>详情</Button>
             {canEdit && (
-              <>
-                <Button size="small" onClick={() => handleOpenEditStatus(r)}>改状态</Button>
-                <Popconfirm title="确认删除此订单？" onConfirm={() => handleDelete(r.id)}>
-                  <Button size="small" danger icon={<DeleteOutlined />} />
-                </Popconfirm>
-              </>
+              <Popconfirm title="确认删除此订单？" onConfirm={() => handleDelete(r.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
             )}
           </Space>
         );
@@ -1044,36 +1030,7 @@ export default function OrderManagement() {
         )}
       </Modal>
 
-      {/* Edit Status Modal */}
-      <Modal
-        title="更新订单状态"
-        open={editStatusModal}
-        onCancel={() => setEditStatusModal(false)}
-        onOk={() => statusForm.submit()}
-        okText="保存"
-      >
-        <Form form={statusForm} layout="vertical" onFinish={handleUpdateStatus}>
-          <Form.Item name="status" label="订单状态">
-            <Select>
-              {Object.entries(ORDER_STATUS).filter(([k]) => k !== 'all').map(([k, v]) => (
-                <Select.Option key={k} value={k}>{v.label}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="logistics_status" label="物流状态">
-            <Input placeholder="如：已揽件、运输中、已签收" />
-          </Form.Item>
-          <Form.Item name="tracking_no" label="物流单号">
-            <Input placeholder="快递单号" />
-          </Form.Item>
-          <Form.Item name="carrier" label="承运商">
-            <Input placeholder="如：J&T, Ninja Van, Pos Laju" />
-          </Form.Item>
-          <Form.Item name="remark" label="备注">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Form>
-      </Modal>
+
 
     </div>
   );
