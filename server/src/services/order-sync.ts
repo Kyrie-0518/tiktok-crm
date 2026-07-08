@@ -99,9 +99,19 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
           if (orderId) {
             try {
               const detailResp = await api.getOrderDetail([orderId]);
-              const detail = detailResp?.data?.orders?.[0] || detailResp?.data?.order_list?.[0];
+              // 诊断日志：输出响应结构
+              const respKeys = Object.keys(detailResp || {});
+              const dataKeys = Object.keys(detailResp?.data || {});
+              console.log(`[order-sync] 订单 ${orderId} 详情响应 keys: resp=[${respKeys.join(',')}] data=[${dataKeys.join(',')}]`);
+              const detail = detailResp?.data?.orders?.[0] || detailResp?.data?.order_list?.[0] || detailResp?.data?.order_detail_list?.[0];
               if (detail) {
-                orderDetail = { ...order, ...detail, line_items: detail.order_lines || detail.line_items || detail.item_list || detail.items || order.line_items };
+                const detailKeys = Object.keys(detail);
+                const itemKeys = detailKeys.filter(k => k.includes('item') || k.includes('sku') || k.includes('product') || k.includes('line'));
+                console.log(`[order-sync] 订单 ${orderId} detail 对象 keys: [${detailKeys.join(',')}] 相关:{${itemKeys.join(',')}}`);
+                orderDetail = { ...order, ...detail, line_items: detail.line_item_list || detail.package_list?.[0]?.item_list || detail.order_line_list || detail.order_lines || detail.line_items || detail.item_list || detail.items || order.line_items };
+                console.log(`[order-sync] 订单 ${orderId} 提取到 line_items: ${JSON.stringify((orderDetail as any).line_items?.length ?? 0)} 件`);
+              } else {
+                console.log(`[order-sync] 订单 ${orderId} 无法从响应中提取明细: orders=${!!detailResp?.data?.orders} order_list=${!!detailResp?.data?.order_list}`);
               }
             } catch (detailErr: any) {
               console.warn(`[order-sync] 获取订单 ${orderId} 详情失败: ${detailErr.message}`);
@@ -201,7 +211,14 @@ function saveOrder(db: any, order: any, shopId: number): 'created' | 'updated' |
 
 /** 保存订单明细（order_items） */
 function saveOrderItems(db: any, orderId: number, order: any) {
-  const items = order.order_lines || order.line_items || order.items || order.item_list || [];
+  const items = order.line_item_list
+    || (order.package_list?.[0]?.item_list)
+    || order.order_line_list
+    || order.order_lines
+    || order.line_items
+    || order.items
+    || order.item_list
+    || [];
   if (items.length === 0) {
     console.warn(`[saveOrderItems] 订单 ${orderId} 没有商品信息，原始字段:`, Object.keys(order).filter(k => k.includes('item') || k.includes('sku') || k.includes('product')));
     return;
@@ -217,12 +234,14 @@ function saveOrderItems(db: any, orderId: number, order: any) {
 
   for (const item of items) {
     const productName = item.product_name || item.productName || item.name || '';
-    const sku = item.sku_id || item.skuId || item.seller_sku || item.sellerSku || '';
-    const unitPrice = parseFloat(item.sale_price || item.salePrice || item.price || '0') || 0;
+    const sku = item.sku_id || item.skuId || item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
+    // TikTok API 价格可能是嵌套对象 item_price.amount
+    const rawPrice = item.sale_price || item.salePrice || item.price || item.item_price?.amount || item.unit_price || '0';
+    const unitPrice = parseFloat(typeof rawPrice === 'string' ? rawPrice : String(rawPrice)) || 0;
     const quantity = item.quantity || item.qty || 1;
-    const subtotal = unitPrice * quantity;
-    const itemStatus = STATUS_MAP[item.status] || STATUS_MAP[item.display_status] || 'pending';
-    const imageUrl = item.sku_image || item.skuImage || item.image_url || item.imageUrl || '';
+    const subtotal = parseFloat(item.subtotal || item.total_price?.amount || item.line_amount?.amount || '0') || (unitPrice * quantity);
+    const itemStatus = STATUS_MAP[item.status] || STATUS_MAP[item.display_status] || STATUS_MAP[item.item_status] || 'pending';
+    const imageUrl = item.sku_image || item.skuImage || item.image_url || item.imageUrl || item.item_image || '';
     const specName = item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
 
     // 尝试匹配本地产品
