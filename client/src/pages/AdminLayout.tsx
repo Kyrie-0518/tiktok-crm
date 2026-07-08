@@ -139,11 +139,20 @@ export default function AdminLayout() {
         background: transparent !important;
       }
 
-      .admin-menu .ant-menu-item {
+      .admin-menu > .ant-menu-item {
         height: 42px !important;
         line-height: 42px !important;
         margin: 2px 8px !important;
         padding-inline: 12px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+      }
+      .admin-menu .ant-menu-submenu .ant-menu-item {
+        height: 42px !important;
+        line-height: 42px !important;
+        margin: 2px 8px !important;
+        padding-left: 36px !important;
+        padding-right: 12px !important;
         border-radius: 8px !important;
         font-size: 14px !important;
       }

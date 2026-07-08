@@ -320,11 +320,22 @@ function AppLayout() {
       }
 
       /* 菜单项：舒适高度 + 柔和圆角 */
-      .ant-menu-inline .ant-menu-item {
+      .ant-menu-inline > .ant-menu-item {
         height: 38px !important;
         line-height: 38px !important;
         margin: 2px 10px !important;
         padding-inline: 12px !important;
+        border-radius: 8px !important;
+        font-size: 13.5px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      /* 子菜单项 — 缩进在标题后方 */
+      .ant-menu-inline .ant-menu-submenu .ant-menu-item {
+        height: 38px !important;
+        line-height: 38px !important;
+        margin: 2px 10px !important;
+        padding-left: 36px !important;
+        padding-right: 12px !important;
         border-radius: 8px !important;
         font-size: 13.5px;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
