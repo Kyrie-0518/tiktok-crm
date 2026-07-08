@@ -2,13 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Card, Table, Button, Space, Input, Select, Tag, Badge, Tabs,
   Modal, Form, message, Popconfirm, Row, Col, Statistic, Tooltip,
-  InputNumber, Divider, Upload, Steps, Alert, Progress, Spin,
+  Upload, Steps, Alert, Spin,
   Typography, Result, Dropdown,
 } from 'antd';
 import {
-  SyncOutlined, AppstoreOutlined, CloudDownloadOutlined,
-  SearchOutlined, PrinterOutlined, ExportOutlined,
-  PlusOutlined, DeleteOutlined, EyeOutlined, ReloadOutlined,
+  SyncOutlined, SearchOutlined, ExportOutlined,
+  DeleteOutlined, EyeOutlined, ReloadOutlined,
   RobotOutlined, InboxOutlined, CheckCircleOutlined, WarningOutlined,
   CloudUploadOutlined, CheckSquareOutlined, BorderOutlined,
   UnorderedListOutlined,
@@ -434,7 +433,6 @@ export default function OrderManagement() {
   const pageSize = 20;
 
   // Modals
-  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState<any>(null);
   const [editStatusOrder, setEditStatusOrder] = useState<any>(null);
@@ -448,11 +446,7 @@ export default function OrderManagement() {
   const [selectedAll, setSelectedAll] = useState(false);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [selectAllLoading, setSelectAllLoading] = useState(false);
-  const [form] = Form.useForm();
   const [statusForm] = Form.useForm();
-  const [itemRows, setItemRows] = useState([{ product_id: null as number | null, product_sku_id: null as number | null, product_name: '', sku: '', spec_name: '', quantity: 1, unit_price: 0, subtotal: 0 }]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [productSkus, setProductSkus] = useState<Record<number, any[]>>({});
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -479,17 +473,6 @@ export default function OrderManagement() {
 
   useEffect(() => {
     api.get('/shops').then(r => setShops(r.data)).catch(() => {});
-    // Load products for order item selection
-    api.get('/products').then(r => {
-      setProducts(r.data || []);
-      // Load SKUs for each product
-      const skuMap: Record<number, any[]> = {};
-      Promise.all((r.data || []).map((p: any) =>
-        api.get(`/products/${p.id}/skus`).then(skuRes => {
-          skuMap[p.id] = skuRes.data || [];
-        }).catch(() => {})
-      )).then(() => setProductSkus(skuMap));
-    }).catch(() => {});
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -661,74 +644,32 @@ export default function OrderManagement() {
     }
   };
 
-  // Create order item rows helpers
-  const updateItem = (idx: number, field: string, val: any) => {
-    const next = [...itemRows];
-    next[idx] = { ...next[idx], [field]: val };
-    if (field === 'quantity' || field === 'unit_price') {
-      next[idx].subtotal = (next[idx].quantity || 0) * (next[idx].unit_price || 0);
-    }
-    setItemRows(next);
-  };
+  // Status tabs — 操作按钮内嵌在右侧
+  const tabBarRight = (
+    <Space size="small" style={{ marginBottom: 4 }}>
+      <Button size="small" icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
+      {canEdit && (
+        <>
+          <Button size="small" icon={<SyncOutlined />} onClick={() => setSyncModalOpen(true)}>同步订单</Button>
+          <Button
+            size="small"
+            icon={<RobotOutlined />}
+            onClick={() => setAiImportOpen(true)}
+            style={{ borderColor: BRAND_COLOR, color: BRAND_COLOR }}
+          >
+            AI 导入订单
+          </Button>
+        </>
+      )}
+    </Space>
+  );
 
-  const handleSelectProduct = (idx: number, productId: number) => {
-    const product = products.find(p => p.id === productId);
-    const skus = productSkus[productId] || [];
-    const firstSku = skus[0];
-    const next = [...itemRows];
-    next[idx] = {
-      ...next[idx],
-      product_id: productId,
-      product_sku_id: firstSku?.id || null,
-      product_name: product?.name || '',
-      sku: firstSku?.sku_code || product?.sku || '',
-      spec_name: firstSku?.spec_name || '',
-      unit_price: firstSku?.sell_price || product?.sell_price || 0,
-      subtotal: (next[idx].quantity || 1) * (firstSku?.sell_price || product?.sell_price || 0),
-    };
-    setItemRows(next);
-  };
-
-  const handleSelectSku = (idx: number, skuId: number) => {
-    const row = itemRows[idx];
-    const skus = productSkus[row.product_id || 0] || [];
-    const sku = skus.find(s => s.id === skuId);
-    if (!sku) return;
-    const next = [...itemRows];
-    next[idx] = {
-      ...next[idx],
-      product_sku_id: skuId,
-      sku: sku.sku_code || '',
-      spec_name: sku.spec_name || '',
-      unit_price: sku.sell_price || 0,
-      subtotal: (next[idx].quantity || 1) * (sku.sell_price || 0),
-    };
-    setItemRows(next);
-  };
-
-  const handleCreateOrder = async (values: any) => {
-    const items = itemRows.filter(r => r.product_name);
-    const item_total = items.reduce((s, r) => s + (r.subtotal || 0), 0);
-    const actual_amount = item_total + (values.shipping_fee || 0) - (values.discount || 0);
-    try {
-      await api.post('/orders', { ...values, item_total, actual_amount, items });
-      message.success('订单创建成功');
-      setCreateModalOpen(false);
-      form.resetFields();
-      setItemRows([{ product_id: null, product_sku_id: null, product_name: '', sku: '', spec_name: '', quantity: 1, unit_price: 0, subtotal: 0 }]);
-      loadData();
-    } catch (e: any) {
-      message.error(e.response?.data?.error || '创建失败');
-    }
-  };
-
-  // Status tabs
   const tabItems = ['all', 'pending', 'pending_ship', 'shipped', 'completed', 'cancelled', 'cancel_requested', 'refund_requested'].map(s => ({
     key: s,
     label: (
       <span>
         {ORDER_STATUS[s].label}
-        {counts[s] ? <Badge count={counts[s]} size="small" style={{ marginLeft: 6, backgroundColor: s === 'pending_ship' ? BRAND_COLOR : undefined }} /> : null}
+        {counts[s] ? <Badge count={counts[s]} overflowCount={999999} size="small" style={{ marginLeft: 6, backgroundColor: s === 'pending_ship' ? BRAND_COLOR : undefined }} /> : null}
       </span>
     ),
   }));
@@ -883,27 +824,6 @@ export default function OrderManagement() {
         </div>
       </div>
 
-      {/* Header Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span />
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
-          {canEdit && (
-            <>
-              <Button icon={<SyncOutlined />} onClick={() => setSyncModalOpen(true)}>同步订单</Button>
-              <Button
-                icon={<RobotOutlined />}
-                onClick={() => setAiImportOpen(true)}
-                style={{ borderColor: BRAND_COLOR, color: BRAND_COLOR }}
-              >
-                AI 导入订单
-              </Button>
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>新建订单</Button>
-            </>
-          )}
-        </Space>
-      </div>
-
       {/* Top Stats */}
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         {[
@@ -928,6 +848,7 @@ export default function OrderManagement() {
           activeKey={statusTab}
           onChange={k => { setStatusTab(k); setPage(1); }}
           items={tabItems}
+          tabBarExtraContent={tabBarRight}
           style={{ padding: '0 16px' }}
         />
 
@@ -1134,108 +1055,6 @@ export default function OrderManagement() {
         </Form>
       </Modal>
 
-      {/* Create Order Modal */}
-      <Modal
-        title="新建订单"
-        open={createModalOpen}
-        onCancel={() => { setCreateModalOpen(false); form.resetFields(); }}
-        onOk={() => form.submit()}
-        okText="提交"
-        width={720}
-      >
-        <Form form={form} layout="vertical" onFinish={handleCreateOrder}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="order_no" label="订单号" rules={[{ required: true }]}>
-                <Input placeholder="输入或粘贴TikTok订单号" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="shop_id" label="所属店铺">
-                <Select allowClear placeholder="选择店铺">
-                  {shops.map(s => <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>)}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="buyer_name" label="买家名称">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="buyer_phone" label="买家联系方式">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="status" label="订单状态" initialValue="pending_ship">
-                <Select>
-                  {Object.entries(ORDER_STATUS).filter(([k]) => k !== 'all').map(([k, v]) => (
-                    <Select.Option key={k} value={k}>{v.label}</Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="order_time" label="下单时间">
-                <Input type="datetime-local" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Divider>商品明细</Divider>
-          {itemRows.map((row, idx) => (
-            <Row gutter={8} key={idx} style={{ marginBottom: 8 }}>
-              <Col span={7}>
-                <Select
-                  placeholder="选择产品"
-                  value={row.product_id || undefined}
-                  onChange={v => handleSelectProduct(idx, v)}
-                  style={{ width: '100%' }}
-                  showSearch
-                  optionFilterProp="label"
-                  options={products.map(p => ({ value: p.id, label: p.name }))}
-                />
-              </Col>
-              <Col span={5}>
-                <Select
-                  placeholder="选择SKU"
-                  value={row.product_sku_id || undefined}
-                  onChange={v => handleSelectSku(idx, v)}
-                  style={{ width: '100%' }}
-                  disabled={!row.product_id}
-                  options={(productSkus[row.product_id || 0] || []).map((s: any) => ({ value: s.id, label: `${s.spec_name} (${s.sku_code})` }))}
-                />
-              </Col>
-              <Col span={3}><InputNumber placeholder="数量" min={1} value={row.quantity} onChange={v => updateItem(idx, 'quantity', v)} style={{ width: '100%' }} /></Col>
-              <Col span={4}><InputNumber placeholder="单价RM" min={0} step={0.01} value={row.unit_price} onChange={v => updateItem(idx, 'unit_price', v)} style={{ width: '100%' }} /></Col>
-              <Col span={3}><Input placeholder="小计" value={`RM ${row.subtotal.toFixed(2)}`} readOnly /></Col>
-              <Col span={2}>
-                <Button danger size="small" onClick={() => setItemRows(itemRows.filter((_, i) => i !== idx))} disabled={itemRows.length === 1}>删</Button>
-              </Col>
-            </Row>
-          ))}
-          <Button type="dashed" block onClick={() => setItemRows([...itemRows, { product_id: null, product_sku_id: null, product_name: '', sku: '', spec_name: '', quantity: 1, unit_price: 0, subtotal: 0 }])} style={{ marginBottom: 16 }}>+ 添加商品</Button>
-
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item name="shipping_fee" label="运费(RM)" initialValue={0}>
-                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="discount" label="优惠金额(RM)" initialValue={0}>
-                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="remark" label="备注">
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
     </div>
   );
 }
