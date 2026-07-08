@@ -839,4 +839,39 @@ export class TikTokAPI {
   async getOrderTransactions(params: Record<string, any>) {
     return this.get('finance/order_transactions', params);
   }
+
+  // ═══════════════════════════════════════════════
+  //  联盟达人 API（Affiliate Creator）
+  // ═══════════════════════════════════════════════
+
+  /**
+   * 获取达人个人资料
+   * API: GET /affiliate_creator/202508/profiles
+   * 文档: https://partner.tiktokshop.com/docv2/page/get-creator-profile-202508
+   * 返回: avatar, username, creatorUserOpenId, permissions, registerRegion, selectionRegion, sellerType, userType
+   */
+  async getCreatorProfile(accessToken?: string) {
+    const token = accessToken || this.auth.access_token;
+    const { url, headers } = buildSignedRequest(
+      { ...this.auth, access_token: token },
+      'affiliate_creator/202508/profiles',
+      undefined, undefined, '202508'
+    );
+    const res = await fetch(url, { method: 'GET', headers });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`[${res.status}] ${text.slice(0, 300)}`);
+    return JSON.parse(text);
+  }
+
+  /**
+   * 搜索联盟达人订单（卖家视角）
+   * API: POST /affiliate_seller/202405/orders/search
+   * 返回: 达人带货订单列表，含订单ID和产品ID
+   */
+  async searchAffiliateOrders(params: { page_size?: number; page_token?: string }) {
+    const body: Record<string, any> = {};
+    if (params.page_size) body.page_size = params.page_size;
+    if (params.page_token) body.page_token = params.page_token;
+    return this.post('affiliate_seller/202405/orders/search', body);
+  }
 }
