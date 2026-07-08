@@ -108,33 +108,64 @@ export default function AdminLayout() {
         .admin-layout .ant-layout { background: transparent; }
         .admin-sider { box-shadow: 2px 0 8px rgba(0,0,0,0.04) !important; }
 
-        .admin-menu .ant-menu-item {
-          height: 42px !important;
-          line-height: 42px !important;
-          margin: 2px 8px !important;
-          padding-inline: 12px !important;
-          border-radius: 8px !important;
-          font-size: 14px !important;
-        }
-        .admin-menu .ant-menu-item .anticon {
-          font-size: 16px !important;
-          color: #94a3b8;
-        }
-        .admin-menu .ant-menu-item:hover .anticon {
-          color: var(--admin-primary) !important;
-        }
-        .admin-menu .ant-menu-item:hover {
-          background: rgba(37,99,235,0.06) !important;
-        }
-        .admin-menu .ant-menu-item-selected .anticon {
-          color: var(--admin-selected-color) !important;
-        }
-        .admin-menu .ant-menu-item-selected {
-          background: rgba(37,99,235,0.10) !important;
-          color: var(--admin-selected-color) !important;
-          font-weight: 600;
-        }
-        .admin-menu .ant-menu-item-selected::after { display: none !important; }
+      .admin-menu .ant-menu-submenu-title {
+        height: 40px !important;
+        line-height: 40px !important;
+        margin: 4px 10px 2px !important;
+        padding: 0 16px 0 20px !important;
+        border-radius: 8px !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: var(--admin-text) !important;
+        letter-spacing: 0.3px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      .admin-menu .ant-menu-submenu-title:hover {
+        background: rgba(37,99,235,0.04) !important;
+      }
+      .admin-menu .ant-menu-submenu-open > .ant-menu-submenu-title {
+        color: var(--admin-primary) !important;
+      }
+      .admin-menu .ant-menu-submenu-open > .ant-menu-submenu-title .anticon {
+        color: var(--admin-primary) !important;
+      }
+      .admin-menu .ant-menu-submenu-arrow {
+        color: var(--admin-text-tertiary) !important;
+      }
+      .admin-menu .ant-menu-submenu-open > .ant-menu-submenu-title .ant-menu-submenu-arrow {
+        color: var(--admin-primary) !important;
+      }
+      .admin-menu .ant-menu-submenu .ant-menu {
+        background: transparent !important;
+      }
+
+      .admin-menu .ant-menu-item {
+        height: 42px !important;
+        line-height: 42px !important;
+        margin: 2px 8px !important;
+        padding-inline: 12px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+      }
+      .admin-menu .ant-menu-item .anticon {
+        font-size: 16px !important;
+        color: #94a3b8;
+      }
+      .admin-menu .ant-menu-item:hover .anticon {
+        color: var(--admin-primary) !important;
+      }
+      .admin-menu .ant-menu-item:hover {
+        background: rgba(37,99,235,0.06) !important;
+      }
+      .admin-menu .ant-menu-item-selected .anticon {
+        color: var(--admin-selected-color) !important;
+      }
+      .admin-menu .ant-menu-item-selected {
+        background: rgba(37,99,235,0.10) !important;
+        color: var(--admin-selected-color) !important;
+        font-weight: 600;
+      }
+      .admin-menu .ant-menu-item-selected::after { display: none !important; }
 
         .admin-content::-webkit-scrollbar { width: 6px; }
         .admin-content::-webkit-scrollbar-track { background: transparent; }

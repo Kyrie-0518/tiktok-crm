@@ -6,11 +6,13 @@ import {
   SettingOutlined, LogoutOutlined, RobotOutlined,
   AppstoreOutlined, UnorderedListOutlined,
   DashboardOutlined,
-  DollarOutlined,
+  DollarOutlined, AreaChartOutlined,
+  PayCircleOutlined, FileTextOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined,
   SunOutlined, MoonOutlined,
   KeyOutlined, AuditOutlined, SafetyOutlined,
   CaretDownOutlined, ThunderboltOutlined,
+  TeamOutlined, BarChartOutlined,
 } from '@ant-design/icons';
 import { useAuthStore, hasMinRole } from './stores/authStore';
 import type { RoleKey } from './stores/authStore';
@@ -26,39 +28,46 @@ import SystemSettings from './pages/SystemSettings';
 import AdminLayout from './pages/AdminLayout';
 import AIStudioLayout from './pages/AIStudioLayout';
 import SkiisWorkbody from './pages/SkiisWorkbody';
+import AdBills from './pages/AdBills';
+import DataReports from './pages/DataReports';
 
 const { Sider, Content } = Layout;
 
 const BRAND_COLOR = '#2563eb';
 
 // ═══════════════════════════════════════════
-// 菜单分组：按业务功能领域拆分
+// 菜单分组：按业务功能领域拆分（可折叠 SubMenu）
 // ═══════════════════════════════════════════
 const MENU_GROUPS = [
   {
     key: 'group-business',
     label: '运营中心',
+    icon: <ShopOutlined />,
     items: [
-      { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
+      { key: '/dashboard', icon: <DashboardOutlined />, label: '数据总览' },
       { key: '/shops', icon: <ShopOutlined />, label: '店铺管理' },
       { key: '/products', icon: <AppstoreOutlined />, label: '产品管理' },
       { key: '/orders', icon: <UnorderedListOutlined />, label: '订单管理' },
+      { key: '/influencers', icon: <TeamOutlined />, label: '联盟管理' },
+    ],
+  },
+  {
+    key: 'group-zhihui',
+    label: '智汇中台',
+    icon: <ThunderboltOutlined />,
+    items: [
+      { key: '/skiis-workbody', icon: <ThunderboltOutlined />, label: '欧文' },
+      { key: '/ai-studio', icon: <RobotOutlined />, label: 'AI工作室' },
     ],
   },
   {
     key: 'group-finance',
-    label: '财务',
+    label: '财务中心',
+    icon: <DollarOutlined />,
     items: [
       { key: '/finance', icon: <DollarOutlined />, label: '利润核算' },
-      { key: '/influencers', icon: <UserOutlined />, label: '达人BD' },
-    ],
-  },
-  {
-    key: 'group-ai-studio',
-    label: 'AI 工作室',
-    items: [
-      { key: '/skiis-workbody', icon: <ThunderboltOutlined />, label: '欧文' },
-      { key: '/ai-studio', icon: <RobotOutlined />, label: 'AI 工作室' },
+      { key: '/ad-bills', icon: <PayCircleOutlined />, label: '广告对账' },
+      { key: '/data-reports', icon: <BarChartOutlined />, label: '财务统计表' },
     ],
   },
 ];
@@ -70,17 +79,14 @@ const SYSTEM_BOTTOM_MENUS = [
 ];
 const ADMIN_BOTTOM_MENUS: any[] = [];
 
-// 构建 Ant Design Menu 的 items（含分组标题）
+// 构建 Ant Design Menu 的 items（使用 SubMenu 可折叠）
 function buildMenuItems() {
   const result: any[] = [];
   for (const group of MENU_GROUPS) {
     result.push({
-      type: 'group',
-      label: <span style={{
-        fontSize: 11, fontWeight: 600, letterSpacing: 0.5,
-        color: 'var(--bo-group-label-color)',
-        paddingLeft: 4,
-      }}>{group.label}</span>,
+      key: group.key,
+      icon: group.icon,
+      label: group.label,
       children: group.items.map(item => ({
         key: item.key,
         icon: item.icon,
@@ -263,6 +269,41 @@ function AppLayout() {
 
       /* ═══ 菜单样式（柔和圆角 + 舒适间距） ═══ */
 
+      /* 分组标题（SubMenu）样式 — 更像标题 */
+      .ant-menu-submenu-title {
+        padding: 0 16px 0 20px !important;
+        margin: 4px 10px 2px !important;
+        border-radius: 8px !important;
+        height: 40px !important;
+        line-height: 40px !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: var(--bo-text-primary) !important;
+        letter-spacing: 0.3px;
+      }
+      .ant-menu-submenu-title .anticon {
+        font-size: 15px !important;
+        color: var(--bo-text-secondary) !important;
+      }
+      .ant-menu-submenu-title:hover {
+        background: rgba(37,99,235,0.04) !important;
+      }
+      .ant-menu-submenu-open > .ant-menu-submenu-title {
+        color: var(--bo-primary) !important;
+      }
+      .ant-menu-submenu-open > .ant-menu-submenu-title .anticon {
+        color: var(--bo-primary) !important;
+      }
+      .ant-menu-submenu-arrow {
+        color: var(--bo-text-tertiary) !important;
+      }
+      .ant-menu-submenu-open > .ant-menu-submenu-title .ant-menu-submenu-arrow {
+        color: var(--bo-primary) !important;
+      }
+      .ant-menu-submenu .ant-menu {
+        background: transparent !important;
+      }
+
       /* 分组标题间距 */
       .ant-menu-item-group-list { margin: 0; }
       .ant-menu-item-group { margin-bottom: 0; }
@@ -291,10 +332,6 @@ function AppLayout() {
 
       /* 子菜单 padding 也同步 */
       .ant-menu-inline .ant-menu-submenu-title {
-        height: 38px !important;
-        line-height: 38px !important;
-        margin: 2px 10px !important;
-        border-radius: 8px !important;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
       }
 
@@ -353,6 +390,47 @@ function AppLayout() {
       /* 选中图标颜色 */
       .ant-menu-light .ant-menu-item-selected .anticon { color: var(--bo-selected-color) !important; }
       .ant-menu-dark .ant-menu-item-selected .anticon { color: var(--bo-selected-color) !important; }
+
+      /* 管理后台入口卡片样式 */
+      .admin-entry-card {
+        margin: 8px 12px 12px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(59,130,246,0.05));
+        border: 1px solid rgba(37,99,235,0.12);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .admin-entry-card:hover {
+        background: linear-gradient(135deg, rgba(37,99,235,0.14), rgba(59,130,246,0.10));
+        border-color: rgba(37,99,235,0.20);
+        box-shadow: 0 2px 8px rgba(37,99,235,0.10);
+      }
+      .admin-entry-card .admin-icon-wrap {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+      }
+      .admin-entry-card .admin-title {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1.3;
+      }
+      .admin-entry-card .admin-subtitle {
+        font-size: 11px;
+        color: #64748b;
+        line-height: 1.3;
+      }
     `}</style>
 
     <Layout style={{ minHeight: '100vh', background: 'var(--bo-bg)' }}>
@@ -457,49 +535,50 @@ function AppLayout() {
           </div>
         )}
 
-        {/* ── 管理后台入口（紧贴底部用户区） ── */}
+        {/* ── 管理后台入口（卡片风格） ── */}
         {!siderCollapsed && (
-          <div style={{ margin: '0 12px', padding: '4px 0' }}>
-            <div
-              onClick={() => navigate('/admin')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '5px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
-                color: location.pathname === '/admin'
-                  ? 'var(--bo-bottom-item-active-color)' : 'var(--bo-bottom-item-color)',
-                fontWeight: location.pathname === '/admin' ? 600 : 400,
-                background: location.pathname === '/admin'
-                  ? 'var(--bo-bottom-item-active-bg)' : 'transparent',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                if (location.pathname !== '/admin')
-                  e.currentTarget.style.background = 'var(--bo-bottom-item-hover-bg)';
-              }}
-              onMouseLeave={e => {
-                if (location.pathname !== '/admin')
-                  e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <span style={{ fontSize: 14, flexShrink: 0 }}><SafetyOutlined /></span>
-              管理后台
+          <div
+            className="admin-entry-card"
+            onClick={() => navigate('/admin')}
+            style={{
+              borderColor: location.pathname === '/admin'
+                ? 'rgba(37,99,235,0.25)' : undefined,
+              background: location.pathname === '/admin'
+                ? 'linear-gradient(135deg, rgba(37,99,235,0.14), rgba(59,130,246,0.10))' : undefined,
+            }}
+          >
+            <div className="admin-icon-wrap">
+              <SafetyOutlined style={{ color: '#fff', fontSize: 18 }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="admin-title">管理后台</div>
+              <div className="admin-subtitle">系统配置 · 权限 · 日志</div>
             </div>
           </div>
         )}
         {siderCollapsed && (
-          <Tooltip key="admin-collapsed" title="管理后台" placement="right">
+          <Tooltip title="管理后台" placement="right">
             <div
               onClick={() => navigate('/admin')}
               style={{
-                fontSize: 15, cursor: 'pointer', padding: 4, borderRadius: 4,
-                marginBottom: 2,
-                color: location.pathname === '/admin'
-                  ? 'var(--bo-primary)' : 'var(--bo-group-label-color)',
-                transition: 'all 0.15s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '8px 8px 12px',
+                padding: 8,
+                borderRadius: 10,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: location.pathname === '/admin'
+                  ? 'linear-gradient(135deg, rgba(37,99,235,0.14), rgba(59,130,246,0.10))'
+                  : 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(59,130,246,0.05))',
+                border: `1px solid ${location.pathname === '/admin' ? 'rgba(37,99,235,0.25)' : 'rgba(37,99,235,0.12)'}`,
+                transition: 'all 0.2s ease',
               }}
             >
-              <SafetyOutlined />
+              <SafetyOutlined style={{
+                color: location.pathname === '/admin' ? '#2563eb' : '#64748b',
+                fontSize: 18,
+              }} />
             </div>
           </Tooltip>
         )}
@@ -687,6 +766,8 @@ function AppLayout() {
             <Route path="/orders" element={<PermRouteGuard permKey="orders"><OrderManagement /></PermRouteGuard>} />
             <Route path="/finance" element={<PermRouteGuard permKey="finance"><Finance /></PermRouteGuard>} />
             <Route path="/influencers" element={<PermRouteGuard permKey="influencers"><Influencers /></PermRouteGuard>} />
+            <Route path="/ad-bills" element={<AdBills />} />
+            <Route path="/data-reports" element={<DataReports />} />
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/admin/*" element={<AdminLayout />} />
             <Route path="/skiis-workbody" element={<SkiisWorkbody />} />
