@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Row, Col, Input, Select, Tag, Typography, Button, Space,
-  Statistic, Avatar, Empty, Spin, message, Badge,
+  Statistic, Avatar, Empty, Spin, message,
 } from 'antd';
 import {
   SearchOutlined, UserOutlined,
-  StarOutlined, EyeOutlined, TeamOutlined,
-  RiseOutlined, ReloadOutlined,
-  LinkOutlined, SyncOutlined, CloudDownloadOutlined,
-  ShopOutlined,
+  TeamOutlined, RiseOutlined, ReloadOutlined,
+  LinkOutlined, ShopOutlined, CalendarOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 
@@ -27,7 +25,6 @@ interface CreatorRow {
   cooperation_type: string;
   commission_rate: number;
   remark: string;
-  // 从 remark JSON 中解析
   parsed: {
     avatar_url?: string;
     register_region?: string;
@@ -36,35 +33,25 @@ interface CreatorRow {
     user_type?: string;
     permissions?: string[];
   };
-  // 关联订单统计
-  order_count: number;
-  total_revenue: number;
 }
 
-const CATEGORIES = ['全部', '美妆', '数码', '时尚', '家居', '食品', '运动', '宠物', '母婴'];
-const COUNTRIES = ['全部', 'MY', 'PH', 'SG', 'TH', 'VN', 'ID'];
+const STATUSES = ['全部', '未回复', '已回复', '待寄样', '待签收', '待拍摄', '已完成'];
+const COOP_TYPES = ['全部', '纯佣', '坑位费', '纯坑位', '置换'];
+const CHANNELS = ['全部', 'TikTok私信', '邮件', 'WhatsApp', '其他'];
 
 export default function CreatorMarket() {
   const [creators, setCreators] = useState<CreatorRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [keyword, setKeyword] = useState('');
-  const [country, setCountry] = useState('全部');
-  const [shops, setShops] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState('全部');
+  const [coopFilter, setCoopFilter] = useState('全部');
+  const [channelFilter, setChannelFilter] = useState('全部');
 
   const loadCreators = useCallback(async () => {
     setLoading(true);
     try {
-      // 拉取 influencer 列表 + 关联订单统计
-      const res = await api.get('/influencers', { params: { page_size: 200 } });
+      const res = await api.get('/influencers', { params: { page_size: 500 } });
       const list = (res.data?.list || res.data?.influencers || []) as any[];
-
-      // 尝试拉取订单统计（如有）
-      let orderStats: Record<number, { count: number; revenue: number }> = {};
-      try {
-        const statsRes = await api.get('/influencers/order-stats');
-        orderStats = statsRes.data || {};
-      } catch { /* ignore */ }
 
       const parsed: CreatorRow[] = list.map((r: any) => {
         let profile: any = {};
@@ -89,8 +76,6 @@ export default function CreatorMarket() {
             user_type: profile.user_type,
             permissions: profile.permissions,
           },
-    order_count: orderStats[r.id]?.count ?? 0,
-    total_revenue: orderStats[r.id]?.revenue ?? 0,
         };
       });
       setCreators(parsed);
@@ -101,48 +86,21 @@ export default function CreatorMarket() {
     }
   }, []);
 
-  useEffect(() => {
-    api.get('/shops').then(r => setShops(r.data || [])).catch(() => {});
-    loadCreators();
-  }, [loadCreators]);
-
-  // 从 TikTok 同步达人数据
-  const handleSyncFromTikTok = async () => {
-    setSyncing(true);
-    try {
-      const shopIds = shops.length > 0 ? shops.map((s: any) => s.id) : [1];
-      let totalLinked = 0;
-      let totalOrders = 0;
-
-      for (const shopId of shopIds) {
-        try {
-          const res = await api.post('/influencers/sync-affiliate-orders', { shop_id: shopId });
-          totalLinked += res.data?.linked || 0;
-          totalOrders += res.data?.total_orders || 0;
-        } catch { /* 跳过同步失败的店铺 */ }
-      }
-
-      if (totalLinked > 0) {
-        message.success(`从 ${totalOrders} 条联盟订单中发现了 ${totalLinked} 位带货达人`);
-      } else {
-        message.info('当前未检测到新的联盟带货订单，达人数据为空');
-      }
-      loadCreators();
-    } catch (e: any) {
-      message.error('同步失败: ' + (e.response?.data?.error || e.message));
-    } finally {
-      setSyncing(false);
-    }
-  };
+  useEffect(() => { loadCreators(); }, [loadCreators]);
 
   const filtered = creators.filter(c => {
     if (keyword && !c.name.toLowerCase().includes(keyword.toLowerCase()) && !c.influencer_id.toLowerCase().includes(keyword.toLowerCase())) return false;
-    if (country !== '全部' && c.parsed.register_region !== country) return false;
+    if (statusFilter !== '全部' && c.status !== statusFilter) return false;
+    if (coopFilter !== '全部' && c.cooperation_type !== coopFilter) return false;
+    if (channelFilter !== '全部' && c.contact_channel !== channelFilter) return false;
     return true;
   });
 
   const getStatusColor = (status: string) => {
-    const map: Record<string, string> = { '未回复': '#faad14', '已回复': '#2563eb', '待寄样': '#722ed1', '已完成': '#059669' };
+    const map: Record<string, string> = {
+      '未回复': '#faad14', '已回复': '#2563eb', '待寄样': '#722ed1',
+      '待签收': '#13c2c2', '待拍摄': '#eb2f96', '已完成': '#059669',
+    };
     return map[status] || '#8c8c8c';
   };
 
@@ -160,21 +118,10 @@ export default function CreatorMarket() {
         <div style={{ flex: 1 }}>
           <Title level={4} style={{ margin: 0, color: '#1e293b' }}>达人广场</Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            从 TikTok Shop 联盟订单中同步达人数据，发现优质带货达人
+            浏览所有达人信息，支持搜索、筛选、查看详情
           </Text>
         </div>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadCreators} style={{ borderRadius: 8 }}>刷新</Button>
-          <Button
-            type="primary"
-            icon={<CloudDownloadOutlined />}
-            onClick={handleSyncFromTikTok}
-            loading={syncing}
-            style={{ borderRadius: 8, background: PRIMARY, borderColor: PRIMARY }}
-          >
-            从联盟订单发现达人
-          </Button>
-        </Space>
+        <Button icon={<ReloadOutlined />} onClick={loadCreators} style={{ borderRadius: 8 }}>刷新</Button>
       </div>
 
       {/* 统计卡 */}
@@ -193,8 +140,8 @@ export default function CreatorMarket() {
         </Col>
         <Col xs={8} sm={4}>
           <Card size="small" style={{ borderRadius: 8, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }} bodyStyle={{ padding: '12px 10px' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#d97706' }}>{creators.filter(c => c.order_count > 0).length}</div>
-            <Text type="secondary" style={{ fontSize: 11 }}>已出单</Text>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#d97706' }}>{creators.filter(c => c.status === '已回复' || c.status === '待寄样').length}</div>
+            <Text type="secondary" style={{ fontSize: 11 }}>建联中</Text>
           </Card>
         </Col>
         <Col xs={0} sm={12} />
@@ -211,8 +158,12 @@ export default function CreatorMarket() {
             style={{ width: 240, borderRadius: 8 }}
             allowClear
           />
-          <Select value={country} onChange={setCountry} style={{ width: 120, borderRadius: 8 }}
-            options={COUNTRIES.map(c => ({ value: c, label: c === '全部' ? '全部地区' : c }))} />
+          <Select value={statusFilter} onChange={setStatusFilter} style={{ width: 120, borderRadius: 8 }}
+            options={STATUSES.map(s => ({ value: s, label: s === '全部' ? '全部状态' : s }))} />
+          <Select value={coopFilter} onChange={setCoopFilter} style={{ width: 120, borderRadius: 8 }}
+            options={COOP_TYPES.map(s => ({ value: s, label: s === '全部' ? '全部合作' : s }))} />
+          <Select value={channelFilter} onChange={setChannelFilter} style={{ width: 120, borderRadius: 8 }}
+            options={CHANNELS.map(s => ({ value: s, label: s === '全部' ? '全部渠道' : s }))} />
           <Text type="secondary" style={{ marginLeft: 'auto', fontSize: 12 }}>
             共 <Text strong style={{ color: PRIMARY }}>{filtered.length}</Text> 位达人
           </Text>
@@ -227,17 +178,12 @@ export default function CreatorMarket() {
               <div>
                 <div style={{ marginBottom: 8 }}>暂无达人数据</div>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  TikTok Shop API 不提供直接的达人列表接口，我们通过分析联盟订单来发现带货达人。<br />
-                  请先确保：① 店铺已授权 TikTok ② 有达人通过联盟计划带货产生订单
+                  请先在「达人列表」页面手动添加达人，或通过 Excel 批量导入
                 </Text>
               </div>
             }
             style={{ marginTop: 40 }}
-          >
-            <Button type="primary" icon={<CloudDownloadOutlined />} onClick={handleSyncFromTikTok} loading={syncing} style={{ borderRadius: 8 }}>
-              从TikTok同步达人
-            </Button>
-          </Empty>
+          />
         ) : (
           <Row gutter={[16, 16]}>
             {filtered.map(creator => (
@@ -301,8 +247,7 @@ export default function CreatorMarket() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <TeamOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
-                              <Badge status="processing" />
+                            <div style={{ fontSize: 16, fontWeight: 700, color: getStatusColor(creator.status) }}>
                               {creator.status}
                             </div>
                             <Text type="secondary" style={{ fontSize: 10 }}>建联状态</Text>
@@ -313,8 +258,10 @@ export default function CreatorMarket() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <RiseOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{creator.order_count}</div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>关联订单</Text>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                              {creator.commission_rate > 0 ? `${creator.commission_rate}%` : '-'}
+                            </div>
+                            <Text type="secondary" style={{ fontSize: 10 }}>佣金比例</Text>
                           </div>
                         </div>
                       </Col>
@@ -331,25 +278,35 @@ export default function CreatorMarket() {
                       </Col>
                       <Col span={12}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <StarOutlined style={{ color: '#d97706', fontSize: 12 }} />
+                          <CalendarOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: '#d97706', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {creator.cooperation_type || '未知'}
                             </div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>
-                              {creator.commission_rate > 0 ? `佣金 ${creator.commission_rate}%` : '合作方式'}
-                            </Text>
+                            <Text type="secondary" style={{ fontSize: 10 }}>合作方式</Text>
                           </div>
                         </div>
                       </Col>
                     </Row>
 
-                    {/* 平台信息 */}
-                    {creator.parsed.seller_type && (
+                    {/* 联系信息 */}
+                    {creator.contact_info && (
                       <div style={{
                         marginTop: 12, padding: '8px 12px',
                         background: '#f0fdf4', borderRadius: 8,
                         fontSize: 12, color: PRIMARY, fontWeight: 500,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        📱 {creator.contact_info}
+                      </div>
+                    )}
+
+                    {/* 平台信息 */}
+                    {creator.parsed.seller_type && (
+                      <div style={{
+                        marginTop: 8, padding: '6px 10px',
+                        background: '#f8fafc', borderRadius: 6,
+                        fontSize: 11, color: '#64748b',
                       }}>
                         🌐 {creator.parsed.seller_type === 'CROSS_BORDER' ? '跨境卖家' : '本地卖家'}
                         {creator.parsed.selection_region ? ` · 可推广地区: ${creator.parsed.selection_region}` : ''}
@@ -367,11 +324,9 @@ export default function CreatorMarket() {
                       onClick={() => window.open(`https://www.tiktok.com/@${creator.influencer_id}`, '_blank')}>
                       查看主页
                     </Button>
-                    {creator.order_count > 0 ? (
-                      <Tag color="green" style={{ margin: 0 }}>已带货</Tag>
-                    ) : (
-                      <Tag color="default" style={{ margin: 0 }}>待建联</Tag>
-                    )}
+                    <Tag color={creator.status === '已完成' ? 'green' : 'default'} style={{ margin: 0 }}>
+                      {creator.status === '已完成' ? '已合作' : creator.status}
+                    </Tag>
                   </div>
                 </Card>
               </Col>
