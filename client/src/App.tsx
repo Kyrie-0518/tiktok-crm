@@ -13,9 +13,8 @@ import {
   KeyOutlined, AuditOutlined, SafetyOutlined,
   CaretDownOutlined, ThunderboltOutlined,
   TeamOutlined, BarChartOutlined,
-  ColumnHeightOutlined, FolderOpenOutlined,
-  SendOutlined, ExclamationCircleOutlined,
-  RiseOutlined,
+  RiseOutlined, ControlOutlined,
+  FundOutlined, PictureOutlined,
 } from '@ant-design/icons';
 import { useAuthStore, hasMinRole } from './stores/authStore';
 import type { RoleKey } from './stores/authStore';
@@ -31,11 +30,12 @@ import SystemSettings from './pages/SystemSettings';
 import AdminLayout from './pages/AdminLayout';
 import AIStudioLayout from './pages/AIStudioLayout';
 import SkiisWorkbody from './pages/SkiisWorkbody';
-import ProductMulti from './pages/ProductMulti';
-import OperateMaterial from './pages/OperateMaterial';
-import ProductPromotion from './pages/ProductPromotion';
-import ProblemOrders from './pages/ProblemOrders';
-import UserCenter from './pages/UserCenter';
+import AdDashboard from './pages/AdDashboard';
+import AdAccounts from './pages/AdAccounts';
+import AdCampaigns from './pages/AdCampaigns';
+import AdRules from './pages/AdRules';
+import AdLogs from './pages/AdLogs';
+import AdCreatives from './pages/AdCreatives';
 import AdBills from './pages/AdBills';
 import DataReports from './pages/DataReports';
 
@@ -73,13 +73,12 @@ const MENU_GROUPS = [
     label: '流量引擎',
     icon: <RiseOutlined />,
     items: [
-      { key: '/ad-bills', icon: <PayCircleOutlined />, label: '广告推款' },
-      { key: '/product-multi', icon: <ColumnHeightOutlined />, label: '产品多列' },
-      { key: '/operate-material', icon: <FolderOpenOutlined />, label: '运营素材' },
-      { key: '/product-promotion', icon: <SendOutlined />, label: '商品推广' },
-      { key: '/problem-orders', icon: <ExclamationCircleOutlined />, label: '问题订单' },
-      { key: '/data-reports', icon: <BarChartOutlined />, label: '数据报表' },
-      { key: '/user-center', icon: <UserOutlined />, label: '用户中心' },
+      { key: '/ad-dashboard', icon: <FundOutlined />, label: '广告仪表盘' },
+      { key: '/ad-accounts', icon: <SafetyOutlined />, label: '账户授权' },
+      { key: '/ad-campaigns', icon: <AppstoreOutlined />, label: '系列管理' },
+      { key: '/ad-rules', icon: <ControlOutlined />, label: '智能规则' },
+      { key: '/ad-logs', icon: <FileTextOutlined />, label: '执行日志' },
+      { key: '/ad-creatives', icon: <PictureOutlined />, label: '素材分析' },
     ],
   },
   {
@@ -801,11 +800,12 @@ function AppLayout() {
             <Route path="/influencers" element={<PermRouteGuard permKey="influencers"><Influencers /></PermRouteGuard>} />
             <Route path="/ad-bills" element={<AdBills />} />
             <Route path="/data-reports" element={<DataReports />} />
-            <Route path="/product-multi" element={<ProductMulti />} />
-            <Route path="/operate-material" element={<OperateMaterial />} />
-            <Route path="/product-promotion" element={<ProductPromotion />} />
-            <Route path="/problem-orders" element={<ProblemOrders />} />
-            <Route path="/user-center" element={<UserCenter />} />
+            <Route path="/ad-dashboard" element={<AdDashboard />} />
+            <Route path="/ad-accounts" element={<AdAccounts />} />
+            <Route path="/ad-campaigns" element={<AdCampaigns />} />
+            <Route path="/ad-rules" element={<AdRules />} />
+            <Route path="/ad-logs" element={<AdLogs />} />
+            <Route path="/ad-creatives" element={<AdCreatives />} />
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/admin/*" element={<AdminLayout />} />
             <Route path="/skiis-workbody" element={<SkiisWorkbody />} />
