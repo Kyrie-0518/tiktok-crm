@@ -853,7 +853,7 @@ export class TikTokAPI {
   async getCreatorProfile(accessToken?: string) {
     const token = accessToken || this.auth.access_token;
     const { url, headers } = buildSignedRequest(
-      { ...this.auth, access_token: token },
+      { ...this.auth, access_token: token, shop_cipher: '' },
       'affiliate_creator/profiles',
       undefined, undefined, '202508'
     );
