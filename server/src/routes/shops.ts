@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import getDb from '../db';
 import authMiddleware from '../middleware/auth';
-import { syncShopOrders, testApiConnection } from '../services/order-sync';
+import { syncShopOrders, testApiConnection, resyncAllOrderItems } from '../services/order-sync';
 import { syncShopProducts } from '../services/tiktok-product-sync';
 
 const router = Router();
@@ -235,6 +235,19 @@ router.post('/:id/sync', authMiddleware, async (req: Request, res: Response) => 
     });
   } catch (e: any) {
     res.status(500).json({ success: false, errors: [`同步异常: ${e.message}`] });
+  }
+});
+
+// POST /api/shops/:id/resync-items — 重新拉取所有已有订单的商品明细
+router.post('/:id/resync-items', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await resyncAllOrderItems(Number(req.params.id));
+    res.json({
+      success: result.errors.length === 0,
+      ...result,
+    });
+  } catch (e: any) {
+    res.status(500).json({ success: false, errors: [`补全异常: ${e.message}`] });
   }
 });
 

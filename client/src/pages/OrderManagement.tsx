@@ -543,6 +543,22 @@ export default function OrderManagement() {
     }
   };
 
+  const handleResyncItems = async (shopId: number) => {
+    if (!shopId) return;
+    setSyncLoading(true);
+    message.loading({ content: '补全商品明细中，请耐心等待...', key: 'resync-items', duration: 0 });
+    try {
+      const res = await api.post(`/shops/${shopId}/resync-items`, {}, { timeout: 300000 });
+      message.success({ content: `补全完成：共处理 ${res.data.processed} 条订单`, key: 'resync-items' });
+      loadData();
+    } catch (e: any) {
+      message.error({ content: e.response?.data?.errors?.[0] || '补全失败', key: 'resync-items' });
+    } finally {
+      setSyncLoading(false);
+      setSyncModalOpen(false);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     await api.delete(`/orders/${id}`);
     message.success('已删除');
@@ -1033,7 +1049,7 @@ export default function OrderManagement() {
       >
         <div style={{ padding: '8px 0 16px' }}>
           <p style={{ color: '#666', fontSize: 13, marginBottom: 16 }}>
-            选择要同步的 TikTok 店铺，系统将自动拉取最新订单数据。
+            选择要同步的 TikTok 店铺，系统将自动拉取最新订单数据。若旧订单缺少商品明细，可使用"补全商品明细"修复。
           </p>
           <Select
             placeholder="选择店铺"
@@ -1043,10 +1059,13 @@ export default function OrderManagement() {
           >
             {shops.map(s => <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>)}
           </Select>
-          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }} wrap>
             <Button onClick={() => setSyncModalOpen(false)}>取消</Button>
             <Button icon={<SyncOutlined />} loading={syncLoading} onClick={() => handleSyncOrders(syncShopId!)} disabled={!syncShopId}>
               同步订单
+            </Button>
+            <Button type="primary" loading={syncLoading} onClick={() => handleResyncItems(syncShopId!)} disabled={!syncShopId}>
+              补全商品明细
             </Button>
           </Space>
         </div>
