@@ -37,8 +37,8 @@ interface CreatorRow {
     permissions?: string[];
   };
   // 关联订单统计
-  order_count?: number;
-  total_revenue?: number;
+  order_count: number;
+  total_revenue: number;
 }
 
 const CATEGORIES = ['全部', '美妆', '数码', '时尚', '家居', '食品', '运动', '宠物', '母婴'];
@@ -89,8 +89,8 @@ export default function CreatorMarket() {
             user_type: profile.user_type,
             permissions: profile.permissions,
           },
-          order_count: orderStats[r.id]?.count || 0,
-          total_revenue: orderStats[r.id]?.revenue || 0,
+    order_count: orderStats[r.id]?.count ?? 0,
+    total_revenue: orderStats[r.id]?.revenue ?? 0,
         };
       });
       setCreators(parsed);
