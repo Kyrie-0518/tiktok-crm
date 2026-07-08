@@ -89,33 +89,47 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
 
       if (orders.length === 0) break;
 
-      // 4. 获取订单详情（含商品信息）并写入数据库
+      // 4. 批量获取订单详情（含商品信息）—— 一次调用拉取整页详情，避免逐个调用超时
+      const orderIds = orders.map((o: any) => o.id || o.order_id || '').filter(Boolean);
+      let detailMap: Record<string, any> = {};
+      if (orderIds.length > 0) {
+        try {
+          const detailResp = await api.getOrderDetail(orderIds);
+          const respKeys = Object.keys(detailResp || {});
+          const dataKeys = Object.keys(detailResp?.data || {});
+          console.log(`[order-sync] 批量获取 ${orderIds.length} 条订单详情, resp keys: [${respKeys.join(',')}], data keys: [${dataKeys.join(',')}]`);
+          const detailList = detailResp?.data?.orders
+                         || detailResp?.data?.order_list
+                         || detailResp?.data?.order_detail_list
+                         || [];
+          for (const d of detailList) {
+            const did = d.id || d.order_id || '';
+            if (did) {
+              detailMap[did] = {
+                ...d,
+                line_items: d.line_item_list || d.package_list?.[0]?.item_list || d.order_line_list || d.order_lines || d.line_items || d.item_list || d.items || [],
+              };
+            }
+          }
+          console.log(`[order-sync] 成功解析 ${Object.keys(detailMap).length} 条订单详情`);
+        } catch (detailErr: any) {
+          console.error(`[order-sync] 批量获取订单详情失败: ${detailErr.message}`);
+          // 不中断，继续用列表数据（虽然没有商品明细）
+        }
+      }
+
       for (const order of orders) {
         try {
           const orderId = order.id || order.order_id || '';
           let orderDetail = order;
 
-          // TikTok /orders/search 列表只返回概要，商品信息需要获取详情
-          if (orderId) {
-            try {
-              const detailResp = await api.getOrderDetail([orderId]);
-              // 诊断日志：输出响应结构
-              const respKeys = Object.keys(detailResp || {});
-              const dataKeys = Object.keys(detailResp?.data || {});
-              console.log(`[order-sync] 订单 ${orderId} 详情响应 keys: resp=[${respKeys.join(',')}] data=[${dataKeys.join(',')}]`);
-              const detail = detailResp?.data?.orders?.[0] || detailResp?.data?.order_list?.[0] || detailResp?.data?.order_detail_list?.[0];
-              if (detail) {
-                const detailKeys = Object.keys(detail);
-                const itemKeys = detailKeys.filter(k => k.includes('item') || k.includes('sku') || k.includes('product') || k.includes('line'));
-                console.log(`[order-sync] 订单 ${orderId} detail 对象 keys: [${detailKeys.join(',')}] 相关:{${itemKeys.join(',')}}`);
-                orderDetail = { ...order, ...detail, line_items: detail.line_item_list || detail.package_list?.[0]?.item_list || detail.order_line_list || detail.order_lines || detail.line_items || detail.item_list || detail.items || order.line_items };
-                console.log(`[order-sync] 订单 ${orderId} 提取到 line_items: ${JSON.stringify((orderDetail as any).line_items?.length ?? 0)} 件`);
-              } else {
-                console.log(`[order-sync] 订单 ${orderId} 无法从响应中提取明细: orders=${!!detailResp?.data?.orders} order_list=${!!detailResp?.data?.order_list}`);
-              }
-            } catch (detailErr: any) {
-              console.warn(`[order-sync] 获取订单 ${orderId} 详情失败: ${detailErr.message}`);
-            }
+          if (orderId && detailMap[orderId]) {
+            const d = detailMap[orderId];
+            const itemCount = Array.isArray(d.line_items) ? d.line_items.length : 0;
+            console.log(`[order-sync] 订单 ${orderId} 提取到 line_items: ${itemCount} 件`);
+            orderDetail = { ...order, ...d };
+          } else if (orderId) {
+            console.log(`[order-sync] 订单 ${orderId} 无详情数据，使用列表摘要`);
           }
 
           const saved = saveOrder(db, orderDetail, shopId);
@@ -222,13 +236,8 @@ function saveOrderItems(db: any, orderId: number, order: any) {
     || order.item_list
     || [];
   if (items.length === 0) {
-    console.warn(`[saveOrderItems] 订单 ${orderId} 没有商品信息，原始字段:`, Object.keys(order).filter(k => k.includes('item') || k.includes('sku') || k.includes('product') || k.includes('line')));
-    return;
+    return; // 无商品明细，静默跳过
   }
-
-  // 诊断：输出第一个item的字段结构
-  console.log(`[saveOrderItems] 订单 ${orderId} 共 ${items.length} 件商品，第1件字段: [${Object.keys(items[0]).join(',')}]`);
-  console.log(`[saveOrderItems] 订单 ${orderId} 第1件商品值: product_name=${items[0].product_name}, sku_id=${items[0].sku_id}, sku_name=${items[0].sku_name}, sku_image=${items[0].sku_image}, sale_price=${items[0].sale_price}, original_price=${items[0].original_price}, retail_price=${items[0].retail_price}, quantity=${items[0].quantity}, qty=${items[0].qty}`);
 
   // 先删除旧明细再重新插入
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
@@ -273,7 +282,9 @@ function saveOrderItems(db: any, orderId: number, order: any) {
 
   // 验证写入
   const savedCount = db.prepare('SELECT COUNT(*) as c FROM order_items WHERE order_id = ?').get(orderId) as any;
-  console.log(`[saveOrderItems] 订单 ${orderId} 写入 ${savedCount?.c || 0} 条商品明细 (insertedCount=${insertedCount})`);
+  if (savedCount?.c !== insertedCount) {
+    console.warn(`[saveOrderItems] 订单 ${orderId} 预期写入 ${insertedCount} 条，实际 ${savedCount?.c || 0} 条`);
+  }
 }
 
 /** 凭证连通性测试 */
