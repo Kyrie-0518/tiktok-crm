@@ -418,6 +418,30 @@ router.delete('/:id', authMiddleware, (req: Request, res: Response) => {
 });
 
 // ═══════════════════════════════════════════════
+//  达人订单统计（达人广场用）
+// ═══════════════════════════════════════════════
+
+// GET /api/influencers/order-stats — 获取各达人的关联订单统计
+router.get('/order-stats', authMiddleware, (_req: Request, res: Response) => {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      i.id,
+      i.influencer_id,
+      i.name,
+      COUNT(o.id) as order_count,
+      COALESCE(SUM(o.actual_amount), 0) as total_revenue
+    FROM influencers i
+    LEFT JOIN orders o ON o.influencer_id = i.id
+    GROUP BY i.id
+  `).all() as any[];
+
+  const stats: Record<number, { count: number; revenue: number }> = {};
+  rows.forEach(r => { stats[r.id] = { count: r.order_count, revenue: r.total_revenue }; });
+  res.json(stats);
+});
+
+// ═══════════════════════════════════════════════
 //  TikTok 达人同步（从官方 SDK 拉取达人信息）
 // ═══════════════════════════════════════════════
 

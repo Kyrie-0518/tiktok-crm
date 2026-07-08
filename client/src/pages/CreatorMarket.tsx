@@ -1,93 +1,149 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Row, Col, Input, Select, Tag, Typography, Button, Space,
-  Statistic, Avatar, Rate, Tooltip, Empty, Spin,
+  Statistic, Avatar, Empty, Spin, message, Badge,
 } from 'antd';
 import {
-  SearchOutlined, UserOutlined, TikTokOutlined,
+  SearchOutlined, UserOutlined,
   StarOutlined, EyeOutlined, TeamOutlined,
-  HeartOutlined, RiseOutlined, FilterOutlined,
-  LinkOutlined, MessageOutlined,
+  RiseOutlined, ReloadOutlined,
+  LinkOutlined, SyncOutlined, CloudDownloadOutlined,
+  ShopOutlined,
 } from '@ant-design/icons';
+import api from '../api';
 
 const { Text, Title } = Typography;
 const PRIMARY = '#059669';
 
-interface Creator {
-  id: string;
+interface CreatorRow {
+  id: number;
+  influencer_id: string;
   name: string;
-  handle: string;
-  avatar: string;
-  followers: number;
-  category: string;
-  country: string;
-  avg_views: number;
-  engagement_rate: number;
-  commission_preference: string;
-  rating: number;
-  total_videos: number;
-  tags: string[];
+  shop_name: string;
+  shop_id: number;
+  status: string;
+  contact_channel: string;
+  contact_info: string;
+  cooperation_type: string;
+  commission_rate: number;
+  remark: string;
+  // 从 remark JSON 中解析
+  parsed: {
+    avatar_url?: string;
+    register_region?: string;
+    selection_region?: string;
+    seller_type?: string;
+    user_type?: string;
+    permissions?: string[];
+  };
+  // 关联订单统计
+  order_count?: number;
+  total_revenue?: number;
 }
 
-const MOCK_CREATORS: Creator[] = [
-  { id: '1', name: 'BeautyGuru Mia', handle: '@beautygurumia', avatar: '', followers: 2500000, category: '美妆', country: '马来西亚', avg_views: 850000, engagement_rate: 4.2, commission_preference: '纯佣 15%', rating: 4.8, total_videos: 320, tags: ['美妆', '护肤', '测评'] },
-  { id: '2', name: 'TechReview Joe', handle: '@techreviewjoe', avatar: '', followers: 1800000, category: '数码', country: '菲律宾', avg_views: 620000, engagement_rate: 3.8, commission_preference: '坑位费 + 10%', rating: 4.6, total_videos: 215, tags: ['数码', '开箱', '测评'] },
-  { id: '3', name: 'FashionFinds SG', handle: '@fashionfindssg', avatar: '', followers: 3200000, category: '时尚', country: '新加坡', avg_views: 1200000, engagement_rate: 5.1, commission_preference: '纯佣 12%', rating: 4.9, total_videos: 450, tags: ['时尚', '穿搭', '奢侈品'] },
-  { id: '4', name: 'HomeStyle Maria', handle: '@homestylemaria', avatar: '', followers: 950000, category: '家居', country: '马来西亚', avg_views: 380000, engagement_rate: 4.5, commission_preference: '置换', rating: 4.7, total_videos: 180, tags: ['家居', '收纳', '好物'] },
-  { id: '5', name: 'FoodLover Ken', handle: '@foodloverken', avatar: '', followers: 2100000, category: '食品', country: '泰国', avg_views: 720000, engagement_rate: 6.2, commission_preference: '纯佣 18%', rating: 4.9, total_videos: 520, tags: ['美食', '测评', '烹饪'] },
-  { id: '6', name: 'FitCoach Amy', handle: '@fitcoachamy', avatar: '', followers: 1400000, category: '运动', country: '越南', avg_views: 490000, engagement_rate: 5.8, commission_preference: '坑位费 + 15%', rating: 4.5, total_videos: 280, tags: ['健身', '瑜伽', '装备'] },
-  { id: '7', name: 'PetLover David', handle: '@petloverdavid', avatar: '', followers: 870000, category: '宠物', country: '马来西亚', avg_views: 310000, engagement_rate: 7.1, commission_preference: '纯佣 10%', rating: 4.8, total_videos: 165, tags: ['宠物', '用品', '猫狗'] },
-  { id: '8', name: 'KidToyReviewer', handle: '@kidtoyreviewer', avatar: '', followers: 2900000, category: '母婴', country: '印尼', avg_views: 980000, engagement_rate: 4.9, commission_preference: '纯佣 14%', rating: 4.7, total_videos: 380, tags: ['母婴', '玩具', '开箱'] },
-];
-
 const CATEGORIES = ['全部', '美妆', '数码', '时尚', '家居', '食品', '运动', '宠物', '母婴'];
-const COUNTRIES = ['全部', '马来西亚', '菲律宾', '新加坡', '泰国', '越南', '印尼'];
-const FOLLOWER_RANGES = [
-  { value: 'all', label: '全部粉丝' },
-  { value: '100k-500k', label: '10万-50万' },
-  { value: '500k-1m', label: '50万-100万' },
-  { value: '1m-3m', label: '100万-300万' },
-  { value: '3m+', label: '300万+' },
-];
+const COUNTRIES = ['全部', 'MY', 'PH', 'SG', 'TH', 'VN', 'ID'];
 
 export default function CreatorMarket() {
-  const [creators, setCreators] = useState<Creator[]>([]);
+  const [creators, setCreators] = useState<CreatorRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [keyword, setKeyword] = useState('');
-  const [category, setCategory] = useState('全部');
   const [country, setCountry] = useState('全部');
-  const [followerRange, setFollowerRange] = useState('all');
+  const [shops, setShops] = useState<any[]>([]);
 
-  useEffect(() => {
+  const loadCreators = useCallback(async () => {
     setLoading(true);
-    // TODO: 接入真实 TikTok Creator Marketplace API
-    setTimeout(() => {
-      setCreators(MOCK_CREATORS);
+    try {
+      // 拉取 influencer 列表 + 关联订单统计
+      const res = await api.get('/influencers', { params: { page_size: 200 } });
+      const list = (res.data?.list || res.data?.influencers || []) as any[];
+
+      // 尝试拉取订单统计（如有）
+      let orderStats: Record<number, { count: number; revenue: number }> = {};
+      try {
+        const statsRes = await api.get('/influencers/order-stats');
+        orderStats = statsRes.data || {};
+      } catch { /* ignore */ }
+
+      const parsed: CreatorRow[] = list.map((r: any) => {
+        let profile: any = {};
+        try { profile = r.remark ? JSON.parse(r.remark) : {}; } catch { /* ignore */ }
+        return {
+          id: r.id,
+          influencer_id: r.influencer_id || '',
+          name: r.name || r.influencer_id || '',
+          shop_name: r.shop_name || '',
+          shop_id: r.shop_id || 0,
+          status: r.status || '未回复',
+          contact_channel: r.contact_channel || '',
+          contact_info: r.contact_info || '',
+          cooperation_type: r.cooperation_type || '',
+          commission_rate: r.commission_rate || 0,
+          remark: r.remark || '',
+          parsed: {
+            avatar_url: profile.avatar_url,
+            register_region: profile.register_region,
+            selection_region: profile.selection_region,
+            seller_type: profile.seller_type,
+            user_type: profile.user_type,
+            permissions: profile.permissions,
+          },
+          order_count: orderStats[r.id]?.count || 0,
+          total_revenue: orderStats[r.id]?.revenue || 0,
+        };
+      });
+      setCreators(parsed);
+    } catch (e: any) {
+      message.error('加载达人列表失败: ' + (e.response?.data?.error || e.message));
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   }, []);
 
+  useEffect(() => {
+    api.get('/shops').then(r => setShops(r.data || [])).catch(() => {});
+    loadCreators();
+  }, [loadCreators]);
+
+  // 从 TikTok 同步达人数据
+  const handleSyncFromTikTok = async () => {
+    setSyncing(true);
+    try {
+      const shopIds = shops.length > 0 ? shops.map((s: any) => s.id) : [1];
+      let totalLinked = 0;
+      let totalOrders = 0;
+
+      for (const shopId of shopIds) {
+        try {
+          const res = await api.post('/influencers/sync-affiliate-orders', { shop_id: shopId });
+          totalLinked += res.data?.linked || 0;
+          totalOrders += res.data?.total_orders || 0;
+        } catch { /* 跳过同步失败的店铺 */ }
+      }
+
+      if (totalLinked > 0) {
+        message.success(`从 ${totalOrders} 条联盟订单中关联了 ${totalLinked} 位达人`);
+      } else {
+        message.info('未发现新的达人联盟订单，请确保店铺已授权且有联盟订单数据');
+      }
+      loadCreators();
+    } catch (e: any) {
+      message.error('同步失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const filtered = creators.filter(c => {
-    if (keyword && !c.name.toLowerCase().includes(keyword.toLowerCase()) && !c.handle.toLowerCase().includes(keyword.toLowerCase())) return false;
-    if (category !== '全部' && c.category !== category) return false;
-    if (country !== '全部' && c.country !== country) return false;
-    if (followerRange === '100k-500k' && (c.followers < 100000 || c.followers > 500000)) return false;
-    if (followerRange === '500k-1m' && (c.followers < 500000 || c.followers > 1000000)) return false;
-    if (followerRange === '1m-3m' && (c.followers < 1000000 || c.followers > 3000000)) return false;
-    if (followerRange === '3m+' && c.followers < 3000000) return false;
+    if (keyword && !c.name.toLowerCase().includes(keyword.toLowerCase()) && !c.influencer_id.toLowerCase().includes(keyword.toLowerCase())) return false;
+    if (country !== '全部' && c.parsed.register_region !== country) return false;
     return true;
   });
 
-  const formatFollowers = (n: number): string => {
-    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-    return String(n);
-  };
-
-  const formatViews = (n: number): string => {
-    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-    return String(n);
+  const getStatusColor = (status: string) => {
+    const map: Record<string, string> = { '未回复': '#faad14', '已回复': '#2563eb', '待寄样': '#722ed1', '已完成': '#059669' };
+    return map[status] || '#8c8c8c';
   };
 
   return (
@@ -103,9 +159,46 @@ export default function CreatorMarket() {
         </div>
         <div style={{ flex: 1 }}>
           <Title level={4} style={{ margin: 0, color: '#1e293b' }}>达人广场</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>发现优质 TikTok 带货达人，筛选、对比、一键建联</Text>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            从 TikTok Shop 联盟订单中同步达人数据，发现优质带货达人
+          </Text>
         </div>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={loadCreators} style={{ borderRadius: 8 }}>刷新</Button>
+          <Button
+            type="primary"
+            icon={<CloudDownloadOutlined />}
+            onClick={handleSyncFromTikTok}
+            loading={syncing}
+            style={{ borderRadius: 8, background: PRIMARY, borderColor: PRIMARY }}
+          >
+            从TikTok同步达人
+          </Button>
+        </Space>
       </div>
+
+      {/* 统计卡 */}
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        <Col xs={8} sm={4}>
+          <Card size="small" style={{ borderRadius: 8, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }} bodyStyle={{ padding: '12px 10px' }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: PRIMARY }}>{creators.length}</div>
+            <Text type="secondary" style={{ fontSize: 11 }}>达人总数</Text>
+          </Card>
+        </Col>
+        <Col xs={8} sm={4}>
+          <Card size="small" style={{ borderRadius: 8, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }} bodyStyle={{ padding: '12px 10px' }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#2563eb' }}>{creators.filter(c => c.status === '已完成').length}</div>
+            <Text type="secondary" style={{ fontSize: 11 }}>已合作</Text>
+          </Card>
+        </Col>
+        <Col xs={8} sm={4}>
+          <Card size="small" style={{ borderRadius: 8, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }} bodyStyle={{ padding: '12px 10px' }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#d97706' }}>{creators.filter(c => c.order_count > 0).length}</div>
+            <Text type="secondary" style={{ fontSize: 11 }}>已出单</Text>
+          </Card>
+        </Col>
+        <Col xs={0} sm={12} />
+      </Row>
 
       {/* 筛选栏 */}
       <Card style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: 16 }}>
@@ -118,12 +211,8 @@ export default function CreatorMarket() {
             style={{ width: 240, borderRadius: 8 }}
             allowClear
           />
-          <Select value={category} onChange={setCategory} style={{ width: 120, borderRadius: 8 }}
-            options={CATEGORIES.map(c => ({ value: c, label: c }))} />
-          <Select value={country} onChange={setCountry} style={{ width: 130, borderRadius: 8 }}
-            options={COUNTRIES.map(c => ({ value: c, label: c }))} />
-          <Select value={followerRange} onChange={setFollowerRange} style={{ width: 140, borderRadius: 8 }}
-            options={FOLLOWER_RANGES} />
+          <Select value={country} onChange={setCountry} style={{ width: 120, borderRadius: 8 }}
+            options={COUNTRIES.map(c => ({ value: c, label: c === '全部' ? '全部地区' : c }))} />
           <Text type="secondary" style={{ marginLeft: 'auto', fontSize: 12 }}>
             共 <Text strong style={{ color: PRIMARY }}>{filtered.length}</Text> 位达人
           </Text>
@@ -133,7 +222,21 @@ export default function CreatorMarket() {
       {/* 达人卡片网格 */}
       <Spin spinning={loading}>
         {filtered.length === 0 ? (
-          <Empty description="暂无匹配的达人" style={{ marginTop: 40 }} />
+          <Empty
+            description={
+              <div>
+                <div style={{ marginBottom: 8 }}>暂无达人数据</div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  点击「从TikTok同步达人」从联盟订单中自动拉取达人信息
+                </Text>
+              </div>
+            }
+            style={{ marginTop: 40 }}
+          >
+            <Button type="primary" icon={<CloudDownloadOutlined />} onClick={handleSyncFromTikTok} loading={syncing} style={{ borderRadius: 8 }}>
+              从TikTok同步达人
+            </Button>
+          </Empty>
         ) : (
           <Row gutter={[16, 16]}>
             {filtered.map(creator => (
@@ -142,8 +245,7 @@ export default function CreatorMarket() {
                   hoverable
                   style={{
                     borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                    transition: 'all 0.2s ease',
-                    overflow: 'hidden',
+                    transition: 'all 0.2s ease', overflow: 'hidden',
                   }}
                   bodyStyle={{ padding: 0 }}
                   onMouseEnter={(e) => {
@@ -155,7 +257,7 @@ export default function CreatorMarket() {
                     (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
                   }}
                 >
-                  {/* 卡片头部 - 渐变背景 */}
+                  {/* 卡片头部 */}
                   <div style={{
                     height: 80, padding: '16px 20px 0',
                     background: `linear-gradient(135deg, ${PRIMARY}, #34d399)`,
@@ -163,6 +265,7 @@ export default function CreatorMarket() {
                   }}>
                     <Avatar
                       size={56}
+                      src={creator.parsed.avatar_url || undefined}
                       icon={<UserOutlined />}
                       style={{
                         background: '#fff', color: PRIMARY, fontSize: 24,
@@ -172,39 +275,36 @@ export default function CreatorMarket() {
                     />
                     <div style={{ flex: 1, color: '#fff', minWidth: 0 }}>
                       <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {creator.name}
+                        {creator.name || creator.influencer_id}
                       </div>
-                      <div style={{ fontSize: 12, opacity: 0.85 }}>{creator.handle}</div>
+                      <div style={{ fontSize: 12, opacity: 0.85 }}>@{creator.influencer_id}</div>
                       <div style={{ marginTop: 2 }}>
-                        <Tag color="blue" style={{ fontSize: 10, background: 'rgba(255,255,255,0.25)', border: 'none', color: '#fff' }}>
-                          {creator.category}
-                        </Tag>
-                        <Tag style={{ fontSize: 10, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff' }}>
-                          {creator.country}
-                        </Tag>
+                        {creator.shop_name && (
+                          <Tag style={{ fontSize: 10, background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff' }}>
+                            <ShopOutlined /> {creator.shop_name}
+                          </Tag>
+                        )}
+                        {creator.parsed.register_region && (
+                          <Tag style={{ fontSize: 10, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff' }}>
+                            {creator.parsed.register_region}
+                          </Tag>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* 卡片主体 */}
                   <div style={{ padding: '12px 20px 16px' }}>
-                    {/* 核心数据 */}
                     <Row gutter={[12, 12]}>
                       <Col span={12}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <TeamOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{formatFollowers(creator.followers)}</div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>粉丝</Text>
-                          </div>
-                        </div>
-                      </Col>
-                      <Col span={12}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <EyeOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
-                          <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{formatViews(creator.avg_views)}</div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>均观看</Text>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                              <Badge status="processing" />
+                              {creator.status}
+                            </div>
+                            <Text type="secondary" style={{ fontSize: 10 }}>建联状态</Text>
                           </div>
                         </div>
                       </Col>
@@ -212,8 +312,19 @@ export default function CreatorMarket() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <RiseOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: '#059669' }}>{creator.engagement_rate}%</div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>互动率</Text>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{creator.order_count}</div>
+                            <Text type="secondary" style={{ fontSize: 10 }}>关联订单</Text>
+                          </div>
+                        </div>
+                      </Col>
+                      <Col span={12}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <LinkOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {creator.contact_channel || '未设置'}
+                            </div>
+                            <Text type="secondary" style={{ fontSize: 10 }}>建联渠道</Text>
                           </div>
                         </div>
                       </Col>
@@ -221,28 +332,28 @@ export default function CreatorMarket() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <StarOutlined style={{ color: '#d97706', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: '#d97706' }}>{creator.rating}</div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>评分</Text>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#d97706', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {creator.cooperation_type || '未知'}
+                            </div>
+                            <Text type="secondary" style={{ fontSize: 10 }}>
+                              {creator.commission_rate > 0 ? `佣金 ${creator.commission_rate}%` : '合作方式'}
+                            </Text>
                           </div>
                         </div>
                       </Col>
                     </Row>
 
-                    {/* 佣金偏好 */}
-                    <div style={{
-                      marginTop: 12, padding: '8px 12px',
-                      background: '#f0fdf4', borderRadius: 8,
-                      fontSize: 12, color: PRIMARY, fontWeight: 500,
-                    }}>
-                      💰 {creator.commission_preference}
-                    </div>
-
-                    {/* 标签 */}
-                    <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {creator.tags.map(tag => (
-                        <Tag key={tag} style={{ fontSize: 10, lineHeight: '18px', margin: 0 }}>{tag}</Tag>
-                      ))}
-                    </div>
+                    {/* 平台信息 */}
+                    {creator.parsed.seller_type && (
+                      <div style={{
+                        marginTop: 12, padding: '8px 12px',
+                        background: '#f0fdf4', borderRadius: 8,
+                        fontSize: 12, color: PRIMARY, fontWeight: 500,
+                      }}>
+                        🌐 {creator.parsed.seller_type === 'CROSS_BORDER' ? '跨境卖家' : '本地卖家'}
+                        {creator.parsed.selection_region ? ` · 可推广地区: ${creator.parsed.selection_region}` : ''}
+                      </div>
+                    )}
                   </div>
 
                   {/* 底部操作 */}
@@ -250,15 +361,16 @@ export default function CreatorMarket() {
                     borderTop: '1px solid #f1f5f9', padding: '10px 20px',
                     display: 'flex', gap: 8, justifyContent: 'space-between',
                   }}>
-                    <Button type="primary" size="small" icon={<LinkOutlined />}
-                      style={{ borderRadius: 6, background: PRIMARY, borderColor: PRIMARY, fontSize: 12 }}>
-                      一键建联
-                    </Button>
-                    <Button size="small" icon={<MessageOutlined />}
-                      onClick={() => window.open(`https://www.tiktok.com/${creator.handle}`, '_blank')}
-                      style={{ borderRadius: 6, fontSize: 12 }}>
+                    <Button type="primary" size="small"
+                      style={{ borderRadius: 6, background: PRIMARY, borderColor: PRIMARY, fontSize: 12 }}
+                      onClick={() => window.open(`https://www.tiktok.com/@${creator.influencer_id}`, '_blank')}>
                       查看主页
                     </Button>
+                    {creator.order_count > 0 ? (
+                      <Tag color="green" style={{ margin: 0 }}>已带货</Tag>
+                    ) : (
+                      <Tag color="default" style={{ margin: 0 }}>待建联</Tag>
+                    )}
                   </div>
                 </Card>
               </Col>
