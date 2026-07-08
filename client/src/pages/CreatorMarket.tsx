@@ -41,6 +41,13 @@ const COOP_TYPES = ['全部', '纯佣', '坑位费', '纯坑位', '置换'];
 const CHANNELS = ['全部', 'TikTok私信', '邮件', 'WhatsApp', '其他'];
 
 export default function CreatorMarket() {
+  const [creators, setCreators] = useState<CreatorRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [keyword, setKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState('全部');
+  const [coopFilter, setCoopFilter] = useState('全部');
+  const [channelFilter, setChannelFilter] = useState('全部');
+  const [syncing, setSyncing] = useState(false);
   const [shops, setShops] = useState<any[]>([]);
   const [selectedShop, setSelectedShop] = useState<number | null>(null);
 
