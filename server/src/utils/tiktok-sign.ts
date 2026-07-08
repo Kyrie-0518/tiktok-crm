@@ -81,8 +81,8 @@ export function buildSignedRequest(
     ? endpoint.slice(rawCategory.length + 1)
     : endpoint;
   // 使用环境变量 TIKTOK_API_BASE，支持沙箱/生产环境切换
-  // 官方 SDK 默认 basePath: https://open-api.tiktokglobalshop.com/api (含 /api)
-  const apiBase = (process.env.TIKTOK_API_BASE || 'https://open-api.tiktokglobalshop.com/api').replace(/\/$/, '');
+  // 官方 SDK basePath: https://open-api.tiktokglobalshop.com（不含 /api，详见 affiliateCreatorV202508Api.ts:24）
+  const apiBase = (process.env.TIKTOK_API_BASE || 'https://open-api.tiktokglobalshop.com').replace(/\/$/, '');
   const apiBaseUrl = new URL(apiBase);
   const pathnamePrefix = apiBaseUrl.pathname.replace(/\/$/, '');
   const base = `${apiBase}/${category}/${apiVersion}/${endpointWithoutCategory}`;
