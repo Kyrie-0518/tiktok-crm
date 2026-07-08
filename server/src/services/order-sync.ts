@@ -249,8 +249,11 @@ function saveOrderItems(db: any, orderId: number, order: any) {
     || (order.item_list?.length ? order.item_list : undefined)
     || [];
   if (items.length === 0) {
-    return; // 无商品明细，静默跳过
+    console.log(`[saveOrderItems] 订单 ${orderId} 无商品明细，跳过`);
+    return;
   }
+
+  console.log(`[saveOrderItems] 订单 ${orderId} 准备写入 ${items.length} 条商品明细`);
 
   // 先删除旧明细再重新插入
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
@@ -287,6 +290,7 @@ function saveOrderItems(db: any, orderId: number, order: any) {
     try {
       insert.run(orderId, productId, productName, sku, unitPrice, quantity, subtotal, itemStatus, imageUrl, specName);
       insertedCount++;
+      console.log(`[saveOrderItems] 订单 ${orderId} 插入成功: ${productName} ×${quantity}`);
     } catch (insertErr: any) {
       console.error(`[saveOrderItems] 订单 ${orderId} 插入商品明细失败: ${insertErr.message}`);
       console.error(`  参数: productName=${productName}, sku=${sku}, unitPrice=${unitPrice}, quantity=${quantity}, subtotal=${subtotal}, itemStatus=${itemStatus}, imageUrl=${imageUrl}, specName=${specName}`);
@@ -295,6 +299,7 @@ function saveOrderItems(db: any, orderId: number, order: any) {
 
   // 验证写入
   const savedCount = db.prepare('SELECT COUNT(*) as c FROM order_items WHERE order_id = ?').get(orderId) as any;
+  console.log(`[saveOrderItems] 订单 ${orderId} 写入完成: 预期 ${insertedCount} 条, 实际 ${savedCount?.c || 0} 条`);
   if (savedCount?.c !== insertedCount) {
     console.warn(`[saveOrderItems] 订单 ${orderId} 预期写入 ${insertedCount} 条，实际 ${savedCount?.c || 0} 条`);
   }

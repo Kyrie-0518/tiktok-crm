@@ -117,6 +117,9 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
       LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
       WHERE oi.order_id = ?
     `).all(o.id);
+    if (o.items.length > 0) {
+      console.log(`[orders] 订单 ${o.id} / ${o.order_no} 返回 ${o.items.length} 条商品明细`);
+    }
   }
 
   // Fallback: for items missing images, try matching by spec_name/sku_code (fuzzy)
