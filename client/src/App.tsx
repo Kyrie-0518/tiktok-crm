@@ -23,12 +23,12 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Finance from './pages/Finance';
-import Influencers from './pages/Influencers';
 import ShopManagement from './pages/ShopManagement';
 import OrderManagement from './pages/OrderManagement';
 import SystemSettings from './pages/SystemSettings';
 import AdminLayout from './pages/AdminLayout';
 import AIStudioLayout from './pages/AIStudioLayout';
+import InfluencerLayout from './pages/InfluencerLayout';
 import SkiisWorkbody from './pages/SkiisWorkbody';
 import AdDashboard from './pages/AdDashboard';
 import AdAccounts from './pages/AdAccounts';
@@ -153,6 +153,7 @@ function AppLayout() {
   // 检测是否在AI工作室页面
   const isInAIStudio = location.pathname.startsWith('/ai-studio');
   const isInAdmin = location.pathname.startsWith('/admin');
+  const isInInfluencerLayout = location.pathname.startsWith('/influencers');
   const [searchParams] = React.useMemo(() => {
     // 简单解析 URL search params
     const params = new URLSearchParams(location.search);
@@ -471,7 +472,7 @@ function AppLayout() {
         width={220}
         collapsedWidth={56}
         collapsible
-        collapsed={siderCollapsed || isInAIStudio || isInAdmin}
+        collapsed={siderCollapsed || isInAIStudio || isInAdmin || isInInfluencerLayout}
         trigger={null}
         style={{
           background: 'var(--bo-sider-bg)',
@@ -481,8 +482,8 @@ function AppLayout() {
           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           display: 'flex', flexDirection: 'column',
           // AI工作室 / 管理后台页面隐藏主侧边栏
-          visibility: (isInAIStudio || isInAdmin) ? 'hidden' : 'visible',
-          pointerEvents: (isInAIStudio || isInAdmin) ? 'none' : 'auto',
+          visibility: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 'hidden' : 'visible',
+          pointerEvents: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 'none' : 'auto',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -782,13 +783,13 @@ function AppLayout() {
 
       {/* ═══ 主内容区（无 Header） ═══ */}
       <Layout style={{
-        marginLeft: (isInAIStudio || isInAdmin) ? 0 : (siderCollapsed ? 56 : 220),
-        background: (isInAIStudio || isInAdmin) ? 'transparent' : 'var(--bo-content-bg)',
+        marginLeft: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 0 : (siderCollapsed ? 56 : 220),
+        background: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 'transparent' : 'var(--bo-content-bg)',
         transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <Content style={{
-          padding: (isInAIStudio || isInAdmin) ? 0 : '20px',
-          height: (isInAIStudio || isInAdmin) ? '100%' : '100vh', overflow: 'auto',
+          padding: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 0 : '20px',
+          height: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? '100%' : '100vh', overflow: 'auto',
           background: 'transparent',
         }}>
           <Routes>
@@ -797,7 +798,7 @@ function AppLayout() {
             <Route path="/shops" element={<PermRouteGuard permKey="shops"><ShopManagement /></PermRouteGuard>} />
             <Route path="/orders" element={<PermRouteGuard permKey="orders"><OrderManagement /></PermRouteGuard>} />
             <Route path="/finance" element={<PermRouteGuard permKey="finance"><Finance /></PermRouteGuard>} />
-            <Route path="/influencers" element={<PermRouteGuard permKey="influencers"><Influencers /></PermRouteGuard>} />
+            <Route path="/influencers/*" element={<PermRouteGuard permKey="influencers"><InfluencerLayout /></PermRouteGuard>} />
             <Route path="/ad-bills" element={<AdBills />} />
             <Route path="/data-reports" element={<DataReports />} />
             <Route path="/ad-dashboard" element={<AdDashboard />} />
