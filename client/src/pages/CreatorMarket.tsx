@@ -41,32 +41,8 @@ const COOP_TYPES = ['全部', '纯佣', '坑位费', '纯坑位', '置换'];
 const CHANNELS = ['全部', 'TikTok私信', '邮件', 'WhatsApp', '其他'];
 
 export default function CreatorMarket() {
-  const [creators, setCreators] = useState<CreatorRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [keyword, setKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState('全部');
-  const [coopFilter, setCoopFilter] = useState('全部');
-  const [channelFilter, setChannelFilter] = useState('全部');
-  const [syncing, setSyncing] = useState(false);
-
-  const handleSyncFromTikTok = async () => {
-    setSyncing(true);
-    try {
-      const res = await api.post('/influencers/sync-from-tiktok');
-      if (res.data?.created) {
-        message.success(`成功同步达人: ${res.data.profile?.username || ''}`);
-      } else if (res.data?.updated) {
-        message.success(`已更新达人资料: ${res.data.profile?.username || ''}`);
-      } else {
-        message.info(res.data?.message || '同步完成，无新数据');
-      }
-      loadCreators();
-    } catch (e: any) {
-      message.error('同步失败: ' + (e.response?.data?.error || e.message));
-    } finally {
-      setSyncing(false);
-    }
-  };
+  const [shops, setShops] = useState<any[]>([]);
+  const [selectedShop, setSelectedShop] = useState<number | null>(null);
 
   const loadCreators = useCallback(async () => {
     setLoading(true);
@@ -107,7 +83,39 @@ export default function CreatorMarket() {
     }
   }, []);
 
-  useEffect(() => { loadCreators(); }, [loadCreators]);
+  useEffect(() => {
+    api.get('/shops').then(r => {
+      const list = r.data || [];
+      setShops(list);
+      // 自动选中第一个已授权店铺
+      const authorized = list.find((s: any) => s.access_token);
+      if (authorized) setSelectedShop(authorized.id);
+    }).catch(() => {});
+    loadCreators();
+  }, [loadCreators]);
+
+  const handleSyncFromTikTok = async () => {
+    if (!selectedShop) {
+      message.warning('请先选择已授权的店铺');
+      return;
+    }
+    setSyncing(true);
+    try {
+      const res = await api.post('/influencers/sync-from-tiktok', { shop_id: selectedShop });
+      if (res.data?.created) {
+        message.success(`成功同步达人: ${res.data.profile?.username || ''}`);
+      } else if (res.data?.updated) {
+        message.success(`已更新达人资料: ${res.data.profile?.username || ''}`);
+      } else {
+        message.info(res.data?.message || '同步完成，无新数据');
+      }
+      loadCreators();
+    } catch (e: any) {
+      message.error('同步失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const filtered = creators.filter(c => {
     if (keyword && !c.name.toLowerCase().includes(keyword.toLowerCase()) && !c.influencer_id.toLowerCase().includes(keyword.toLowerCase())) return false;
@@ -142,12 +150,20 @@ export default function CreatorMarket() {
             浏览所有达人信息，支持搜索、筛选、查看详情
           </Text>
         </div>
-        <Space>
-          <Button icon={<CloudDownloadOutlined />} onClick={handleSyncFromTikTok} loading={syncing} style={{ borderRadius: 8 }}>
-            从TikTok同步达人资料
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={loadCreators} style={{ borderRadius: 8 }}>刷新</Button>
-        </Space>
+          <Space>
+            <Select
+              placeholder="选择店铺"
+              value={selectedShop}
+              onChange={setSelectedShop}
+              style={{ width: 200, borderRadius: 8 }}
+              options={shops.map(s => ({ value: s.id, label: s.name }))}
+              disabled={shops.length === 0}
+            />
+            <Button icon={<CloudDownloadOutlined />} onClick={handleSyncFromTikTok} loading={syncing} style={{ borderRadius: 8 }}>
+              从TikTok同步达人资料
+            </Button>
+            <Button icon={<ReloadOutlined />} onClick={loadCreators} style={{ borderRadius: 8 }}>刷新</Button>
+          </Space>
       </div>
 
       {/* 统计卡 */}
