@@ -8,13 +8,6 @@ import {
   SettingOutlined,
   PictureOutlined,
   FileImageOutlined,
-  PayCircleOutlined,
-  ColumnHeightOutlined,
-  FolderOpenOutlined,
-  SendOutlined,
-  ExclamationCircleOutlined,
-  BarChartOutlined,
-  UserOutlined,
   ThunderboltOutlined,
   ArrowRightOutlined,
 } from '@ant-design/icons';
@@ -47,23 +40,12 @@ const MODULES: StudioModule[] = [
   // ── 素材 ──
   { key: 'material-library', label: '素材库', icon: <PictureOutlined />, path: '/material-library', color: '#0891b2', description: 'AI生成的视频素材管理', category: 'material' },
   { key: 'raw-materials', label: '原料素材', icon: <FileImageOutlined />, path: '/raw-materials', color: '#d97706', description: '原始图片/视频素材上传管理', category: 'material' },
-  // ── 运营 ──
-  { key: 'ad-bills', label: '广告账款', icon: <PayCircleOutlined />, path: '/ad-bills', color: '#dc2626', description: '广告费用账单管理与追踪', category: 'operation' },
-  { key: 'product-multi', label: '产品多列', icon: <ColumnHeightOutlined />, path: '/product-multi', color: '#4f46e5', description: '多维度产品数据展示', category: 'operation' },
-  { key: 'operate-material', label: '运营素材', icon: <FolderOpenOutlined />, path: '/operate-material', color: '#ea580c', description: '运营活动素材资源管理', category: 'operation' },
-  { key: 'product-promotion', label: '商品推广', icon: <SendOutlined />, path: '/product-promotion', color: '#be185d', description: '商品推广活动管理与效果追踪', category: 'operation' },
-  { key: 'problem-orders', label: '问题订单', icon: <ExclamationCircleOutlined />, path: '/problem-orders', color: '#eab308', description: '异常订单处理与追踪', category: 'operation' },
-  // ── 报表 & 用户 ──
-  { key: 'data-reports', label: '数据报表', icon: <BarChartOutlined />, path: '/data-reports', color: '#0d9488', description: '多维度数据分析报表', category: 'report' },
-  { key: 'user-center', label: '用户中心', icon: <UserOutlined />, path: '/user-center', color: '#6366f1', description: '账号信息与偏好设置', category: 'report' },
 ];
 
 const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
   analysis: { label: 'AI分析', color: '#7B61FF' },
   video: { label: 'AI视频', color: '#8b5cf6' },
   material: { label: '素材管理', color: '#0891b2' },
-  operation: { label: '运营工具', color: '#ea580c' },
-  report: { label: '报表中心', color: '#0d9488' },
 };
 
 interface StudioStats {
@@ -175,26 +157,6 @@ export default function AIStudio() {
               value={stats?.active_models ?? 0}
               prefix={<SettingOutlined style={{ color: '#059669' }} />}
               valueStyle={{ fontSize: 26, fontWeight: 700, color: '#059669' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={8} xl={6}>
-          <Card className="stat-card-top-border" style={{ borderRadius: 10, borderTopColor: '#ea580c' }} bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>待处理广告账单</Text>}
-              value={stats?.pending_ad_bills ?? 0}
-              prefix={<PayCircleOutlined style={{ color: '#ea580c' }} />}
-              valueStyle={{ fontSize: 26, fontWeight: 700, color: '#ea580c' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={8} xl={6}>
-          <Card className="stat-card-top-border" style={{ borderRadius: 10, borderTopColor: '#eab308' }} bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>问题订单</Text>}
-              value={stats?.problem_order_count ?? 0}
-              prefix={<ExclamationCircleOutlined style={{ color: '#eab308' }} />}
-              valueStyle={{ fontSize: 26, fontWeight: 700, color: '#eab308' }}
             />
           </Card>
         </Col>

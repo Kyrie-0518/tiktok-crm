@@ -4,9 +4,7 @@ import { Layout, Menu, Button, Typography, Avatar } from 'antd';
 import {
   RobotOutlined, PieChartOutlined, AreaChartOutlined,
   VideoCameraOutlined, SettingOutlined, PictureOutlined,
-  FileImageOutlined, PayCircleOutlined, ColumnHeightOutlined,
-  FolderOpenOutlined, SendOutlined, ExclamationCircleOutlined,
-  BarChartOutlined, UserOutlined, ThunderboltOutlined,
+  FileImageOutlined, ThunderboltOutlined,
   ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
@@ -17,13 +15,6 @@ import SeedanceVideoGenerator from './SeedanceVideoGenerator';
 import VideoModelConfig from './VideoModelConfig';
 import MaterialLibrary from './MaterialLibrary';
 import RawMaterials from './RawMaterials';
-import AdBills from './AdBills';
-import ProductMulti from './ProductMulti';
-import OperateMaterial from './OperateMaterial';
-import ProductPromotion from './ProductPromotion';
-import ProblemOrders from './ProblemOrders';
-import DataReports from './DataReports';
-import UserCenter from './UserCenter';
 
 const { Sider, Content } = Layout;
 const { Text } = Typography;
@@ -67,19 +58,6 @@ const STUDIO_MENU_GROUPS = [
       { key: '/ai-studio/seedance', icon: <RobotOutlined />, label: 'AI视频生成' },
       { key: '/ai-studio/material-library', icon: <PictureOutlined />, label: '素材库' },
       { key: '/ai-studio/raw-materials', icon: <FileImageOutlined />, label: '原料素材' },
-    ],
-  },
-  {
-    key: 'group-ad',
-    label: '广告管理',
-    items: [
-      { key: '/ai-studio/ad-bills', icon: <PayCircleOutlined />, label: '广告账款' },
-      { key: '/ai-studio/product-multi', icon: <ColumnHeightOutlined />, label: '产品多列' },
-      { key: '/ai-studio/operate-material', icon: <FolderOpenOutlined />, label: '运营素材' },
-      { key: '/ai-studio/product-promotion', icon: <SendOutlined />, label: '商品推广' },
-      { key: '/ai-studio/problem-orders', icon: <ExclamationCircleOutlined />, label: '问题订单' },
-      { key: '/ai-studio/data-reports', icon: <BarChartOutlined />, label: '数据报表' },
-      { key: '/ai-studio/user-center', icon: <UserOutlined />, label: '用户中心' },
     ],
   },
 ];
@@ -363,13 +341,6 @@ export default function AIStudioLayout() {
                 <Route path="video-models" element={<VideoModelConfig />} />
                 <Route path="material-library" element={<MaterialLibrary />} />
                 <Route path="raw-materials" element={<RawMaterials />} />
-                <Route path="ad-bills" element={<AdBills />} />
-                <Route path="product-multi" element={<ProductMulti />} />
-                <Route path="operate-material" element={<OperateMaterial />} />
-                <Route path="product-promotion" element={<ProductPromotion />} />
-                <Route path="problem-orders" element={<ProblemOrders />} />
-                <Route path="data-reports" element={<DataReports />} />
-                <Route path="user-center" element={<UserCenter />} />
                 <Route path="*" element={<Navigate to="/ai-studio" replace />} />
               </Routes>
             </Content>
