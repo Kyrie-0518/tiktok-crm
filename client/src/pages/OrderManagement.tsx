@@ -6,6 +6,7 @@ import {
   Typography, Result, Dropdown,
 } from 'antd';
 import {
+  SyncOutlined, AppstoreOutlined, CloudDownloadOutlined,
   SearchOutlined, PrinterOutlined, ExportOutlined,
   PlusOutlined, DeleteOutlined, EyeOutlined, ReloadOutlined,
   RobotOutlined, InboxOutlined, CheckCircleOutlined, WarningOutlined,
@@ -439,6 +440,9 @@ export default function OrderManagement() {
   const [editStatusOrder, setEditStatusOrder] = useState<any>(null);
   const [editStatusModal, setEditStatusModal] = useState(false);
   const [aiImportOpen, setAiImportOpen] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncShopId, setSyncShopId] = useState<number | undefined>(undefined);
+  const [syncLoading, setSyncLoading] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<number>>(new Set());
   const [selectedAll, setSelectedAll] = useState(false);
@@ -491,6 +495,53 @@ export default function OrderManagement() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleSearch = () => { setPage(1); loadData(); };
+
+  const handleSyncOrders = async (shopId: number) => {
+    if (!shopId) return;
+    setSyncLoading(true);
+    try {
+      const res = await api.post(`/shops/${shopId}/sync`);
+      message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`);
+      loadData();
+    } catch (e: any) {
+      message.error(e.response?.data?.errors?.[0] || '同步失败');
+    } finally {
+      setSyncLoading(false);
+      setSyncModalOpen(false);
+    }
+  };
+
+  const handleSyncProducts = async (shopId: number) => {
+    if (!shopId) return;
+    setSyncLoading(true);
+    try {
+      const res = await api.post(`/shops/${shopId}/sync-products`);
+      message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`);
+      loadData();
+    } catch (e: any) {
+      message.error(e.response?.data?.errors?.[0] || '同步失败');
+    } finally {
+      setSyncLoading(false);
+      setSyncModalOpen(false);
+    }
+  };
+
+  const handleSyncAll = async (shopId: number) => {
+    if (!shopId) return;
+    setSyncLoading(true);
+    message.loading({ content: '全量同步中...', key: 'sync-all' });
+    try {
+      const res = await api.post(`/shops/${shopId}/sync-all`);
+      const s = res.data.summary;
+      message.success({ content: `同步完成：产品${s.products_created + s.products_updated} 订单${s.orders_created + s.orders_updated}`, key: 'sync-all' });
+      loadData();
+    } catch (e: any) {
+      message.error({ content: e.response?.data?.errors?.[0] || '同步失败', key: 'sync-all' });
+    } finally {
+      setSyncLoading(false);
+      setSyncModalOpen(false);
+    }
+  };
 
   const handleDelete = async (id: number) => {
     await api.delete(`/orders/${id}`);
@@ -685,7 +736,7 @@ export default function OrderManagement() {
     {
       title: '商品信息',
       key: 'items',
-      width: 220,
+      width: 260,
       render: (_: any, r: any) => {
         const items = r.items || [];
         if (!items.length) return <span style={{ color: '#ccc' }}>无商品信息</span>;
@@ -702,22 +753,23 @@ export default function OrderManagement() {
               {imgSrc ? (
                 <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <span style={{ fontSize: 22 }}>📦</span>
+                <InboxOutlined style={{ fontSize: 18, color: '#ccc' }} />
               )}
             </div>
             {/* Right: Title + SKU */}
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
               <div style={{
-                fontSize: 13, fontWeight: 400, color: '#333',
+                fontSize: 13, fontWeight: 500, color: '#333',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
                 {item.product_name || '-'}
+                <span style={{ color: '#999', fontWeight: 400, marginLeft: 6 }}>×{item.quantity || 1}</span>
               </div>
               <div style={{
                 fontSize: 12, color: '#999',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
-                {item.spec_name || ''}{items.length > 1 ? ` 等${items.length}件` : ` ×${item.quantity || 1}`}
+                {item.sku || item.spec_name || '-'}{items.length > 1 ? ` 等${items.length}件` : ''}
               </div>
             </div>
           </div>
@@ -837,6 +889,7 @@ export default function OrderManagement() {
           <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
           {canEdit && (
             <>
+              <Button icon={<SyncOutlined />} onClick={() => setSyncModalOpen(true)}>同步订单</Button>
               <Button
                 icon={<RobotOutlined />}
                 onClick={() => setAiImportOpen(true)}
@@ -969,6 +1022,41 @@ export default function OrderManagement() {
         onClose={() => setAiImportOpen(false)}
         onSuccess={() => { loadData(); }}
       />
+
+      {/* Sync TikTok Modal */}
+      <Modal
+        title={<Space><SyncOutlined style={{ color: BRAND_COLOR }} /><span>同步 TikTok</span></Space>}
+        open={syncModalOpen}
+        onCancel={() => setSyncModalOpen(false)}
+        footer={null}
+        width={400}
+      >
+        <div style={{ padding: '8px 0 16px' }}>
+          <p style={{ color: '#666', fontSize: 13, marginBottom: 16 }}>
+            选择要同步的 TikTok 店铺，系统将自动拉取最新订单与产品数据。
+          </p>
+          <Select
+            placeholder="选择店铺"
+            style={{ width: '100%', marginBottom: 16 }}
+            onChange={v => setSyncShopId(v)}
+            allowClear
+          >
+            {shops.map(s => <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>)}
+          </Select>
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button onClick={() => setSyncModalOpen(false)}>取消</Button>
+            <Button icon={<SyncOutlined />} loading={syncLoading} onClick={() => handleSyncOrders(syncShopId)} disabled={!syncShopId}>
+              同步订单
+            </Button>
+            <Button icon={<AppstoreOutlined />} loading={syncLoading} onClick={() => handleSyncProducts(syncShopId)} disabled={!syncShopId}>
+              同步产品
+            </Button>
+            <Button type="primary" icon={<CloudDownloadOutlined />} loading={syncLoading} onClick={() => handleSyncAll(syncShopId)} disabled={!syncShopId}>
+              全量同步
+            </Button>
+          </Space>
+        </div>
+      </Modal>
 
       {/* Detail Modal */}
       <Modal
