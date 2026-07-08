@@ -123,9 +123,9 @@ export default function CreatorMarket() {
       }
 
       if (totalLinked > 0) {
-        message.success(`从 ${totalOrders} 条联盟订单中关联了 ${totalLinked} 位达人`);
+        message.success(`从 ${totalOrders} 条联盟订单中发现了 ${totalLinked} 位带货达人`);
       } else {
-        message.info('未发现新的达人联盟订单，请确保店铺已授权且有联盟订单数据');
+        message.info('当前未检测到新的联盟带货订单，达人数据为空');
       }
       loadCreators();
     } catch (e: any) {
@@ -172,7 +172,7 @@ export default function CreatorMarket() {
             loading={syncing}
             style={{ borderRadius: 8, background: PRIMARY, borderColor: PRIMARY }}
           >
-            从TikTok同步达人
+            从联盟订单发现达人
           </Button>
         </Space>
       </div>
@@ -227,7 +227,8 @@ export default function CreatorMarket() {
               <div>
                 <div style={{ marginBottom: 8 }}>暂无达人数据</div>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  点击「从TikTok同步达人」从联盟订单中自动拉取达人信息
+                  TikTok Shop API 不提供直接的达人列表接口，我们通过分析联盟订单来发现带货达人。<br />
+                  请先确保：① 店铺已授权 TikTok ② 有达人通过联盟计划带货产生订单
                 </Text>
               </div>
             }

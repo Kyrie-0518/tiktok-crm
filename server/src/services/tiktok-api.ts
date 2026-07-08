@@ -865,13 +865,12 @@ export class TikTokAPI {
 
   /**
    * 搜索联盟达人订单（卖家视角）
-   * API: POST /affiliate_seller/202405/orders/search
-   * 返回: 达人带货订单列表，含订单ID和产品ID
+   * API: POST /api/202405/affiliate_seller/202405/orders/search
    */
   async searchAffiliateOrders(params: { page_size?: number; page_token?: string }) {
     const body: Record<string, any> = {};
     if (params.page_size) body.page_size = params.page_size;
     if (params.page_token) body.page_token = params.page_token;
-    return this.post('affiliate_seller/202405/orders/search', body);
+    return this.post('affiliate_seller/202405/orders/search', body, undefined, '202405');
   }
 }
