@@ -251,10 +251,10 @@ function saveOrderItems(db: any, orderId: number, order: any) {
     const imageUrl = item.sku_image || item.skuImage || item.image_url || item.imageUrl || item.item_image || '';
     const specName = item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
 
-    // 尝试匹配本地产品
+    // 尝试匹配本地产品（product_skus 列名是 sku_code）
     let productId: number | null = null;
     if (sku) {
-      const localSku = db.prepare('SELECT product_id FROM product_skus WHERE sku = ? LIMIT 1').get(sku) as any;
+      const localSku = db.prepare('SELECT product_id FROM product_skus WHERE sku_code = ? LIMIT 1').get(sku) as any;
       if (localSku) productId = localSku.product_id;
     }
     if (!productId && productName) {
