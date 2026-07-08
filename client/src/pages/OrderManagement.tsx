@@ -994,7 +994,7 @@ export default function OrderManagement() {
               <Col span={12}><p><strong>物流单号：</strong>{detailOrder.tracking_no || '-'}</p></Col>
               <Col span={12}><p><strong>承运商：</strong>{detailOrder.carrier || '-'}</p></Col>
             </Row>
-            <Divider />
+  <div style={{ borderTop: '1px solid #f0f0f0', margin: '12px 0' }} />
             <strong>商品明细</strong>
             <Table
               dataSource={detailOrder.items || []}
