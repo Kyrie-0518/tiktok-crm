@@ -204,12 +204,17 @@ function initTables() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+      product_sku_id INTEGER REFERENCES product_skus(id) ON DELETE SET NULL,
       sku TEXT DEFAULT '',
       product_name TEXT DEFAULT '',
       spec_name TEXT DEFAULT '',
       quantity INTEGER DEFAULT 1,
       unit_price REAL DEFAULT 0,
-      subtotal REAL DEFAULT 0
+      subtotal REAL DEFAULT 0,
+      item_status TEXT DEFAULT 'pending',
+      image_url TEXT DEFAULT '',
+      product_source_id TEXT DEFAULT '',
+      image TEXT DEFAULT ''
     );
   `);
 
@@ -423,15 +428,28 @@ function initTables() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
         product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+        product_sku_id INTEGER REFERENCES product_skus(id) ON DELETE SET NULL,
         sku TEXT DEFAULT '',
         product_name TEXT DEFAULT '',
         spec_name TEXT DEFAULT '',
         quantity INTEGER DEFAULT 1,
         unit_price REAL DEFAULT 0,
-        subtotal REAL DEFAULT 0
+        subtotal REAL DEFAULT 0,
+        item_status TEXT DEFAULT 'pending',
+        image_url TEXT DEFAULT '',
+        product_source_id TEXT DEFAULT '',
+        image TEXT DEFAULT ''
       );
     `);
   }
+  // Add missing columns to existing order_items table
+  const oiCols = db.prepare("PRAGMA table_info(order_items)").all() as any[];
+  const oiColNames = oiCols.map(c => c.name);
+  if (!oiColNames.includes('product_sku_id')) db.exec('ALTER TABLE order_items ADD COLUMN product_sku_id INTEGER REFERENCES product_skus(id) ON DELETE SET NULL');
+  if (!oiColNames.includes('item_status')) db.exec("ALTER TABLE order_items ADD COLUMN item_status TEXT DEFAULT 'pending'");
+  if (!oiColNames.includes('image_url')) db.exec("ALTER TABLE order_items ADD COLUMN image_url TEXT DEFAULT ''");
+  if (!oiColNames.includes('product_source_id')) db.exec("ALTER TABLE order_items ADD COLUMN product_source_id TEXT DEFAULT ''");
+  if (!oiColNames.includes('image')) db.exec("ALTER TABLE order_items ADD COLUMN image TEXT DEFAULT ''");
   // Migrate: roles table
   if (!tableList.some(t => t.name === 'roles')) {
     db.exec(`

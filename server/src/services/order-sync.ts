@@ -220,9 +220,13 @@ function saveOrderItems(db: any, orderId: number, order: any) {
     || order.item_list
     || [];
   if (items.length === 0) {
-    console.warn(`[saveOrderItems] 订单 ${orderId} 没有商品信息，原始字段:`, Object.keys(order).filter(k => k.includes('item') || k.includes('sku') || k.includes('product')));
+    console.warn(`[saveOrderItems] 订单 ${orderId} 没有商品信息，原始字段:`, Object.keys(order).filter(k => k.includes('item') || k.includes('sku') || k.includes('product') || k.includes('line')));
     return;
   }
+
+  // 诊断：输出第一个item的字段结构
+  console.log(`[saveOrderItems] 订单 ${orderId} 第1件商品字段: [${Object.keys(items[0]).join(',')}]`);
+  console.log(`[saveOrderItems] 订单 ${orderId} 第1件商品值: product_name=${items[0].product_name}, sku_id=${items[0].sku_id}, sku_image=${items[0].sku_image}, sale_price=${items[0].sale_price}, quantity=${items[0].quantity}`);
 
   // 先删除旧明细再重新插入
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
@@ -257,6 +261,10 @@ function saveOrderItems(db: any, orderId: number, order: any) {
 
     insert.run(orderId, productId, productName, sku, unitPrice, quantity, subtotal, itemStatus, imageUrl, specName);
   }
+
+  // 验证写入
+  const savedCount = db.prepare('SELECT COUNT(*) as c FROM order_items WHERE order_id = ?').get(orderId) as any;
+  console.log(`[saveOrderItems] 订单 ${orderId} 写入 ${savedCount?.c || 0} 条商品明细`);
 }
 
 /** 凭证连通性测试 */
