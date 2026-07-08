@@ -29,6 +29,7 @@ import adminApiConfigRoutes from './routes/admin-api-configs';
 // import douyinSearchRoutes from './routes/douyin-search';
 import { startAutoBackup } from './utils/backup';
 import { startAuditLogCleanup } from './middleware/audit';
+import { startAutoSync } from './services/auto-sync';
 import auditLogRoutes from './routes/audit-logs';
 import aiStudioRoutes from './routes/ai-studio';
 import productsTiktokRoutes from './routes/products-tiktok';
@@ -150,4 +151,9 @@ app.listen(PORT, () => {
 
   // 启动审计日志自动清理（30天）
   startAuditLogCleanup();
+
+  // 启动订单自动同步（每10分钟从 TikTok API 拉取新订单）
+  const syncInterval = parseInt(process.env.AUTO_SYNC_INTERVAL_MINUTES || '10', 10);
+  console.log(`[Scheduler] 订单自动同步: 每 ${syncInterval} 分钟执行一次`);
+  startAutoSync(syncInterval);
 });

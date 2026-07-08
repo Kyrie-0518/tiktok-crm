@@ -362,6 +362,44 @@ router.get('/meta/counts', authMiddleware, (req: Request, res: Response) => {
 
 // ========== 爬虫同步接口 ==========
 
+// ═══════════════════════════════════════════
+// 自动同步状态 & 控制（配合 auto-sync.ts 调度器）
+// ═══════════════════════════════════════════
+
+// GET /api/orders/sync-status — 获取自动同步状态
+router.get('/sync-status', authMiddleware, (_req: Request, res: Response) => {
+  try {
+    const { getSyncStatus } = require('../services/auto-sync');
+    res.json(getSyncStatus());
+  } catch {
+    res.json({ running: false, lastRunAt: null, intervalMinutes: 10, message: '自动同步服务未启动' });
+  }
+});
+
+// POST /api/orders/sync-now — 手动触发立即同步
+router.post('/sync-now', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    const { runSyncNow } = require('../services/auto-sync');
+    const results = await runSyncNow();
+    res.json({ success: true, results });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/orders/sync-interval — 设置同步间隔（分钟）
+router.post('/sync-interval', authMiddleware, (req: Request, res: Response) => {
+  const { minutes } = req.body;
+  if (!minutes || minutes < 1) return res.status(400).json({ error: '间隔时间必须 >= 1 分钟' });
+  try {
+    const { setSyncInterval } = require('../services/auto-sync');
+    setSyncInterval(minutes);
+    res.json({ success: true, intervalMinutes: minutes });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/orders/sync-from-platform — 电商平台订单同步到 ERP
 router.post('/sync-from-platform', authMiddleware, (req: Request, res: Response) => {
   const {
