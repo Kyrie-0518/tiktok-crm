@@ -1045,13 +1045,13 @@ export default function OrderManagement() {
           </Select>
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button onClick={() => setSyncModalOpen(false)}>取消</Button>
-            <Button icon={<SyncOutlined />} loading={syncLoading} onClick={() => handleSyncOrders(syncShopId)} disabled={!syncShopId}>
+            <Button icon={<SyncOutlined />} loading={syncLoading} onClick={() => handleSyncOrders(syncShopId!)} disabled={!syncShopId}>
               同步订单
             </Button>
-            <Button icon={<AppstoreOutlined />} loading={syncLoading} onClick={() => handleSyncProducts(syncShopId)} disabled={!syncShopId}>
+            <Button icon={<AppstoreOutlined />} loading={syncLoading} onClick={() => handleSyncProducts(syncShopId!)} disabled={!syncShopId}>
               同步产品
             </Button>
-            <Button type="primary" icon={<CloudDownloadOutlined />} loading={syncLoading} onClick={() => handleSyncAll(syncShopId)} disabled={!syncShopId}>
+            <Button type="primary" icon={<CloudDownloadOutlined />} loading={syncLoading} onClick={() => handleSyncAll(syncShopId!)} disabled={!syncShopId}>
               全量同步
             </Button>
           </Space>
