@@ -417,4 +417,103 @@ router.delete('/:id', authMiddleware, (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+// ═══════════════════════════════════════════════
+//  TikTok 达人同步（调用 getCreatorProfile API）
+// ═══════════════════════════════════════════════
+
+// POST /api/influencers/sync-from-tiktok — 从 TikTok Shop API 拉取达人资料并存入本地
+router.post('/sync-from-tiktok', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const db = getDb();
+    const { shop_id } = req.body;
+
+    // 获取店铺凭证
+    const shop = db.prepare(`
+      SELECT * FROM tiktok_shops WHERE id = ? AND access_token IS NOT NULL
+    `).get(shop_id || 1) as any;
+
+    if (!shop || !shop.access_token) {
+      return res.status(400).json({ error: '店铺未授权，请先在店铺管理中授权 TikTok Shop' });
+    }
+
+    const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
+    const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
+    if (!appKey || !appSecret) {
+      return res.status(400).json({ error: '缺少 App Key / App Secret，请检查环境变量或店铺配置' });
+    }
+
+    const { TikTokAPI } = require('../services/tiktok-api');
+    const api = new TikTokAPI({
+      app_key: appKey,
+      app_secret: appSecret,
+      access_token: shop.access_token,
+      shop_cipher: shop.shop_cipher || '',
+      api_version: shop.api_version || '202309',
+    });
+
+    // 调用 getCreatorProfile API（文档: https://partner.tiktokshop.com/docv2/page/get-creator-profile-202508）
+    const profileResp = await api.getCreatorProfile();
+
+    if (profileResp.code !== 0) {
+      return res.status(400).json({
+        error: profileResp.message || 'API 调用失败',
+        detail: profileResp,
+      });
+    }
+
+    const profile = profileResp.data;
+    if (!profile || !profile.username) {
+      return res.json({ success: true, synced: 0, message: '未获取到达人资料（该店铺可能未开通达人联盟功能）' });
+    }
+
+    // 解析达人资料并 Upsert 到本地数据库
+    const influencerId = profile.username;
+    const existing = db.prepare('SELECT id FROM influencers WHERE influencer_id = ?').get(influencerId) as any;
+
+    const remarkData = {
+      creator_user_open_id: profile.creatorUserOpenId,
+      register_region: profile.registerRegion,
+      selection_region: profile.selectionRegion,
+      seller_type: profile.sellerType,
+      user_type: profile.userType,
+      permissions: profile.permissions || [],
+      avatar_url: profile.avatar?.url || '',
+      avatar_height: profile.avatar?.height || 0,
+      avatar_width: profile.avatar?.width || 0,
+    };
+
+    const influencerData = {
+      influencer_id: influencerId,
+      name: influencerId,
+      shop_id: shop_id || shop.id,
+      contact_channel: 'TikTok API',
+      status: '已回复',
+      remark: JSON.stringify(remarkData),
+    };
+
+    if (existing) {
+      db.prepare(`
+        UPDATE influencers SET name = ?, shop_id = ?, contact_channel = ?, status = ?, remark = ?
+        WHERE id = ?
+      `).run(influencerData.name, influencerData.shop_id, influencerData.contact_channel, influencerData.status, influencerData.remark, existing.id);
+      res.json({
+        success: true, synced: 1, updated: true,
+        profile: { username: influencerId, avatar_url: profile.avatar?.url, register_region: profile.registerRegion },
+      });
+    } else {
+      db.prepare(`
+        INSERT INTO influencers (influencer_id, name, shop_id, contact_channel, status, remark)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(influencerData.influencer_id, influencerData.name, influencerData.shop_id, influencerData.contact_channel, influencerData.status, influencerData.remark);
+      res.json({
+        success: true, synced: 1, created: true,
+        profile: { username: influencerId, avatar_url: profile.avatar?.url, register_region: profile.registerRegion },
+      });
+    }
+  } catch (e: any) {
+    console.error('[influencers] sync-from-tiktok 失败:', e.message);
+    res.status(500).json({ error: e.message || '同步失败' });
+  }
+});
+
 export default router;

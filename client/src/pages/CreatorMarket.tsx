@@ -7,6 +7,7 @@ import {
   SearchOutlined, UserOutlined,
   TeamOutlined, RiseOutlined, ReloadOutlined,
   LinkOutlined, ShopOutlined, CalendarOutlined,
+  CloudDownloadOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 
@@ -46,6 +47,26 @@ export default function CreatorMarket() {
   const [statusFilter, setStatusFilter] = useState('全部');
   const [coopFilter, setCoopFilter] = useState('全部');
   const [channelFilter, setChannelFilter] = useState('全部');
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncFromTikTok = async () => {
+    setSyncing(true);
+    try {
+      const res = await api.post('/influencers/sync-from-tiktok');
+      if (res.data?.created) {
+        message.success(`成功同步达人: ${res.data.profile?.username || ''}`);
+      } else if (res.data?.updated) {
+        message.success(`已更新达人资料: ${res.data.profile?.username || ''}`);
+      } else {
+        message.info(res.data?.message || '同步完成，无新数据');
+      }
+      loadCreators();
+    } catch (e: any) {
+      message.error('同步失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const loadCreators = useCallback(async () => {
     setLoading(true);
@@ -121,7 +142,12 @@ export default function CreatorMarket() {
             浏览所有达人信息，支持搜索、筛选、查看详情
           </Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={loadCreators} style={{ borderRadius: 8 }}>刷新</Button>
+        <Space>
+          <Button icon={<CloudDownloadOutlined />} onClick={handleSyncFromTikTok} loading={syncing} style={{ borderRadius: 8 }}>
+            从TikTok同步达人资料
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={loadCreators} style={{ borderRadius: 8 }}>刷新</Button>
+        </Space>
       </div>
 
       {/* 统计卡 */}
