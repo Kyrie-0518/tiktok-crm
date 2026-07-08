@@ -40,6 +40,7 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
   const errors: string[] = [];
   let created = 0;
   let updated = 0;
+  let fixed = 0;
 
   // 1. 获取店铺凭证
   const shop = db.prepare(`
@@ -159,13 +160,17 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
     }
 
   // 6. 修复缺失商品明细的旧订单（已同步但 order_items 为空的订单）
-  const fixed = await fixMissingOrderItems(db, api, shopId);
+  fixed = await fixMissingOrderItems(db, api, shopId);
   if (fixed > 0) {
     console.log(`[order-sync] 额外修复 ${fixed} 条旧订单的商品明细`);
   }
 
   // 7. 更新同步时间
   db.prepare("UPDATE tiktok_shops SET last_synced_at = datetime('now') WHERE id = ?").run(shopId);
+
+  } catch (e: any) {
+    errors.push(`API 调用失败: ${e.message}`);
+  }
 
   return { created, updated, itemsFixed: fixed, errors };
 }
@@ -225,6 +230,80 @@ async function fixMissingOrderItems(db: any, api: TikTokAPI, shopId: number): Pr
   }
   console.log(`[fixMissingOrderItems] 完成: 修复 ${fixed} 条订单`);
   return fixed;
+}
+
+/** 解析并保存单个订单到本地数据库 */
+function saveOrder(db: any, order: any, shopId: number): 'created' | 'updated' | 'skipped' {
+  const orderNo = order.id || order.order_id || '';
+  if (!orderNo) return 'skipped';
+
+  const buyerName = order.buyer_name || order.recipient_address?.name || '';
+  const buyerPhone = order.buyer_phone || order.recipient_address?.phone || '';
+  const status = STATUS_MAP[order.status] || 'pending';
+  const logisticsStatus = LOGISTICS_MAP[order.status] || '';
+  const trackingNo = order.tracking_number || order.package_info?.tracking_number || '';
+  const carrier = order.shipping_provider_name || order.package_info?.carrier || '';
+  const actualAmount = parseFloat(order.total_amount || order.payment?.total_amount || '0') || 0;
+  const currency = order.currency || 'MYR';
+  const orderTime = order.create_time
+    ? toUtc8(order.create_time)
+    : (order.created_time || new Date().toISOString().replace('Z', ''));
+  const updateTime = order.update_time
+    ? toUtc8(order.update_time)
+    : orderTime;
+  let paymentStatus = 'unpaid';
+  if (order.payment_status === 'PAID' || order.payment?.status === 'PAID') paymentStatus = 'paid';
+  else if (order.payment_status === 'PARTIAL_PAID') paymentStatus = 'partial';
+
+  const existing = db.prepare('SELECT id, status, actual_amount FROM orders WHERE order_no = ?').get(orderNo) as any;
+
+  if (existing) {
+    db.prepare(`
+      UPDATE orders SET
+        shop_id = ?, buyer_name = ?, buyer_phone = ?, status = ?,
+        payment_status = ?, logistics_status = ?, tracking_no = ?, carrier = ?,
+        actual_amount = ?, currency = ?, order_time = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      shopId, buyerName, buyerPhone, status,
+      paymentStatus, logisticsStatus, trackingNo, carrier,
+      actualAmount, currency, orderTime, updateTime,
+      existing.id
+    );
+    saveOrderItems(db, existing.id, order);
+    return 'updated';
+  } else {
+    const result = db.prepare(`
+      INSERT INTO orders (order_no, shop_id, buyer_name, buyer_phone, status,
+        payment_status, logistics_status, tracking_no, carrier,
+        actual_amount, currency, order_time, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      orderNo, shopId, buyerName, buyerPhone, status,
+      paymentStatus, logisticsStatus, trackingNo, carrier,
+      actualAmount, currency, orderTime, orderTime, updateTime
+    );
+    saveOrderItems(db, result.lastInsertRowid as number, order);
+    return 'created';
+  }
+}
+
+/** 保存订单明细 */
+function saveOrderItems(db: any, orderId: number, order: any) {
+  const items =
+    (order.line_item_list?.length ? order.line_item_list : undefined)
+    || order.package_list?.[0]?.item_list
+    || (order.order_line_list?.length ? order.order_line_list : undefined)
+    || (order.order_lines?.length ? order.order_lines : undefined)
+    || (order.line_items?.length ? order.line_items : undefined)
+    || (order.items?.length ? order.items : undefined)
+    || (order.item_list?.length ? order.item_list : undefined)
+    || [];
+  if (items.length === 0) {
+    console.log(`[saveOrderItems] 订单 ${orderId} 无商品明细，跳过`);
+    return;
+  }
+  saveOrderItemsToDb(db, orderId, items);
 }
 
 /** 保存商品明细到数据库（items 为已提取的数组） */
@@ -437,55 +516,4 @@ export async function resyncAllOrderItems(shopId: number): Promise<{ processed: 
 
   console.log(`[resyncItems] 完成: 处理 ${processed} 条订单, 错误 ${errors.length} 个`);
   return { processed, errors };
-}
-
-/** 保存商品明细到数据库（items 为已提取的数组） */
-function saveOrderItemsToDb(db: any, orderId: number, items: any[]) {
-  if (!items || items.length === 0) {
-    console.log(`[saveOrderItemsToDb] 订单 ${orderId} 无商品明细，跳过`);
-    return;
-  }
-
-  console.log(`[saveOrderItemsToDb] 订单 ${orderId} 准备写入 ${items.length} 条商品明细`);
-
-  // 先删除旧明细再重新插入
-  db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
-
-  const insert = db.prepare(`
-    INSERT INTO order_items (order_id, product_id, product_name, sku, unit_price, quantity, subtotal, item_status, image_url, spec_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  let insertedCount = 0;
-  for (const item of items) {
-    const productName = item.product_name || item.productName || item.name || '';
-    const sku = item.sku_id || item.skuId || item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
-    const rawPrice = item.sale_price || item.salePrice || item.original_price || item.retail_price || item.price || item.item_price?.amount || item.unit_price || '0';
-    const unitPrice = parseFloat(typeof rawPrice === 'string' ? rawPrice : String(rawPrice)) || 0;
-    const quantity = item.quantity || item.qty || 1;
-    const subtotal = parseFloat(item.subtotal || item.total_price?.amount || item.line_amount?.amount || '0') || (unitPrice * quantity);
-    const itemStatus = STATUS_MAP[item.status] || STATUS_MAP[item.display_status] || STATUS_MAP[item.item_status] || 'pending';
-    const imageUrl = item.sku_image || item.skuImage || item.image_url || item.imageUrl || item.item_image || '';
-    const specName = item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
-
-    let productId: number | null = null;
-    if (sku) {
-      const localSku = db.prepare('SELECT product_id FROM product_skus WHERE sku_code = ? LIMIT 1').get(sku) as any;
-      if (localSku) productId = localSku.product_id;
-    }
-    if (!productId && productName) {
-      const localProduct = db.prepare('SELECT id FROM products WHERE name LIKE ? LIMIT 1').get(`%${productName}%`) as any;
-      if (localProduct) productId = localProduct.id;
-    }
-
-    try {
-      insert.run(orderId, productId, productName, sku, unitPrice, quantity, subtotal, itemStatus, imageUrl, specName);
-      insertedCount++;
-    } catch (insertErr: any) {
-      console.error(`[saveOrderItemsToDb] 订单 ${orderId} 插入失败: ${insertErr.message}`);
-    }
-  }
-
-  const savedCount = db.prepare('SELECT COUNT(*) as c FROM order_items WHERE order_id = ?').get(orderId) as any;
-  console.log(`[saveOrderItemsToDb] 订单 ${orderId} 写入完成: 预期 ${insertedCount} 条, 实际 ${savedCount?.c || 0} 条`);
 }
