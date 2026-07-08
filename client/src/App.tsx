@@ -88,6 +88,8 @@ const MENU_GROUPS = [
     icon: <DollarOutlined />,
     items: [
       { key: '/finance', icon: <DollarOutlined />, label: '利润核算' },
+      { key: '/ad-bills', icon: <PayCircleOutlined />, label: '广告对账' },
+      { key: '/data-reports', icon: <BarChartOutlined />, label: '财务统计表' },
     ],
   },
 ];
