@@ -122,6 +122,8 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
           if (saved === 'created') created++;
           else if (saved === 'updated') updated++;
         } catch (e: any) {
+          console.error(`[order-sync] 订单 ${order.id || 'unknown'} 处理失败: ${e.message}`);
+          if (e.stack) console.error(e.stack.split('\n').slice(0, 3).join('\n'));
           errors.push(`订单 ${order.id || 'unknown'}: ${e.message}`);
         }
       }
@@ -225,8 +227,8 @@ function saveOrderItems(db: any, orderId: number, order: any) {
   }
 
   // 诊断：输出第一个item的字段结构
-  console.log(`[saveOrderItems] 订单 ${orderId} 第1件商品字段: [${Object.keys(items[0]).join(',')}]`);
-  console.log(`[saveOrderItems] 订单 ${orderId} 第1件商品值: product_name=${items[0].product_name}, sku_id=${items[0].sku_id}, sku_image=${items[0].sku_image}, sale_price=${items[0].sale_price}, quantity=${items[0].quantity}`);
+  console.log(`[saveOrderItems] 订单 ${orderId} 共 ${items.length} 件商品，第1件字段: [${Object.keys(items[0]).join(',')}]`);
+  console.log(`[saveOrderItems] 订单 ${orderId} 第1件商品值: product_name=${items[0].product_name}, sku_id=${items[0].sku_id}, sku_name=${items[0].sku_name}, sku_image=${items[0].sku_image}, sale_price=${items[0].sale_price}, original_price=${items[0].original_price}, retail_price=${items[0].retail_price}, quantity=${items[0].quantity}, qty=${items[0].qty}`);
 
   // 先删除旧明细再重新插入
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
@@ -236,11 +238,12 @@ function saveOrderItems(db: any, orderId: number, order: any) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
+  let insertedCount = 0;
   for (const item of items) {
     const productName = item.product_name || item.productName || item.name || '';
     const sku = item.sku_id || item.skuId || item.sku_name || item.skuName || item.seller_sku || item.sellerSku || '';
-    // TikTok API 价格可能是嵌套对象 item_price.amount
-    const rawPrice = item.sale_price || item.salePrice || item.price || item.item_price?.amount || item.unit_price || '0';
+    // TikTok API 价格可能是嵌套对象 item_price.amount；sale_price 可能为0，用 original_price/retail_price 回退
+    const rawPrice = item.sale_price || item.salePrice || item.original_price || item.retail_price || item.price || item.item_price?.amount || item.unit_price || '0';
     const unitPrice = parseFloat(typeof rawPrice === 'string' ? rawPrice : String(rawPrice)) || 0;
     const quantity = item.quantity || item.qty || 1;
     const subtotal = parseFloat(item.subtotal || item.total_price?.amount || item.line_amount?.amount || '0') || (unitPrice * quantity);
@@ -259,12 +262,18 @@ function saveOrderItems(db: any, orderId: number, order: any) {
       if (localProduct) productId = localProduct.id;
     }
 
-    insert.run(orderId, productId, productName, sku, unitPrice, quantity, subtotal, itemStatus, imageUrl, specName);
+    try {
+      insert.run(orderId, productId, productName, sku, unitPrice, quantity, subtotal, itemStatus, imageUrl, specName);
+      insertedCount++;
+    } catch (insertErr: any) {
+      console.error(`[saveOrderItems] 订单 ${orderId} 插入商品明细失败: ${insertErr.message}`);
+      console.error(`  参数: productName=${productName}, sku=${sku}, unitPrice=${unitPrice}, quantity=${quantity}, subtotal=${subtotal}, itemStatus=${itemStatus}, imageUrl=${imageUrl}, specName=${specName}`);
+    }
   }
 
   // 验证写入
   const savedCount = db.prepare('SELECT COUNT(*) as c FROM order_items WHERE order_id = ?').get(orderId) as any;
-  console.log(`[saveOrderItems] 订单 ${orderId} 写入 ${savedCount?.c || 0} 条商品明细`);
+  console.log(`[saveOrderItems] 订单 ${orderId} 写入 ${savedCount?.c || 0} 条商品明细 (insertedCount=${insertedCount})`);
 }
 
 /** 凭证连通性测试 */
