@@ -854,7 +854,7 @@ export class TikTokAPI {
     const token = accessToken || this.auth.access_token;
     const { url, headers } = buildSignedRequest(
       { ...this.auth, access_token: token },
-      'affiliate_creator/202508/profiles',
+      'affiliate_creator/profiles',
       undefined, undefined, '202508'
     );
     const res = await fetch(url, { method: 'GET', headers });
@@ -871,6 +871,6 @@ export class TikTokAPI {
     const body: Record<string, any> = {};
     if (params.page_size) body.page_size = params.page_size;
     if (params.page_token) body.page_token = params.page_token;
-    return this.post('affiliate_seller/202405/orders/search', body, undefined, '202405');
+    return this.post('affiliate_seller/orders/search', body, undefined, '202405');
   }
 }

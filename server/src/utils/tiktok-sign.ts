@@ -76,13 +76,17 @@ export function buildSignedRequest(
   // 从 endpoint 推断 API category（orders → order, products → product 等）
   const rawCategory = endpoint.split('/')[0] || endpoint;
   const category = CATEGORY_MAP[rawCategory] || rawCategory;
+  // 如果 endpoint 的 prefix 和 category 相同，去掉重复（如 affiliate_creator/profiles → profiles）
+  const endpointWithoutCategory = (rawCategory === category && endpoint.startsWith(rawCategory + '/'))
+    ? endpoint.slice(rawCategory.length + 1)
+    : endpoint;
   // 使用环境变量 TIKTOK_API_BASE，支持沙箱/生产环境切换
   // 官方 SDK 默认 basePath: https://open-api.tiktokglobalshop.com/api (含 /api)
   const apiBase = (process.env.TIKTOK_API_BASE || 'https://open-api.tiktokglobalshop.com/api').replace(/\/$/, '');
   const apiBaseUrl = new URL(apiBase);
   const pathnamePrefix = apiBaseUrl.pathname.replace(/\/$/, '');
-  const base = `${apiBase}/${category}/${apiVersion}/${endpoint}`;
-  const pathname = `${pathnamePrefix}/${category}/${apiVersion}/${endpoint}`;
+  const base = `${apiBase}/${category}/${apiVersion}/${endpointWithoutCategory}`;
+  const pathname = `${pathnamePrefix}/${category}/${apiVersion}/${endpointWithoutCategory}`;
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
   // 签名只包含有实际数据的 body，空对象不参与签名（官方规则）
