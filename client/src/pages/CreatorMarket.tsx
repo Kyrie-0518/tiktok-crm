@@ -123,7 +123,12 @@ export default function CreatorMarket() {
     setSyncing(true);
     try {
       const res = await api.post('/influencers/sync-from-tiktok', { shop_id: selectedShop });
-      if (res.data?.discovered > 0) {
+      if (res.data?.success === false) {
+        message.error('同步失败: ' + (res.data?.error || '未知错误'));
+        if (res.data?.detail) {
+          console.error('[TikTok API 响应]', res.data.detail);
+        }
+      } else if (res.data?.discovered > 0) {
         message.success(res.data?.message || `从 TikTok 达人广场发现 ${res.data?.discovered} 位达人`);
       } else {
         message.info(res.data?.message || '未搜索到达人');

@@ -460,14 +460,24 @@ router.post('/sync-from-tiktok', authMiddleware, async (req: Request, res: Respo
           gmvRanges: gmvRanges || undefined,
           categoryIds: categoryIds || undefined,
         });
-        if (resp.code !== 0) break;
+        if (resp.code !== 0) {
+          console.error(`[sync-from-tiktok] TikTok API 错误: code=${resp.code}, message=${resp.message || resp.msg}`);
+          return res.json({
+            success: false, discovered: 0,
+            error: resp.message || resp.msg || `TikTok API 错误 (code=${resp.code})`,
+            detail: resp,
+          });
+        }
         const creators = resp.data?.creators || resp.data?.list || [];
         allCreators.push(...creators);
         pageToken = resp.data?.next_page_token;
         if (!pageToken || creators.length === 0) break;
       } catch (e: any) {
         console.error(`[sync-from-tiktok] 搜索达人第 ${i + 1} 页失败:`, e.message);
-        break;
+        return res.json({
+          success: false, discovered: 0,
+          error: e.message || '调用 TikTok API 失败',
+        });
       }
     }
 
