@@ -105,20 +105,20 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     // 保存到 settings 表
     const db = getDb();
-    db.exec(`
+    db.prepare(`
       INSERT INTO settings (key, value) VALUES ('tt_ads_access_token', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `, [accessToken]);
+    `).run(accessToken);
     if (refreshToken) {
-      db.exec(`
+      db.prepare(`
         INSERT INTO settings (key, value) VALUES ('tt_ads_refresh_token', ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
-      `, [refreshToken]);
+      `).run(refreshToken);
     }
-    db.exec(`
+    db.prepare(`
       INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `, [JSON.stringify(advertiserIds)]);
+    `).run(JSON.stringify(advertiserIds));
 
     console.log('[TikTok Ads] ✅ access_token 已保存');
 
@@ -163,16 +163,15 @@ router.post('/save-token', authMiddleware, (req: Request, res: Response) => {
     if (!access_token) return res.status(400).json({ success: false, error: '缺少 access_token' });
 
     const db = getDb();
-    db.exec(`INSERT INTO settings (key, value) VALUES ('tt_ads_access_token', ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [access_token]);
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_access_token', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(access_token);
     if (refresh_token) {
-      db.exec(`INSERT INTO settings (key, value) VALUES ('tt_ads_refresh_token', ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [refresh_token]);
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_refresh_token', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(refresh_token);
     }
     if (advertiser_ids) {
-      db.exec(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        [JSON.stringify(advertiser_ids)]);
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(advertiser_ids));
     }
 
     console.log('[TikTok Ads] ✅ 手动写入 token 成功');
