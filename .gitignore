@@ -9,3 +9,4 @@ server/.env
 *.log
 .DS_Store
 Thumbs.db
+.playwright-cli/
