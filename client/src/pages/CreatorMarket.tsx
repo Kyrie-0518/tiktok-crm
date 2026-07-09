@@ -126,7 +126,7 @@ export default function CreatorMarket() {
       if (res.data?.success === false) {
         const errMsg = res.data?.error || '未知错误';
         if (errMsg.includes('429') || errMsg.toLowerCase().includes('too many requests')) {
-          message.error('TikTok API 限流：请求太频繁，请等待 5-10 分钟后重试。建议检查「系统设置」中订单自动同步间隔是否过短。');
+          message.error('TikTok API 限流：请求太频繁，请等待 5-10 分钟后重试。');
         } else {
           message.error('同步失败: ' + errMsg);
         }
