@@ -571,5 +571,3 @@ router.post('/sync-from-tiktok', authMiddleware, async (req: Request, res: Respo
 });
 
 export default router;
-
-export default router;
