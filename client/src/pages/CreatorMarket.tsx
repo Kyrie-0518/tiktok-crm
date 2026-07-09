@@ -7,7 +7,7 @@ import {
   SearchOutlined, UserOutlined,
   TeamOutlined, RiseOutlined, ReloadOutlined,
   LinkOutlined, ShopOutlined, CalendarOutlined,
-  CloudDownloadOutlined,
+  CloudDownloadOutlined, StarOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 
@@ -33,6 +33,20 @@ interface CreatorRow {
     seller_type?: string;
     user_type?: string;
     permissions?: string[];
+    marketplace?: {
+      nickname?: string;
+      follower_count?: number;
+      rating?: string;
+      pps?: string;
+      gmv?: { currency?: string; amount?: string };
+      promoted_product_num?: number;
+      ec_live_count?: number;
+      ec_video_count?: number;
+      ec_video_engagement_rate?: string;
+      post_rate?: string;
+      avg_commission_rate?: number;
+      avg_ec_video_play_count?: number;
+    };
   };
 }
 
@@ -109,12 +123,11 @@ export default function CreatorMarket() {
     setSyncing(true);
     try {
       const res = await api.post('/influencers/sync-from-tiktok', { shop_id: selectedShop });
-      if (res.data?.created) {
-        message.success(`成功同步达人: ${res.data.profile?.username || ''}`);
-      } else if (res.data?.updated) {
-        message.success(`已更新达人资料: ${res.data.profile?.username || ''}`);
+      if (res.data?.discovered > 0) {
+        const enriched = res.data?.enriched || 0;
+        message.success(res.data?.message || `发现 ${res.data?.discovered} 位达人${enriched > 0 ? `，已拉取 ${enriched} 位表现数据` : ''}`);
       } else {
-        message.info(res.data?.message || '同步完成，无新数据');
+        message.info(res.data?.message || '未发现带货达人');
       }
       loadCreators();
     } catch (e: any) {
@@ -296,10 +309,16 @@ export default function CreatorMarket() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <TeamOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: getStatusColor(creator.status) }}>
-                              {creator.status}
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                              {creator.parsed.marketplace?.follower_count
+                                ? (creator.parsed.marketplace.follower_count >= 1000000
+                                  ? (creator.parsed.marketplace.follower_count / 1000000).toFixed(1) + 'M'
+                                  : creator.parsed.marketplace.follower_count >= 1000
+                                  ? (creator.parsed.marketplace.follower_count / 1000).toFixed(0) + 'K'
+                                  : creator.parsed.marketplace.follower_count)
+                                : '-'}
                             </div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>建联状态</Text>
+                            <Text type="secondary" style={{ fontSize: 10 }}>粉丝</Text>
                           </div>
                         </div>
                       </Col>
@@ -307,10 +326,26 @@ export default function CreatorMarket() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <RiseOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
-                              {creator.commission_rate > 0 ? `${creator.commission_rate}%` : '-'}
+                            <div style={{ fontSize: 16, fontWeight: 700, color: PRIMARY }}>
+                              {creator.parsed.marketplace?.gmv?.amount
+                                ? '$' + Number(creator.parsed.marketplace.gmv.amount).toLocaleString()
+                                : creator.commission_rate > 0 ? `${creator.commission_rate}%` : '-'}
                             </div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>佣金比例</Text>
+                            <Text type="secondary" style={{ fontSize: 10 }}>{creator.parsed.marketplace?.gmv ? 'GMV' : '佣金'}</Text>
+                          </div>
+                        </div>
+                      </Col>
+                      <Col span={12}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <StarOutlined style={{ color: '#d97706', fontSize: 12 }} />
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#d97706' }}>
+                              {creator.parsed.marketplace?.rating || '-'}
+                            </div>
+                            <Text type="secondary" style={{ fontSize: 10 }}>评分/</Text>
+                            <Text style={{ fontSize: 10, color: PRIMARY }}>
+                              PPS {creator.parsed.marketplace?.pps || '-'}
+                            </Text>
                           </div>
                         </div>
                       </Col>
@@ -319,24 +354,38 @@ export default function CreatorMarket() {
                           <LinkOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {creator.contact_channel || '未设置'}
+                              {creator.parsed.marketplace?.promoted_product_num != null
+                                ? `${creator.parsed.marketplace.promoted_product_num} 品`
+                                : creator.contact_channel || '未设置'}
                             </div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>建联渠道</Text>
-                          </div>
-                        </div>
-                      </Col>
-                      <Col span={12}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <CalendarOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {creator.cooperation_type || '未知'}
-                            </div>
-                            <Text type="secondary" style={{ fontSize: 10 }}>合作方式</Text>
+                            <Text type="secondary" style={{ fontSize: 10 }}>{creator.parsed.marketplace?.promoted_product_num ? '推广产品' : '渠道'}</Text>
                           </div>
                         </div>
                       </Col>
                     </Row>
+
+                    {/* Marketplace 数据条 */}
+                    {creator.parsed.marketplace && (
+                      <div style={{
+                        marginTop: 12, padding: '8px 12px',
+                        background: '#f0fdf4', borderRadius: 8,
+                        fontSize: 11, color: PRIMARY, fontWeight: 500,
+                        display: 'flex', gap: 12, flexWrap: 'wrap',
+                      }}>
+                        {creator.parsed.marketplace.ec_video_count != null && (
+                          <span>📹 {creator.parsed.marketplace.ec_video_count} 视频</span>
+                        )}
+                        {creator.parsed.marketplace.ec_live_count != null && (
+                          <span>📺 {creator.parsed.marketplace.ec_live_count} 直播</span>
+                        )}
+                        {creator.parsed.marketplace.ec_video_engagement_rate != null && (
+                          <span>❤️ {Number(creator.parsed.marketplace.ec_video_engagement_rate) / 100}%</span>
+                        )}
+                        {creator.parsed.marketplace.avg_ec_video_play_count != null && (
+                          <span>▶️ {creator.parsed.marketplace.avg_ec_video_play_count.toLocaleString()}</span>
+                        )}
+                      </div>
+                    )}
 
                     {/* 联系信息 */}
                     {creator.contact_info && (

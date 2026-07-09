@@ -873,4 +873,13 @@ export class TikTokAPI {
     if (params.page_token) body.page_token = params.page_token;
     return this.post('affiliate_seller/orders/search', body, undefined, '202405');
   }
+
+  /**
+   * 获取达人 Marketplace 表现数据（卖家端 API）
+   * API: GET /affiliate_seller/202508/marketplace_creators/{creator_user_id}
+   * 返回: 粉丝数/GMV/评分/互动率/粉丝画像/视频数据/直播间数据 等完整达人表现
+   */
+  async getMarketplaceCreatorPerformance(creatorUserId: string) {
+    return this.get(`affiliate_seller/marketplace_creators/${encodeURIComponent(creatorUserId)}`, undefined, '202508');
+  }
 }

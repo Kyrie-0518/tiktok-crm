@@ -1,0 +1,58 @@
+- generic [ref=e5]:
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - img [ref=e11]
+      - generic [ref=e36] [cursor=pointer]:
+        - text: Documentation
+        - img [ref=e37]
+      - generic [ref=e39] [cursor=pointer]: Contact Us
+    - generic [ref=e40]:
+      - img [ref=e42] [cursor=pointer]:
+        - generic [ref=e44]: Search content
+      - separator [ref=e50]
+      - generic [ref=e51] [cursor=pointer]: Log in
+      - separator [ref=e52]
+      - button "Join now" [ref=e54] [cursor=pointer]
+  - generic [ref=e57]:
+    - heading "Documents" [level=1] [ref=e58]
+    - generic [ref=e59]:
+      - generic [ref=e63]:
+        - tab "FAQs" [ref=e64] [cursor=pointer]:
+          - generic [ref=e65]: FAQs
+        - tab "API Testing Tool" [ref=e66] [cursor=pointer]:
+          - generic [ref=e68]:
+            - text: API Testing Tool
+            - img [ref=e69]
+      - tabpanel [ref=e73]:
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - list [ref=e80]:
+              - listitem [ref=e81]
+              - listitem [ref=e82]
+              - listitem [ref=e83]
+            - list [ref=e86]:
+              - listitem [ref=e87]
+              - listitem [ref=e88]
+              - listitem [ref=e89]
+            - list [ref=e92]:
+              - listitem [ref=e93]
+              - listitem [ref=e94]
+              - listitem [ref=e95]
+          - generic [ref=e96]:
+            - list [ref=e102]:
+              - listitem [ref=e103]
+              - listitem [ref=e104]
+              - listitem [ref=e105]
+            - list [ref=e108]:
+              - listitem [ref=e109]
+              - listitem [ref=e110]
+              - listitem [ref=e111]
+          - generic [ref=e114]:
+            - generic [ref=e115]:
+              - list [ref=e118]:
+                - listitem [ref=e119]
+              - list [ref=e122]:
+                - listitem [ref=e123]
+                - listitem [ref=e124]
+                - listitem [ref=e125]
+            - img [ref=e126] [cursor=pointer]
