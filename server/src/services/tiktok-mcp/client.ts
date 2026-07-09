@@ -45,7 +45,7 @@ export async function connectToMCPServer(serverUrl?: string, accessToken?: strin
     return false;
   }
 
-  const url = serverUrl || process.env.TT_MCP_SERVER_URL;
+  const url = serverUrl || process.env.TT_MCP_SERVER_URL || 'https://business-api.tiktok.com/open_mcp/tt-ads-mcp-flat';
   const token = accessToken || process.env.TT_MCP_ACCESS_TOKEN;
 
   if (!url) {
