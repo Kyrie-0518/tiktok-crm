@@ -4,6 +4,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { fetch, ProxyAgent } from 'undici';
 import { authMiddleware } from '../middleware/auth';
 import getDb from '../db';
 
@@ -30,7 +31,11 @@ async function exchangeAuthCode(authCode: string) {
     grant_type: 'authorization_code',
   };
 
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+  const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
+
   console.log('[TikTok Ads] 交换 token, URL:', url);
+  console.log('[TikTok Ads] 代理:', proxyUrl || '无');
   console.log('[TikTok Ads] 请求体:', JSON.stringify({ ...body, secret: '***' }));
 
   try {
@@ -38,7 +43,8 @@ async function exchangeAuthCode(authCode: string) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+      dispatcher,
+    } as any);
 
     const text = await res.text();
     console.log('[TikTok Ads] 交换token响应 HTTP', res.status, ':', text.slice(0, 500));
