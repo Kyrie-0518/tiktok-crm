@@ -33,19 +33,24 @@ async function exchangeAuthCode(authCode: string) {
   console.log('[TikTok Ads] 交换 token, URL:', url);
   console.log('[TikTok Ads] 请求体:', JSON.stringify({ ...body, secret: '***' }));
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-  const text = await res.text();
-  console.log('[TikTok Ads] 交换token响应 HTTP', res.status, ':', text.slice(0, 500));
+    const text = await res.text();
+    console.log('[TikTok Ads] 交换token响应 HTTP', res.status, ':', text.slice(0, 500));
 
-  let json: any = {};
-  try { json = JSON.parse(text); } catch { /* ignore */ }
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
-  return json;
+    let json: any = {};
+    try { json = JSON.parse(text); } catch { /* ignore */ }
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
+    return json;
+  } catch (fetchErr: any) {
+    console.error('[TikTok Ads] fetch 异常:', fetchErr.message, fetchErr.cause || '', fetchErr.code || '');
+    throw new Error(`fetch failed: ${fetchErr.message}${fetchErr.cause ? ' | ' + fetchErr.cause.message : ''}`);
+  }
 }
 
 // ── 路由 ──
