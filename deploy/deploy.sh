@@ -28,17 +28,10 @@ docker compose up --build -d
 
 # 5. 配置 Nginx（如果尚未配置）
 echo "[5/6] 配置 Nginx..."
-if [ ! -f /etc/nginx/sites-enabled/bozone ]; then
-    cp deploy/nginx-host.conf /etc/nginx/sites-available/bozone
-    ln -sf /etc/nginx/sites-available/bozone /etc/nginx/sites-enabled/bozone
-    # 移除默认配置（避免冲突）
-    rm -f /etc/nginx/sites-enabled/default
-    echo "  Nginx 配置已创建"
-else
-    # 已存在则同步更新
-    cp deploy/nginx-host.conf /etc/nginx/sites-available/bozone
-    echo "  Nginx 配置已更新"
-fi
+cp deploy/nginx-host.conf /etc/nginx/conf.d/bozone.conf
+rm -f /etc/nginx/conf.d/default.conf
+
+echo "  Nginx 配置已更新"
 
 # 检查 Nginx 配置语法
 nginx -t
