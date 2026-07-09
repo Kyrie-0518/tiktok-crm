@@ -59,7 +59,10 @@ const AdLogs: React.FC = () => {
   }, [selectedAdv, selectedRule]);
 
   const loadLogs = useCallback(async () => {
-    if (!selectedRule) return;
+    if (!selectedRule) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.get(`/ad-center/rules/${selectedRule}/logs`, {

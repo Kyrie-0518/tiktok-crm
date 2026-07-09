@@ -53,12 +53,16 @@ const AdDashboard: React.FC = () => {
         }
       }
     } catch (e: any) {
-      message.error('加载广告账户失败');
+      // 静默失败，避免未授权时每个页面都弹错误
+      console.error('加载广告账户失败', e);
     }
   }, [selectedAdvertiser]);
 
   const loadReport = useCallback(async () => {
-    if (!selectedAdvertiser) return;
+    if (!selectedAdvertiser) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const resp = await api.get('/ad-center/reports', {

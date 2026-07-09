@@ -46,7 +46,10 @@ const AdCreatives: React.FC = () => {
   }, [selectedAdv]);
 
   const loadCreatives = useCallback(async () => {
-    if (!selectedAdv) return;
+    if (!selectedAdv) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.get('/ad-center/creatives', { params: { advertiser_id: selectedAdv, page_size: 100 } });

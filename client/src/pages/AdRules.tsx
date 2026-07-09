@@ -45,7 +45,10 @@ const AdRules: React.FC = () => {
   }, [selectedAdv]);
 
   const loadRules = useCallback(async () => {
-    if (!selectedAdv) return;
+    if (!selectedAdv) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.get('/ad-center/rules', { params: { advertiser_id: selectedAdv } });

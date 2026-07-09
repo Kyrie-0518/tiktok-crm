@@ -49,7 +49,10 @@ const AdCampaigns: React.FC = () => {
   }, [selectedAdv]);
 
   const loadCampaigns = useCallback(async () => {
-    if (!selectedAdv) return;
+    if (!selectedAdv) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.get('/ad-center/campaigns', {
