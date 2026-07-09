@@ -30,6 +30,9 @@ async function exchangeAuthCode(authCode: string) {
     grant_type: 'authorization_code',
   };
 
+  console.log('[TikTok Ads] 交换 token, URL:', url);
+  console.log('[TikTok Ads] 请求体:', JSON.stringify({ ...body, secret: '***' }));
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -37,6 +40,8 @@ async function exchangeAuthCode(authCode: string) {
   });
 
   const text = await res.text();
+  console.log('[TikTok Ads] 交换token响应 HTTP', res.status, ':', text.slice(0, 500));
+
   let json: any = {};
   try { json = JSON.parse(text); } catch { /* ignore */ }
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);

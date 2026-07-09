@@ -33,6 +33,10 @@ function promisify<T>(apiCall: (callback: (err: any, data: any, response: any) =
 
 import getDb from '../db';
 
+// ── 通用配置 ──
+const APP_ID = process.env.TT_ADS_APP_ID || '7641162218708434960';
+const APP_SECRET = process.env.TT_ADS_APP_SECRET || '9c1115593f6199a22eecb3777b7890cbdb8c5445';
+
 function getAccessToken(): string {
   // 优先环境变量
   if (process.env.TT_ADS_ACCESS_TOKEN) return process.env.TT_ADS_ACCESS_TOKEN;
@@ -66,7 +70,8 @@ export async function getAdvertiserInfo(advertiserId?: string) {
   const sdk = await getSDK();
   const api = new sdk.AccountManagementApi();
   const token = getAccessToken();
-  const id = advertiserId || token.split('-')[0] || '';
+  if (!token) throw new Error('TikTok Ads 未授权');
+  const id = advertiserId || '';
   return promisify(cb => api.advertiserInfo(token, { advertiser_id: id }, cb));
 }
 
@@ -231,10 +236,11 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
 }
 
 // ── 通用：获取所有广告主 ──
-
+// oauth2AdvertiserGet(app_id, secret, Access_Token, callback) — 必须传 3 个参数
 export async function getMyAdvertisers() {
   const sdk = await getSDK();
   const api = new sdk.AuthenticationApi();
   const token = getAccessToken();
-  return promisify(cb => api.oauth2AdvertiserGet(token, {}, cb));
+  if (!token) throw new Error('TikTok Ads 未授权，请先完成 OAuth 授权');
+  return promisify(cb => api.oauth2AdvertiserGet(APP_ID, APP_SECRET, token, cb));
 }
