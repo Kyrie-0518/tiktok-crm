@@ -70,6 +70,34 @@ const AdAccounts: React.FC = () => {
 
   useEffect(() => { loadAuthStatus(); loadAccounts(); }, [loadAuthStatus, loadAccounts]);
 
+  // OAuth 回调：从 URL 中读取 auth_code 并自动换 token
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get('auth_code') || params.get('code');
+    if (!authCode) return;
+
+    const exchange = async () => {
+      setLoading(true);
+      try {
+        const res = await api.post('/tiktok-ads/exchange-code', { auth_code: authCode });
+        if (res.data?.success) {
+          message.success('TikTok Ads 授权成功');
+          // 清除 URL 参数，避免刷新时重复执行
+          window.history.replaceState({}, '', '/ad-accounts');
+          loadAuthStatus();
+          loadAccounts();
+        } else {
+          message.error('授权失败: ' + res.data?.error);
+        }
+      } catch (e: any) {
+        message.error('授权失败: ' + (e.response?.data?.error || e.message));
+      } finally {
+        setLoading(false);
+      }
+    };
+    exchange();
+  }, [loadAuthStatus, loadAccounts]);
+
   const handleAuthorize = async () => {
     setAuthLoading(true);
     try {
