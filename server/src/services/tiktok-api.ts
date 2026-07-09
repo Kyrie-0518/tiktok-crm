@@ -875,6 +875,32 @@ export class TikTokAPI {
   }
 
   /**
+   * 搜索达人广场（卖家端 API）— 无需联盟订单，直接搜索 Marketplace 达人
+   * API: POST /affiliate_seller/202508/marketplace_creators/search
+   * 参数: page_size(12/20), page_token, keyword, gmvRanges, category, 等筛选条件
+   * 返回: 达人列表（含基本信息/粉丝/GMV/评分等），数据为近30天
+   */
+  async searchMarketplaceCreators(params: {
+    page_size: number;
+    page_token?: string;
+    keyword?: string;
+    gmvRanges?: string[];
+    categoryIds?: string[];
+  }) {
+    const body: Record<string, any> = {};
+    if (params.keyword) body.keyword = params.keyword;
+    if (params.gmvRanges && params.gmvRanges.length) body.gmv_ranges = params.gmvRanges;
+    if (params.categoryIds && params.categoryIds.length) {
+      body.category = params.categoryIds.map(id => ({ id }));
+    }
+
+    const query: Record<string, string> = { page_size: String(params.page_size) };
+    if (params.page_token) query.page_token = params.page_token;
+
+    return this.post('affiliate_seller/marketplace_creators/search', body, query, '202508');
+  }
+
+  /**
    * 获取达人 Marketplace 表现数据（卖家端 API）
    * API: GET /affiliate_seller/202508/marketplace_creators/{creator_user_id}
    * 返回: 粉丝数/GMV/评分/互动率/粉丝画像/视频数据/直播间数据 等完整达人表现

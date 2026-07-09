@@ -418,16 +418,16 @@ router.delete('/:id', authMiddleware, (req: Request, res: Response) => {
 });
 
 // ═══════════════════════════════════════════════
-//  TikTok 达人数据同步（更新已有达人的 Marketplace 表现数据）
-//  直接对本地 influencers 表中已有的达人调用 getMarketplaceCreatorPerformance
-//  不依赖联盟订单数据
+//  TikTok 达人广场同步（直接搜索 Marketplace 达人，无需联盟订单）
+//  使用 SellerSearchCreatoronMarketplace API: POST /affiliate_seller/202508/marketplace_creators/search
+//  卖家 token 可直接搜索达人广场，支持关键词/类目/GMV范围等筛选
 // ═══════════════════════════════════════════════
 
-// POST /api/influencers/sync-from-tiktok — 为本地达人更新 TikTok Marketplace 表现数据
+// POST /api/influencers/sync-from-tiktok — 从 TikTok 达人广场搜索达人并存入本地
 router.post('/sync-from-tiktok', authMiddleware, async (req: Request, res: Response) => {
   try {
     const db = getDb();
-    const { shop_id, creator_ids } = req.body;
+    const { shop_id, keyword, gmvRanges, categoryIds, maxPages = 5 } = req.body;
 
     const shop = db.prepare(`
       SELECT * FROM tiktok_shops WHERE id = ? AND access_token IS NOT NULL
@@ -447,101 +447,129 @@ router.post('/sync-from-tiktok', authMiddleware, async (req: Request, res: Respo
       api_version: shop.api_version || '202309',
     });
 
-    // 取本地已有的达人（有 influencer_id 的）
-    let localCreators: any[] = [];
-    if (Array.isArray(creator_ids) && creator_ids.length > 0) {
-      // 如果前端传了指定达人ID，只更新这些
-      const placeholders = creator_ids.map(() => '?').join(',');
-      localCreators = db.prepare(`
-        SELECT id, influencer_id, name, remark FROM influencers
-        WHERE influencer_id IN (${placeholders}) AND influencer_id != ''
-      `).all(...creator_ids) as any[];
-    } else {
-      // 否则更新全部本地达人
-      localCreators = db.prepare(`
-        SELECT id, influencer_id, name, remark FROM influencers
-        WHERE influencer_id IS NOT NULL AND influencer_id != ''
-      `).all() as any[];
+    // 从 TikTok 达人广场搜索达人
+    const allCreators: any[] = [];
+    let pageToken: string | undefined;
+
+    for (let i = 0; i < maxPages; i++) {
+      try {
+        const resp = await api.searchMarketplaceCreators({
+          page_size: 20,
+          page_token: pageToken,
+          keyword: keyword || undefined,
+          gmvRanges: gmvRanges || undefined,
+          categoryIds: categoryIds || undefined,
+        });
+        if (resp.code !== 0) break;
+        const creators = resp.data?.creators || resp.data?.list || [];
+        allCreators.push(...creators);
+        pageToken = resp.data?.next_page_token;
+        if (!pageToken || creators.length === 0) break;
+      } catch (e: any) {
+        console.error(`[sync-from-tiktok] 搜索达人第 ${i + 1} 页失败:`, e.message);
+        break;
+      }
     }
 
-    if (localCreators.length === 0) {
+    if (allCreators.length === 0) {
       return res.json({
-        success: true,
-        updated: 0,
-        message: '暂无达人记录，请先在「达人列表」页面添加达人或导入达人数据',
+        success: true, discovered: 0,
+        message: keyword
+          ? `未搜索到匹配"${keyword}"的达人，请尝试其他关键词或确认店铺已授权`
+          : '未搜索到达人，请确认店铺已授权 TikTok 并具有达人广场访问权限',
       });
     }
 
-    // 逐个调用 getMarketplaceCreatorPerformance 更新数据
-    const updatePerformance = db.prepare(`
-      UPDATE influencers SET name = ?, remark = ? WHERE id = ?
+    // 批量 Upsert 达人基本信息
+    const upsert = db.prepare(`
+      INSERT INTO influencers (influencer_id, name, shop_id, contact_channel, status, remark)
+      VALUES (?, ?, ?, 'TikTok API', '已完成', ?)
+      ON CONFLICT(influencer_id) DO UPDATE SET
+        name = excluded.name, shop_id = excluded.shop_id, remark = excluded.remark
     `);
-    let updatedCount = 0;
-    let failedCount = 0;
-    // 限制每次最多取前 20 个（日限额 10000）
-    const batchToFetch = localCreators.slice(0, 20);
 
-    for (const local of batchToFetch) {
-      const cid = local.influencer_id;
-      if (!cid) { failedCount++; continue; }
+    let count = 0;
+    for (const c of allCreators) {
+      const cid = c.creator_user_id || c.creatorId || '';
+      if (!cid) continue;
+      const remark = JSON.stringify({
+        source: 'marketplace_search',
+        synced_at: new Date().toISOString(),
+        marketplace_preview: {
+          nickname: c.nickname,
+          avatar_url: c.avatar?.url,
+          follower_count: c.follower_count,
+          gmv: c.gmv,
+          rating: c.rating,
+          category_ids: c.category_ids,
+        },
+      });
+      upsert.run(cid, c.nickname || cid, shop_id || shop.id, remark);
+      count++;
+    }
 
+    // 拉取前 10 个达人的完整 Marketplace 表现数据
+    const updatePerformance = db.prepare(`UPDATE influencers SET name = ?, remark = ? WHERE id = ?`);
+    const batchToFetch = allCreators.slice(0, 10);
+    let enrichedCount = 0;
+
+    for (const c of batchToFetch) {
+      const cid = c.creator_user_id || c.creatorId || '';
+      if (!cid) continue;
       try {
         const perfResp = await api.getMarketplaceCreatorPerformance(cid);
         if (perfResp.code === 0 && perfResp.data?.creator) {
           const creator = perfResp.data.creator;
-
-          let existingData: any = {};
-          try { existingData = JSON.parse(local.remark || '{}'); } catch { /* ignore */ }
-
-          const enriched = {
-            ...existingData,
-            marketplace: {
-              nickname: creator.nickname,
-              avatar_url: creator.avatar?.url,
-              bio: creator.bio_description,
-              follower_count: creator.follower_count,
-              selection_region: creator.selection_region,
-              category_ids: creator.category_ids,
-              promoted_product_num: creator.promoted_product_num,
-              ec_live_count: creator.ec_live_count,
-              ec_video_count: creator.ec_video_count,
-              avg_ec_video_play_count: creator.avg_ec_video_play_count,
-              gmv: creator.gmv,
-              rating: creator.rating,
-              pps: creator.pps,
-              ec_video_engagement_rate: creator.ec_video_engagement_rate,
-              post_rate: creator.post_rate,
-              follower_location: creator.follower_location,
-              follower_age: creator.follower_age,
-              follower_gender: creator.follower_gender,
-            },
-            synced_at: new Date().toISOString(),
-          };
-
-          // 用 nickname 更新 name（如果有）
-          const newName = creator.nickname || local.name || cid;
-          updatePerformance.run(newName, JSON.stringify(enriched), local.id);
-          updatedCount++;
-        } else {
-          failedCount++;
+          const local = db.prepare('SELECT id, remark FROM influencers WHERE influencer_id = ?').get(cid) as any;
+          if (local) {
+            let existingData: any = {};
+            try { existingData = JSON.parse(local.remark || '{}'); } catch { /* ignore */ }
+            const enriched = {
+              ...existingData,
+              marketplace: {
+                nickname: creator.nickname,
+                avatar_url: creator.avatar?.url,
+                bio: creator.bio_description,
+                follower_count: creator.follower_count,
+                selection_region: creator.selection_region,
+                category_ids: creator.category_ids,
+                promoted_product_num: creator.promoted_product_num,
+                ec_live_count: creator.ec_live_count,
+                ec_video_count: creator.ec_video_count,
+                avg_ec_video_play_count: creator.avg_ec_video_play_count,
+                gmv: creator.gmv,
+                rating: creator.rating,
+                pps: creator.pps,
+                ec_video_engagement_rate: creator.ec_video_engagement_rate,
+                post_rate: creator.post_rate,
+                follower_location: creator.follower_location,
+                follower_age: creator.follower_age,
+                follower_gender: creator.follower_gender,
+              },
+              synced_at: new Date().toISOString(),
+            };
+            updatePerformance.run(creator.nickname || cid, JSON.stringify(enriched), local.id);
+            enrichedCount++;
+          }
         }
       } catch (e: any) {
         console.error(`[sync-from-tiktok] 获取达人 ${cid} 表现数据失败:`, e.message);
-        failedCount++;
       }
     }
 
     res.json({
       success: true,
-      total: localCreators.length,
-      updated: updatedCount,
-      failed: failedCount,
-      message: `已为 ${updatedCount} 位达人更新 Marketplace 数据${failedCount > 0 ? `，${failedCount} 位失败` : ''}`,
+      discovered: count,
+      enriched: enrichedCount,
+      total_from_marketplace: allCreators.length,
+      message: `从 TikTok 达人广场搜索到 ${allCreators.length} 位达人，已入库 ${count} 位${enrichedCount > 0 ? `，已拉取 ${enrichedCount} 位完整表现数据` : ''}`,
     });
   } catch (e: any) {
     console.error('[influencers] sync-from-tiktok 失败:', e.message);
     res.status(500).json({ error: e.message || '同步失败' });
   }
 });
+
+export default router;
 
 export default router;

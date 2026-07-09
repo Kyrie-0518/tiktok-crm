@@ -123,10 +123,10 @@ export default function CreatorMarket() {
     setSyncing(true);
     try {
       const res = await api.post('/influencers/sync-from-tiktok', { shop_id: selectedShop });
-      if (res.data?.updated > 0) {
-        message.success(res.data?.message || `已为 ${res.data?.updated} 位达人更新 TikTok 数据`);
+      if (res.data?.discovered > 0) {
+        message.success(res.data?.message || `从 TikTok 达人广场发现 ${res.data?.discovered} 位达人`);
       } else {
-        message.info(res.data?.message || '暂无需要更新的达人数据');
+        message.info(res.data?.message || '未搜索到达人');
       }
       loadCreators();
     } catch (e: any) {
@@ -239,8 +239,7 @@ export default function CreatorMarket() {
               <div>
                 <div style={{ marginBottom: 8 }}>暂无达人数据</div>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  请先在「达人列表」页面添加达人，或导入达人 Excel 数据<br />
-                  添加后点击「同步达人 TikTok 数据」可拉取粉丝数、GMV、评分等 marketplace 数据
+                  点击「同步达人 TikTok 数据」直接从 TikTok 达人广场搜索达人
                 </Text>
               </div>
             }
