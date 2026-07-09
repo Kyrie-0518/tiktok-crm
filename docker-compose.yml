@@ -9,7 +9,7 @@ services:
     container_name: bozone-server
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       # 持久化数据库和上传文件
       - ./server/data:/app/data
@@ -47,7 +47,7 @@ services:
     container_name: bozone-client
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       server:
         condition: service_healthy
