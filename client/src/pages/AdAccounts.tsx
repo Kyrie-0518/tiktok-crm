@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Tag, Button, Space, Typography, message, Spin, Badge, Alert } from 'antd';
-import { SafetyOutlined, ReloadOutlined, CheckCircleOutlined, SyncOutlined, WarningOutlined, LinkOutlined } from '@ant-design/icons';
+import { SafetyOutlined, ReloadOutlined, CheckCircleOutlined, WarningOutlined, LinkOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
 
@@ -90,8 +90,6 @@ const AdAccounts: React.FC = () => {
       </Text> },
     { title: '邮箱', dataIndex: 'balance_info', key: 'email', width: 220,
       render: (b: any) => b?.email || '-' },
-    { title: '操作', key: 'action', width: 120, fixed: 'right',
-      render: () => <Button icon={<SyncOutlined />} size="small" type="link" style={{ color: PRIMARY }}>同步数据</Button> },
   ];
 
   return (

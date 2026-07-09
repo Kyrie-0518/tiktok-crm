@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { fetch, ProxyAgent } from 'undici';
 import { authMiddleware } from '../middleware/auth';
 import getDb from '../db';
+import { getTokenStatus } from '../services/tiktok-ads';
 
 const router = Router();
 
@@ -34,10 +35,6 @@ async function exchangeAuthCode(authCode: string) {
   const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
   const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
 
-  console.log('[TikTok Ads] 交换 token, URL:', url);
-  console.log('[TikTok Ads] 代理:', proxyUrl || '无');
-  console.log('[TikTok Ads] 请求体:', JSON.stringify({ ...body, secret: '***' }));
-
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -47,8 +44,6 @@ async function exchangeAuthCode(authCode: string) {
     } as any);
 
     const text = await res.text();
-    console.log('[TikTok Ads] 交换token响应 HTTP', res.status, ':', text.slice(0, 500));
-
     let json: any = {};
     try { json = JSON.parse(text); } catch { /* ignore */ }
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
@@ -81,8 +76,6 @@ router.get('/callback', async (req: Request, res: Response) => {
     if (!authorizationCode) {
       return res.status(400).json({ success: false, error: '缺少 auth_code 参数' });
     }
-
-    console.log('[TikTok Ads] 收到 OAuth 回调, auth_code:', authorizationCode.slice(0, 8) + '***');
 
     const result = await exchangeAuthCode(authorizationCode);
 
@@ -120,8 +113,6 @@ router.get('/callback', async (req: Request, res: Response) => {
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `).run(JSON.stringify(advertiserIds));
 
-    console.log('[TikTok Ads] ✅ access_token 已保存');
-
     // 返回成功页面（用户可关闭）
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(`
@@ -143,14 +134,7 @@ router.get('/callback', async (req: Request, res: Response) => {
 // GET /api/tiktok-ads/token-status — 查看当前是否已保存 token
 router.get('/token-status', authMiddleware, (_req: Request, res: Response) => {
   try {
-    const db = getDb();
-    const tokenRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_access_token'").get() as any;
-    const advRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_advertiser_ids'").get() as any;
-    const hasToken = !!(tokenRow?.value);
-    res.json({
-      hasToken,
-      advertiserIds: advRow?.value ? JSON.parse(advRow.value) : [],
-    });
+    res.json(getTokenStatus());
   } catch (e: any) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -171,10 +155,9 @@ router.post('/save-token', authMiddleware, (req: Request, res: Response) => {
     }
     if (advertiser_ids) {
       db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(advertiser_ids));
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`)      .run(JSON.stringify(advertiser_ids));
     }
 
-    console.log('[TikTok Ads] ✅ 手动写入 token 成功');
     res.json({ success: true, message: 'Token 已保存' });
   } catch (e: any) {
     console.error('[TikTok Ads] 手动写入 token 失败:', e.message);

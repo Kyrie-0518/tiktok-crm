@@ -12,7 +12,6 @@ import {
   getAvailableTools,
   getMCPStatus,
   callMCPTool,
-  closeMCPConnection,
 } from '../services/tiktok-mcp/client';
 import * as Ads from '../services/tiktok-ads';
 
