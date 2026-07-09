@@ -25,11 +25,24 @@ const router = Router();
 // GET /api/ad-center/advertisers — 广告账户列表 + 余额
 router.get('/advertisers', authMiddleware, async (_req: Request, res: Response) => {
   try {
-    // 先检查是否已授权，未授权返回空数组并提示
-    const tokenStatus = await Ads.getTokenStatus();
-    if (!tokenStatus.hasToken) {
-      return res.json({ success: true, data: [], unauthorized: true, message: 'TikTok Ads 尚未授权，请先到「账户授权」页面完成授权' });
+    // 优先从数据库读取已授权的广告账号ID列表，避免每次调用 TikTok API
+    const status = Ads.getTokenStatus();
+    if (!status.hasToken) {
+      return res.json({ success: true, data: [], unauthorized: true, message: 'TikTok Ads 尚未授权' });
     }
+
+    // 如果数据库里有 advertiser_ids，直接构造账户列表返回
+    if (status.advertiserIds && status.advertiserIds.length > 0) {
+      const cachedList = status.advertiserIds.map((id: string) => ({
+        advertiser_id: id,
+        advertiser_name: id,
+        status: 'ACTIVE',
+        balance_info: null,
+      }));
+      return res.json({ success: true, data: cachedList });
+    }
+
+    // 兜底：调用 TikTok API
     const advertisers = await Ads.getMyAdvertisers();
     const list = advertisers?.data?.list || advertisers?.data?.advertisers || [];
     if (list.length > 0) {
@@ -46,7 +59,8 @@ router.get('/advertisers', authMiddleware, async (_req: Request, res: Response) 
     res.json({ success: true, data: list });
   } catch (e: any) {
     console.error('[ad-center] 获取广告主失败:', e.message);
-    res.json({ success: false, error: e.message, data: [] });
+    // 失败时返回空列表，避免前端一直 loading
+    res.json({ success: true, data: [], error: e.message });
   }
 });
 
