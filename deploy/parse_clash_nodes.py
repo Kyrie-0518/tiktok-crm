@@ -11,52 +11,34 @@ def url_decode(s):
     return urllib.parse.unquote(s)
 
 def parse_ss(uri):
-    # ss://method:password@server:port#name
+    # ss://base64(method:password@server:port) 或 ss://base64(method:password)@server:port#name
     m = re.match(r'^ss://([^@]+)@([^:]+):(\d+)(?:#(.*))?$', uri)
-    if not m:
-        # 兼容 base64 编码的 ss://
-        m2 = re.match(r'^ss://([A-Za-z0-9+/=]+)(?:#(.*))?$', uri)
-        if m2:
-            try:
-                decoded = base64.b64decode(m2.group(1)).decode('utf-8')
-                # decoded 可能是 method:password@server:port
-                m3 = re.match(r'^([^@]+)@([^:]+):(\d+)(?:#(.*))?$', decoded)
-                if m3:
-                    userinfo = m3.group(1)
-                    server = m3.group(2)
-                    port = int(m3.group(3))
-                    name = url_decode(m2.group(2) or f'{server}:{port}')
-                    if ':' in userinfo:
-                        method, password = userinfo.split(':', 1)
-                    else:
-                        method, password = 'aes-256-gcm', userinfo
-                    return {
-                        'name': name,
-                        'type': 'ss',
-                        'server': server,
-                        'port': port,
-                        'cipher': method,
-                        'password': password,
-                    }
-            except Exception:
-                pass
-        return None
-    userinfo = url_decode(m.group(1))
-    server = m.group(2)
-    port = int(m.group(3))
-    name = url_decode(m.group(4) or f'{server}:{port}')
-    if ':' in userinfo:
-        method, password = userinfo.split(':', 1)
-    else:
-        method, password = 'aes-256-gcm', userinfo
-    return {
-        'name': name,
-        'type': 'ss',
-        'server': server,
-        'port': port,
-        'cipher': method,
-        'password': password,
-    }
+    if m:
+        userinfo_b64 = m.group(1)
+        server = m.group(2)
+        port = int(m.group(3))
+        name = url_decode(m.group(4) or f'{server}:{port}')
+        # userinfo 可能是 base64(method:password) 或 base64(method:password@server:port)
+        try:
+            userinfo = base64.b64decode(userinfo_b64).decode('utf-8')
+            # 去掉可能的 server:port 后缀
+            if '@' in userinfo:
+                userinfo = userinfo.split('@')[0]
+            if ':' in userinfo:
+                method, password = userinfo.split(':', 1)
+            else:
+                method, password = 'aes-256-gcm', userinfo
+        except Exception:
+            method, password = 'aes-256-gcm', url_decode(userinfo_b64)
+        return {
+            'name': name,
+            'type': 'ss',
+            'server': server,
+            'port': port,
+            'cipher': method,
+            'password': password,
+        }
+    return None
 
 def parse_vless(uri):
     # vless://uuid@server:port?params#name
@@ -149,16 +131,21 @@ def generate_config(nodes):
     
     lines.append('proxy-groups:')
     lines.append('  - name: Proxy')
-    lines.append('    type: select')
+    lines.append('    type: url-test')
     lines.append('    proxies:')
     for n in names:
         lines.append(f'      - "{n}"')
+    lines.append('    url: http://www.gstatic.com/generate_204')
+    lines.append('    interval: 300')
+    lines.append('    tolerance: 150')
     lines.append('')
     lines.append('  - name: TikTok')
-    lines.append('    type: select')
+    lines.append('    type: url-test')
     lines.append('    proxies:')
-    lines.append('      - Proxy')
-    lines.append('      - DIRECT')
+    for n in names:
+        lines.append(f'      - "{n}"')
+    lines.append('    url: http://www.gstatic.com/generate_204')
+    lines.append('    interval: 300')
     lines.append('')
     lines.append('rules:')
     lines.append('  - DOMAIN-SUFFIX,bytedance.com,TikTok')
