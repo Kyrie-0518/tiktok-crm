@@ -24,7 +24,7 @@ const AdDashboard: React.FC = () => {
   const [advertisers, setAdvertisers] = useState<AdvertiserInfo[]>([]);
   const [selectedAdvertiser, setSelectedAdvertiser] = useState<string>('');
   const [reportData, setReportData] = useState<any[]>([]);
-  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([
     dayjs().subtract(7, 'day'), dayjs(),
   ]);
 
@@ -64,8 +64,8 @@ const AdDashboard: React.FC = () => {
       const resp = await api.get('/ad-center/reports', {
         params: {
           advertiser_id: selectedAdvertiser,
-          start_date: dateRange[0].format('YYYY-MM-DD'),
-          end_date: dateRange[1].format('YYYY-MM-DD'),
+          start_date: dateRange[0]!.format('YYYY-MM-DD'),
+          end_date: dateRange[1]!.format('YYYY-MM-DD'),
           dimensions: 'campaign_id',
           metrics: 'spend,impressions,clicks,conversions,ctr,cpc,cpm',
         },
@@ -141,7 +141,7 @@ const AdDashboard: React.FC = () => {
         <Space>
           <Select value={selectedAdvertiser} onChange={setSelectedAdvertiser} style={{ width: 220, borderRadius: 8 }}
             options={advertisers.map(a => ({ value: a.advertiser_id, label: a.advertiser_name }))} />
-          <RangePicker value={dateRange} onChange={(d) => d && setDateRange(d)} style={{ borderRadius: 8 }} />
+          <RangePicker value={dateRange} onChange={(d) => d && d[0] && d[1] && setDateRange(d)} style={{ borderRadius: 8 }} />
           <Button icon={<ReloadOutlined />} onClick={loadReport} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
         </Space>
       </div>

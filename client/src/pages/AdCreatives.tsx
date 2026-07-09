@@ -82,9 +82,9 @@ const AdCreatives: React.FC = () => {
     tab === 'image' ? creatives.filter(c => c.creative_type === 'IMAGE') :
     creatives.filter(c => c.creative_type === 'VIDEO');
 
-  const topByCtr = [...creatives].sort((a, b) => b.ctr - a.ctr).slice(0, 6);
-  const totalSpend = creatives.reduce((s, c) => s + c.spend, 0);
-  const avgCtr = creatives.length > 0 ? (creatives.reduce((s, c) => s + c.ctr, 0) / creatives.length).toFixed(2) : '0';
+  const topByCtr = [...creatives].sort((a, b) => (b.ctr ?? 0) - (a.ctr ?? 0)).slice(0, 6);
+  const totalSpend = creatives.reduce((s, c) => s + (c.spend ?? 0), 0);
+  const avgCtr = creatives.length > 0 ? (creatives.reduce((s, c) => s + (c.ctr ?? 0), 0) / creatives.length).toFixed(2) : '0';
 
   const columns: ColumnsType<Creative> = [
     { title: '素材预览', dataIndex: 'thumbnail_url', key: 'preview', width: 80, fixed: 'left',
@@ -96,8 +96,8 @@ const AdCreatives: React.FC = () => {
       render: (t: string) => <Tag color={t === 'VIDEO' ? 'purple' : 'blue'}>{t}</Tag> },
     { title: '展示量', dataIndex: 'impressions', key: 'impressions', width: 110, render: (v: number) => v.toLocaleString() },
     { title: '点击数', dataIndex: 'clicks', key: 'clicks', width: 90, render: (v: number) => v.toLocaleString() },
-    { title: 'CTR', dataIndex: 'ctr', key: 'ctr', width: 90, sorter: (a: any, b: any) => a.ctr - b.ctr,
-      render: (v: number) => <Text strong style={{ color: v > 2 ? '#059669' : '#1e293b' }}>{v.toFixed(2)}%</Text> },
+    { title: 'CTR', dataIndex: 'ctr', key: 'ctr', width: 90, sorter: (a: any, b: any) => (a.ctr ?? 0) - (b.ctr ?? 0),
+      render: (v: number) => <Text strong style={{ color: (v ?? 0) > 2 ? '#059669' : '#1e293b' }}>{(v ?? 0).toFixed(2)}%</Text> },
     { title: '转化', dataIndex: 'conversions', key: 'conversions', width: 80, render: (v: number) => <Tag color="green">{v}</Tag> },
     { title: '消耗', dataIndex: 'spend', key: 'spend', width: 110, render: (v: number) => `$${v.toFixed(2)}` },
   ];
