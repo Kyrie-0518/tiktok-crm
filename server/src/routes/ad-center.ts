@@ -30,72 +30,49 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       return res.json({ success: true, data: [], unauthorized: true, message: 'TikTok Ads 尚未授权' });
     }
 
-    const advertiserIds = status.advertiserIds || [];
-    if (advertiserIds.length === 0) {
-      return res.json({ success: true, data: [] });
-    }
-
     const forceRefresh = req.query.refresh === '1';
+    const db = getDb();
 
-    // 非强制刷新时，从数据库缓存读取
+    // 普通加载：直接读数据库缓存
     if (!forceRefresh) {
-      const db = getDb();
       const cacheRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_accounts_cache'").get() as any;
       if (cacheRow?.value) {
-        try {
-          const cached = JSON.parse(cacheRow.value);
-          if (cached.length > 0) {
-            return res.json({ success: true, data: cached, cached: true });
-          }
-        } catch { /* ignore */ }
+        try { return res.json({ success: true, data: JSON.parse(cacheRow.value) }); } catch { /* ignore */ }
       }
-      // 缓存为空，直接返回 ID 列表，不调用 API（避免超时转圈）
-      const fallbackList = advertiserIds.map((id: string) => ({
-        advertiser_id: id,
-        advertiser_name: id,
-        status: 'ACTIVE',
-        balance_info: null,
-      }));
-      return res.json({ success: true, data: fallbackList, partial: true });
+      // 无缓存：返回 ID 列表
+      const ids = status.advertiserIds || [];
+      return res.json({ success: true, data: ids.map((id: string) => ({
+        advertiser_id: id, advertiser_name: id, status: 'ACTIVE', balance_info: null,
+      })) });
     }
 
-    // 强制刷新：从 TikTok API 获取
-    const timeout = <T>(p: Promise<T>, ms: number): Promise<T | undefined> =>
-      Promise.race([p, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))]);
+    // 强制刷新：调 TikTok API 并更新缓存
+    const advertiserIds = status.advertiserIds || [];
+    if (advertiserIds.length === 0) return res.json({ success: true, data: [] });
 
+    const timeout = <T>(p: Promise<T>, ms: number) =>
+      Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
     const nameMap: Record<string, string> = {};
     const balanceMap: Record<string, any> = {};
 
+    try { await Promise.all(advertiserIds.map(async (id: string) => {
+      const info = await timeout(Ads.getAdvertiserInfo(id), 10000);
+      const name = info?.data?.advertiser_name || info?.data?.name;
+      if (name) nameMap[id] = name;
+    })); } catch { /* ignore */ }
     try {
-      await Promise.all(advertiserIds.map(async (id: string) => {
-        const info = await timeout(Ads.getAdvertiserInfo(id), 5000);
-        const name = info?.data?.advertiser_name || info?.data?.name;
-        if (name) nameMap[id] = name;
-      }));
-    } catch { /* ignore */ }
-
-    try {
-      const balance = await timeout(Ads.getAdvertiserBalance(advertiserIds), 5000);
+      const balance = await timeout(Ads.getAdvertiserBalance(advertiserIds), 10000);
       (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
     } catch { /* ignore */ }
 
     const list = advertiserIds.map((id: string) => ({
-      advertiser_id: id,
-      advertiser_name: nameMap[id] || id,
-      status: 'ACTIVE',
-      balance_info: balanceMap[id] || null,
+      advertiser_id: id, advertiser_name: nameMap[id] || id, status: 'ACTIVE', balance_info: balanceMap[id] || null,
     }));
-
-    // 保存到数据库缓存（即使部分失败也保存）
-    try {
-      const db = getDb();
-      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(list));
-    } catch { /* ignore */ }
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(list));
 
     res.json({ success: true, data: list, refreshed: true });
   } catch (e: any) {
-    console.error('[ad-center] 获取广告主失败:', e.message);
     res.json({ success: true, data: [], error: e.message });
   }
 });

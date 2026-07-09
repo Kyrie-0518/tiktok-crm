@@ -114,17 +114,41 @@ router.get('/callback', async (req: Request, res: Response) => {
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `).run(JSON.stringify(idsArray));
 
-    // 初始化账户缓存：至少包含 ID 列表，避免页面首次进入时转圈
-    const initialCache = idsArray.map((id: string) => ({
-      advertiser_id: id,
-      advertiser_name: id,
-      status: 'ACTIVE',
-      balance_info: null,
-    }));
-    db.prepare(`
-      INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `).run(JSON.stringify(initialCache));
+    // 立即获取账户详情（名称+余额）并存入缓存
+    try {
+      const { getAdvertiserInfo, getAdvertiserBalance } = await import('../services/tiktok-ads');
+      const nameMap: Record<string, string> = {};
+      const balanceMap: Record<string, any> = {};
+
+      const timeout = <T>(p: Promise<T>, ms: number) =>
+        Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
+
+      await Promise.all(idsArray.map(async (id: string) => {
+        const info = await timeout(getAdvertiserInfo(id), 10000);
+        const name = info?.data?.advertiser_name || info?.data?.name;
+        if (name) nameMap[id] = name;
+      }));
+
+      const balance = await timeout(getAdvertiserBalance(idsArray), 10000);
+      (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
+
+      const cache = idsArray.map((id: string) => ({
+        advertiser_id: id,
+        advertiser_name: nameMap[id] || id,
+        status: 'ACTIVE',
+        balance_info: balanceMap[id] || null,
+      }));
+
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(cache));
+
+      console.log('[TikTok Ads] ✅ 账户名称和余额已缓存');
+    } catch (err: any) {
+      // 网络不稳定时，至少保存 ID 列表
+      const fallback = idsArray.map((id: string) => ({ advertiser_id: id, advertiser_name: id, status: 'ACTIVE', balance_info: null }));
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(fallback));
+    }
 
     // 返回成功页面（自动跳转回系统）
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
