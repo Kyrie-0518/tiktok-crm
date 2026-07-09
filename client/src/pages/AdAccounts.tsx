@@ -20,9 +20,14 @@ interface AuthStatus {
 }
 
 const AdAccounts: React.FC = () => {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
-  const [accounts, setAccounts] = useState<AdAccount[]>([]);
+  const [accounts, setAccounts] = useState<AdAccount[]>(() => {
+    try {
+      const cached = localStorage.getItem('ad_accounts_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
 
   const loadAuthStatus = useCallback(async () => {
@@ -34,12 +39,14 @@ const AdAccounts: React.FC = () => {
     }
   }, []);
 
-  const loadAccounts = useCallback(async () => {
-    setLoading(true);
+  const loadAccounts = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.get('/ad-center/advertisers');
       if (res.data?.success) {
-        setAccounts(res.data.data || []);
+        const list = res.data.data || [];
+        setAccounts(list);
+        try { localStorage.setItem('ad_accounts_cache', JSON.stringify(list)); } catch { /* ignore */ }
         if (res.data.unauthorized) {
           message.info(res.data.message || 'TikTok Ads 尚未授权');
         }
@@ -47,13 +54,17 @@ const AdAccounts: React.FC = () => {
         message.error('加载失败: ' + res.data?.error);
       }
     } catch (e: any) {
-      message.error('加载失败: ' + (e.response?.data?.error || e.message));
+      if (!silent) message.error('加载失败: ' + (e.response?.data?.error || e.message));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadAuthStatus(); loadAccounts(); }, [loadAuthStatus, loadAccounts]);
+  useEffect(() => {
+    const hasCache = !!localStorage.getItem('ad_accounts_cache');
+    loadAuthStatus();
+    loadAccounts(!hasCache);
+  }, [loadAuthStatus, loadAccounts]);
 
   const handleAuthorize = async () => {
     setAuthLoading(true);
