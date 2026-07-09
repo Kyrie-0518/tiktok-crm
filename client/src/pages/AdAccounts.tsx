@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Tag, Button, Space, Typography, message, Spin, Badge, Select } from 'antd';
-import { SafetyOutlined, ReloadOutlined, CheckCircleOutlined, SyncOutlined, WarningOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Button, Space, Typography, message, Spin, Badge, Alert } from 'antd';
+import { SafetyOutlined, ReloadOutlined, CheckCircleOutlined, SyncOutlined, WarningOutlined, LinkOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
 
@@ -14,9 +14,25 @@ interface AdAccount {
   balance_info?: { balance: number; email?: string; currency?: string };
 }
 
+interface AuthStatus {
+  hasToken: boolean;
+  advertiserIds: string[];
+}
+
 const AdAccounts: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+
+  const loadAuthStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/tiktok-ads/token-status');
+      setAuthStatus(res.data);
+    } catch (e: any) {
+      console.error('加载授权状态失败:', e);
+    }
+  }, []);
 
   const loadAccounts = useCallback(async () => {
     setLoading(true);
@@ -24,6 +40,9 @@ const AdAccounts: React.FC = () => {
       const res = await api.get('/ad-center/advertisers');
       if (res.data?.success) {
         setAccounts(res.data.data || []);
+        if (res.data.unauthorized) {
+          message.info(res.data.message || 'TikTok Ads 尚未授权');
+        }
       } else {
         message.error('加载失败: ' + res.data?.error);
       }
@@ -34,10 +53,28 @@ const AdAccounts: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { loadAccounts(); }, [loadAccounts]);
+  useEffect(() => { loadAuthStatus(); loadAccounts(); }, [loadAuthStatus, loadAccounts]);
+
+  const handleAuthorize = async () => {
+    setAuthLoading(true);
+    try {
+      const res = await api.get('/tiktok-ads/auth-url');
+      if (res.data?.success && res.data.authUrl) {
+        window.open(res.data.authUrl, '_blank', 'noopener,noreferrer,width=1200,height=800');
+        message.success('请在弹出的 TikTok 授权页面完成登录授权');
+      } else {
+        message.error('获取授权链接失败');
+      }
+    } catch (e: any) {
+      message.error('获取授权链接失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const totalBalance = accounts.reduce((s, a) => s + (Number(a.balance_info?.balance) || 0), 0);
   const activeCount = accounts.filter(a => a.status === 'ACTIVE' || a.status === 'APPROVED').length;
+  const isAuthorized = authStatus?.hasToken ?? accounts.length > 0;
 
   const columns: ColumnsType<AdAccount> = [
     { title: '账户名称', dataIndex: 'advertiser_name', key: 'name', width: 200, fixed: 'left',
@@ -71,8 +108,28 @@ const AdAccounts: React.FC = () => {
           </div>
           <Text type="secondary">TikTok for Business 广告账户管理与授权同步</Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={loadAccounts} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
+        <Space>
+          {isAuthorized ? (
+            <Tag icon={<CheckCircleOutlined />} color="success">已授权</Tag>
+          ) : (
+            <Tag icon={<WarningOutlined />} color="warning">未授权</Tag>
+          )}
+          <Button type="primary" icon={<LinkOutlined />} loading={authLoading} onClick={handleAuthorize} style={{ borderRadius: 8 }}>
+            一键授权 TikTok Ads
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={() => { loadAuthStatus(); loadAccounts(); }} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
+        </Space>
       </div>
+
+      {!isAuthorized && (
+        <Alert
+          message="TikTok Ads 尚未授权"
+          description="请点击右上角「一键授权 TikTok Ads」按钮，在弹出的 TikTok 页面登录并授权。授权成功后刷新本页面即可查看广告账户。"
+          type="warning"
+          showIcon
+          style={{ marginBottom: 20, borderRadius: 12 }}
+        />
+      )}
 
       {loading ? <Spin size="large" style={{ display: 'block', margin: '40px auto' }} /> : (
         <>
@@ -97,7 +154,8 @@ const AdAccounts: React.FC = () => {
           {/* Table */}
           <Card style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <Table columns={columns} dataSource={accounts} rowKey="advertiser_id"
-              size="middle" scroll={{ x: 1020 }} pagination={{ pageSize: 20 }} />
+              size="middle" scroll={{ x: 1020 }} pagination={{ pageSize: 20 }}
+              locale={{ emptyText: '暂无授权账户，请先点击右上角「一键授权」' }} />
           </Card>
         </>
       )}

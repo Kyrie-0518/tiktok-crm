@@ -31,8 +31,33 @@ function promisify<T>(apiCall: (callback: (err: any, data: any, response: any) =
   });
 }
 
+import getDb from '../db';
+
 function getAccessToken(): string {
-  return process.env.TT_ADS_ACCESS_TOKEN || '';
+  // 优先环境变量
+  if (process.env.TT_ADS_ACCESS_TOKEN) return process.env.TT_ADS_ACCESS_TOKEN;
+  // 其次从数据库 settings 表读取 OAuth 回调保存的 token
+  try {
+    const db = getDb();
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_access_token'").get() as any;
+    return row?.value || '';
+  } catch {
+    return '';
+  }
+}
+
+export function getTokenStatus(): { hasToken: boolean; advertiserIds: string[] } {
+  try {
+    const db = getDb();
+    const tokenRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_access_token'").get() as any;
+    const advRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_advertiser_ids'").get() as any;
+    return {
+      hasToken: !!tokenRow?.value,
+      advertiserIds: advRow?.value ? JSON.parse(advRow.value) : [],
+    };
+  } catch {
+    return { hasToken: false, advertiserIds: [] };
+  }
 }
 
 // ── 广告主 / 账户 ──
