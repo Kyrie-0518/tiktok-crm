@@ -108,10 +108,23 @@ router.get('/callback', async (req: Request, res: Response) => {
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
       `).run(refreshToken);
     }
+    const idsArray = Array.isArray(advertiserIds) ? advertiserIds : (advertiserIds ? [advertiserIds] : []);
     db.prepare(`
       INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `).run(JSON.stringify(advertiserIds));
+    `).run(JSON.stringify(idsArray));
+
+    // 初始化账户缓存：至少包含 ID 列表，避免页面首次进入时转圈
+    const initialCache = idsArray.map((id: string) => ({
+      advertiser_id: id,
+      advertiser_name: id,
+      status: 'ACTIVE',
+      balance_info: null,
+    }));
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(JSON.stringify(initialCache));
 
     // 返回成功页面（自动跳转回系统）
     res.setHeader('Content-Type', 'text/html; charset=utf-8');

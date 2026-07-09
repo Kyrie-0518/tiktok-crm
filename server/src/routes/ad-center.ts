@@ -49,9 +49,17 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
           }
         } catch { /* ignore */ }
       }
+      // 缓存为空，直接返回 ID 列表，不调用 API（避免超时转圈）
+      const fallbackList = advertiserIds.map((id: string) => ({
+        advertiser_id: id,
+        advertiser_name: id,
+        status: 'ACTIVE',
+        balance_info: null,
+      }));
+      return res.json({ success: true, data: fallbackList, partial: true });
     }
 
-    // 缓存为空或强制刷新：从 TikTok API 获取
+    // 强制刷新：从 TikTok API 获取
     const timeout = <T>(p: Promise<T>, ms: number): Promise<T | undefined> =>
       Promise.race([p, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))]);
 
