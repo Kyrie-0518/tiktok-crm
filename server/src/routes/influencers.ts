@@ -480,13 +480,16 @@ router.post('/sync-from-tiktok', authMiddleware, async (req: Request, res: Respo
       });
     }
 
-    // 批量 Upsert 达人基本信息
-    const upsert = db.prepare(`
+    // 批量 Upsert 达人基本信息（不用 ON CONFLICT，因为 influencer_id 无 UNIQUE 约束）
+    const insertInf = db.prepare(`
       INSERT INTO influencers (influencer_id, name, shop_id, contact_channel, status, remark)
       VALUES (?, ?, ?, 'TikTok API', '已完成', ?)
-      ON CONFLICT(influencer_id) DO UPDATE SET
-        name = excluded.name, shop_id = excluded.shop_id, remark = excluded.remark
     `);
+    const updateInf = db.prepare(`
+      UPDATE influencers SET name = ?, shop_id = ?, contact_channel = 'TikTok API', status = '已完成', remark = ?
+      WHERE influencer_id = ?
+    `);
+    const checkInf = db.prepare('SELECT id FROM influencers WHERE influencer_id = ?');
 
     let count = 0;
     for (const c of allCreators) {
@@ -504,7 +507,12 @@ router.post('/sync-from-tiktok', authMiddleware, async (req: Request, res: Respo
           category_ids: c.category_ids,
         },
       });
-      upsert.run(cid, c.nickname || cid, shop_id || shop.id, remark);
+      const existing = checkInf.get(cid) as any;
+      if (existing) {
+        updateInf.run(c.nickname || cid, shop_id || shop.id, remark, cid);
+      } else {
+        insertInf.run(cid, c.nickname || cid, shop_id || shop.id, remark);
+      }
       count++;
     }
 
