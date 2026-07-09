@@ -26,6 +26,10 @@ services:
       - FRONTEND_URL=https://bvefdvp.cn
       - TIKTOK_ENV=production
       - TIKTOK_API_BASE=https://open-api.tiktokglobalshop.com
+      # TikTok Ads OAuth
+      - TT_ADS_APP_ID=7641162218708434960
+      - TT_ADS_APP_SECRET=9c1115593f6199a22eecb3777b7890cbdb8c5445
+      - TT_ADS_REDIRECT_URI=https://bvefdvp.cn/api/tiktok-ads/callback
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
