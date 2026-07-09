@@ -12,7 +12,7 @@ const router = Router();
 // 基础配置
 const APP_ID = process.env.TT_ADS_APP_ID || '7641162218708434960';
 const APP_SECRET = process.env.TT_ADS_APP_SECRET || '9c1115593f6199a22eecb3777b7890cbdb8c5445';
-const REDIRECT_URI = process.env.TT_ADS_REDIRECT_URI || 'http://8.163.24.221/api/tiktok-ads/callback';
+const REDIRECT_URI = process.env.TT_ADS_REDIRECT_URI || 'https://risewise.yangyue.com.cn/api/tiktok-ads/callback';
 
 // ── 工具函数 ──
 
