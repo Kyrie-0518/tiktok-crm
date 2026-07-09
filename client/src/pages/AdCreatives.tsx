@@ -1,277 +1,180 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Table, Tag, Typography, Row, Col, Select, Input, Tabs, Statistic, Progress, Button, Space } from 'antd';
-import {
-  PictureOutlined, RiseOutlined, PlayCircleOutlined,
-  StopOutlined, EyeOutlined, ThunderboltOutlined,
-  DollarOutlined, ShoppingCartOutlined, BarChartOutlined,
-} from '@ant-design/icons';
-import * as echarts from 'echarts';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, Table, Tag, Button, Space, Select, Typography, message, Spin, Row, Col, Image, Tabs } from 'antd';
+import { PictureOutlined, ReloadOutlined, LikeOutlined, EyeOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import api from '../api';
 
 const { Text, Title } = Typography;
-const BRAND = '#2563eb';
+const { Option } = Select;
+const PRIMARY = '#2563eb';
 
 interface Creative {
-  id: string;
-  name: string;
-  campaign: string;
-  type: '视频' | '图片';
-  status: '投放中' | '暂停' | '已移除' | '未投放';
-  spend: number;
-  orders: number;
-  revenue: number;
-  roi: number;
-  cpa: number;
-  impressions: number;
-  clicks: number;
-  ctr: number;
-  play_rate: number;
-  shop: string;
-  duration?: string;
+  creative_id: string;
+  creative_name: string;
+  creative_type: string; // IMAGE / VIDEO
+  thumbnail_url?: string;
+  ctr?: number;
+  cvr?: number;
+  spend?: number;
+  impressions?: number;
+  clicks?: number;
+  conversions?: number;
+  status?: string;
+}
+
+interface AdvertiserInfo {
+  advertiser_id: string;
+  advertiser_name: string;
 }
 
 const AdCreatives: React.FC = () => {
-  const [creatives, setCreatives] = useState<Creative[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all');
-  const [searchText, setSearchText] = useState('');
+  const [advertisers, setAdvertisers] = useState<AdvertiserInfo[]>([]);
+  const [selectedAdv, setSelectedAdv] = useState('');
+  const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [tab, setTab] = useState('all');
 
-  useEffect(() => { loadCreatives(); }, []);
+  const loadAdvertisers = useCallback(async () => {
+    try {
+      const res = await api.get('/ad-center/advertisers');
+      if (res.data?.success) {
+        const list = res.data.data || [];
+        setAdvertisers(list);
+        if (list.length && !selectedAdv) setSelectedAdv(list[0].advertiser_id);
+      }
+    } catch { /* ignore */ }
+  }, [selectedAdv]);
 
-  const loadCreatives = async () => {
+  const loadCreatives = useCallback(async () => {
+    if (!selectedAdv) return;
     setLoading(true);
     try {
-      const mock: Creative[] = Array.from({ length: 20 }, (_, i) => ({
-        id: `cr_${i}`,
-        name: `创意素材-${String.fromCharCode(65 + i)}_v${Math.floor(Math.random() * 3) + 1}`,
-        campaign: `系列${String.fromCharCode(65 + (i % 8))}`,
-        type: i % 3 === 0 ? '图片' : '视频',
-        status: (['投放中', '投放中', '投放中', '暂停', '已移除', '未投放'] as const)[i % 6],
-        spend: Math.round((5 + Math.random() * 200) * 100) / 100,
-        orders: Math.floor(Math.random() * 25),
-        revenue: Math.round((10 + Math.random() * 800) * 100) / 100,
-        roi: Math.round((0.5 + Math.random() * 6) * 100) / 100,
-        cpa: Math.round((10 + Math.random() * 80) * 100) / 100,
-        impressions: Math.floor(500 + Math.random() * 10000),
-        clicks: Math.floor(10 + Math.random() * 300),
-        ctr: Math.round((0.3 + Math.random() * 8) * 100) / 100,
-        play_rate: Math.round((30 + Math.random() * 70) * 100) / 100,
-        shop: i % 2 === 0 ? '官方旗舰店' : '东南亚跨境店',
-        duration: i % 3 === 0 ? undefined : `${Math.floor(15 + Math.random() * 45)}s`,
-      }));
-      setCreatives(mock);
-    } catch (e) {
-      console.error(e);
+      const res = await api.get('/ad-center/creatives', { params: { advertiser_id: selectedAdv, page_size: 100 } });
+      if (res.data?.success) {
+        const list = (res.data.data?.list || []).map((c: any) => ({
+          creative_id: c.creative_id || c.id,
+          creative_name: c.creative_name || c.name || '-',
+          creative_type: c.creative_type || c.type || 'IMAGE',
+          thumbnail_url: c.thumbnail_url || c.image_url || c.preview_url,
+          ctr: Number(c.ctr) || 0,
+          cvr: Number(c.cvr) || 0,
+          spend: Number(c.spend) || 0,
+          impressions: Number(c.impressions) || 0,
+          clicks: Number(c.clicks) || 0,
+          conversions: Number(c.conversions) || 0,
+          status: c.status || 'ACTIVE',
+        }));
+        setCreatives(list);
+      } else {
+        message.error(res.data?.error);
+      }
+    } catch (e: any) {
+      message.error('加载失败: ' + (e.response?.data?.error || e.message));
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedAdv]);
 
-  useEffect(() => {
-    const chartDom = document.getElementById('creative-chart');
-    if (!chartDom) return;
-    const chart = echarts.init(chartDom);
-    const top10 = [...creatives].filter(c => c.spend > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-    chart.setOption({
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: { data: ['ROI', '花费'], bottom: 0, textStyle: { color: '#64748b', fontSize: 11 } },
-      grid: { top: 10, left: 120, right: 40, bottom: 30 },
-      xAxis: { type: 'value', axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
-      yAxis: {
-        type: 'category',
-        data: top10.map(c => c.name.substring(0, 12)),
-        axisLabel: { color: '#475569', fontSize: 11 },
-      },
-      series: [
-        { name: '花费', type: 'bar', data: top10.map(c => c.spend), itemStyle: { color: '#3b82f6', borderRadius: [0, 4, 4, 0] }, barWidth: 10, barGap: '20%' },
-        { name: 'ROI', type: 'bar', data: top10.map(c => c.roi), itemStyle: { color: '#059669', borderRadius: [0, 4, 4, 0] }, barWidth: 10 },
-      ],
-    });
-    return () => chart.dispose();
-  }, [creatives]);
+  useEffect(() => { loadAdvertisers(); }, [loadAdvertisers]);
+  useEffect(() => { loadCreatives(); }, [loadCreatives]);
 
-  const filtered = creatives.filter(c => {
-    if (searchText && !c.name.toLowerCase().includes(searchText.toLowerCase())) return false;
-    if (activeTab === 'all') return true;
-    if (activeTab === 'running') return c.status === '投放中';
-    if (activeTab === 'paused') return c.status === '暂停';
-    if (activeTab === 'removed') return c.status === '已移除';
-    return true;
-  });
+  const filtered = tab === 'all' ? creatives :
+    tab === 'image' ? creatives.filter(c => c.creative_type === 'IMAGE') :
+    creatives.filter(c => c.creative_type === 'VIDEO');
 
-  const totals = {
-    running: creatives.filter(c => c.status === '投放中').length,
-    spend: filtered.reduce((s, c) => s + c.spend, 0),
-    orders: filtered.reduce((s, c) => s + c.orders, 0),
-    revenue: filtered.reduce((s, c) => s + c.revenue, 0),
-    avgCtr: filtered.length > 0 ? filtered.reduce((s, c) => s + c.ctr, 0) / filtered.length : 0,
-  };
+  const topByCtr = [...creatives].sort((a, b) => b.ctr - a.ctr).slice(0, 6);
+  const totalSpend = creatives.reduce((s, c) => s + c.spend, 0);
+  const avgCtr = creatives.length > 0 ? (creatives.reduce((s, c) => s + c.ctr, 0) / creatives.length).toFixed(2) : '0';
 
-  const statusConfig: Record<string, { color: string; text: string }> = {
-    '投放中': { color: 'blue', text: '投放中' },
-    '暂停': { color: 'orange', text: '暂停' },
-    '已移除': { color: 'red', text: '已移除' },
-    '未投放': { color: 'default', text: '未投放' },
-  };
-
-  const columns = [
-    {
-      title: '素材名称', key: 'name', width: 200, fixed: 'left' as const,
-      render: (_: any, r: Creative) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 40, height: 56, borderRadius: 6, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {r.type === '视频' ? <PlayCircleOutlined style={{ color: BRAND, fontSize: 18 }} /> : <PictureOutlined style={{ color: '#d97706', fontSize: 18 }} />}
-          </div>
-          <div>
-            <div style={{ fontWeight: 500, fontSize: 13, lineHeight: 1.3 }}>{r.name}</div>
-            <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-              <Tag color={r.type === '视频' ? 'purple' : 'cyan'} style={{ fontSize: 10, lineHeight: '16px' }}>{r.type}{r.duration ? ` ${r.duration}` : ''}</Tag>
-              <Tag style={{ fontSize: 10, lineHeight: '16px' }}>{r.shop}</Tag>
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '系列', dataIndex: 'campaign', key: 'campaign', width: 100,
-      render: (v: string) => <Tag color="geekblue" style={{ fontSize: 11 }}>{v}</Tag>,
-    },
-    {
-      title: '状态', dataIndex: 'status', key: 'status', width: 90,
-      render: (v: string) => {
-        const cfg = statusConfig[v];
-        return <Tag color={cfg?.color} style={{ fontSize: 11 }}>{cfg?.text}</Tag>;
-      },
-    },
-    {
-      title: '展现量', dataIndex: 'impressions', key: 'impressions', width: 90, sorter: (a: Creative, b: Creative) => a.impressions - b.impressions,
-      render: (v: number) => <Text>{v.toLocaleString()}</Text>,
-    },
-    {
-      title: 'CTR', dataIndex: 'ctr', key: 'ctr', width: 70, sorter: (a: Creative, b: Creative) => a.ctr - b.ctr,
-      render: (v: number) => (
-        <Text style={{ color: v > 3 ? '#059669' : v > 1 ? '#d97706' : '#dc2626' }}>{v.toFixed(1)}%</Text>
-      ),
-    },
-    {
-      title: '花费', dataIndex: 'spend', key: 'spend', width: 80, sorter: (a: Creative, b: Creative) => a.spend - b.spend,
-      render: (v: number) => <Text>${v.toFixed(2)}</Text>,
-    },
-    {
-      title: '订单', dataIndex: 'orders', key: 'orders', width: 60, sorter: (a: Creative, b: Creative) => a.orders - b.orders,
-      render: (v: number) => <Text>{v}</Text>,
-    },
-    {
-      title: 'CPA', dataIndex: 'cpa', key: 'cpa', width: 80, sorter: (a: Creative, b: Creative) => a.cpa - b.cpa,
-      render: (v: number) => <Text style={{ color: v > 50 ? '#dc2626' : '#059669' }}>${v.toFixed(2)}</Text>,
-    },
-    {
-      title: 'ROI', dataIndex: 'roi', key: 'roi', width: 70, sorter: (a: Creative, b: Creative) => a.roi - b.roi,
-      render: (v: number) => <Text strong style={{ color: v >= 2 ? '#059669' : '#dc2626' }}>{v.toFixed(1)}x</Text>,
-    },
-    {
-      title: '播放率', dataIndex: 'play_rate', key: 'play_rate', width: 80,
-      render: (v: number) => v ? <Progress percent={Math.round(v)} size="small" strokeColor={BRAND} /> : <Text type="secondary">-</Text>,
-    },
-    {
-      title: '操作', key: 'action', width: 100, fixed: 'right' as const,
-      render: () => (
-        <Space size="small">
-          <Button size="small" type="link" icon={<EyeOutlined />} style={{ fontSize: 12 }}>详情</Button>
-        </Space>
-      ),
-    },
-  ];
-
-  const tabItems = [
-    { key: 'all', label: `全部 (${creatives.length})` },
-    { key: 'running', label: `投放中 (${creatives.filter(c => c.status === '投放中').length})` },
-    { key: 'paused', label: `暂停 (${creatives.filter(c => c.status === '暂停').length})` },
-    { key: 'removed', label: `已移除 (${creatives.filter(c => c.status === '已移除').length})` },
+  const columns: ColumnsType<Creative> = [
+    { title: '素材预览', dataIndex: 'thumbnail_url', key: 'preview', width: 80, fixed: 'left',
+      render: (url: string) => url
+        ? <Image src={url} width={48} height={48} style={{ borderRadius: 6, objectFit: 'cover' }} fallback="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjZjFmNWY5Ii8+PHRleHQgeD0iMjQiIHk9IjI0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk0YTNiOCI+RzwvdGV4dD48L3N2Zz4=" />
+        : <div style={{ width: 48, height: 48, borderRadius: 6, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 18 }}>C</div> },
+    { title: '素材名称', dataIndex: 'creative_name', key: 'name', width: 200, render: (n: string) => <Text strong>{n}</Text> },
+    { title: '类型', dataIndex: 'creative_type', key: 'type', width: 80,
+      render: (t: string) => <Tag color={t === 'VIDEO' ? 'purple' : 'blue'}>{t}</Tag> },
+    { title: '展示量', dataIndex: 'impressions', key: 'impressions', width: 110, render: (v: number) => v.toLocaleString() },
+    { title: '点击数', dataIndex: 'clicks', key: 'clicks', width: 90, render: (v: number) => v.toLocaleString() },
+    { title: 'CTR', dataIndex: 'ctr', key: 'ctr', width: 90, sorter: (a: any, b: any) => a.ctr - b.ctr,
+      render: (v: number) => <Text strong style={{ color: v > 2 ? '#059669' : '#1e293b' }}>{v.toFixed(2)}%</Text> },
+    { title: '转化', dataIndex: 'conversions', key: 'conversions', width: 80, render: (v: number) => <Tag color="green">{v}</Tag> },
+    { title: '消耗', dataIndex: 'spend', key: 'spend', width: 110, render: (v: number) => `$${v.toFixed(2)}` },
   ];
 
   return (
     <div style={{ padding: '0 0 24px' }}>
-      {/* 标题区 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${BRAND}, #60a5fa)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <PictureOutlined style={{ color: '#fff', fontSize: 16 }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${PRIMARY}, #6366f1)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <PictureOutlined style={{ color: '#fff', fontSize: 16 }} />
+            </div>
+            <Title level={4} style={{ margin: 0, color: '#1e293b' }}>素材分析</Title>
+          </div>
+          <Text type="secondary">广告素材表现数据，按 CTR/CVR/消耗 维度分析</Text>
         </div>
-        <div style={{ flex: 1 }}>
-          <Title level={4} style={{ margin: 0, color: '#1e293b' }}>素材分析</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>广告素材效果追踪与创意洞察</Text>
-        </div>
+        <Button icon={<ReloadOutlined />} onClick={loadCreatives} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
       </div>
 
-      {/* 概览卡 */}
-      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-        {[
-          { label: '投放中素材', value: totals.running, color: BRAND, icon: <PlayCircleOutlined /> },
-          { label: '总花费', value: `$${totals.spend.toFixed(0)}`, color: '#3b82f6', icon: <DollarOutlined /> },
-          { label: '总订单', value: totals.orders, color: '#059669', icon: <ShoppingCartOutlined /> },
-          { label: '总收入', value: `$${totals.revenue.toFixed(0)}`, color: '#d97706', icon: <RiseOutlined /> },
-          { label: '平均CTR', value: `${totals.avgCtr.toFixed(1)}%`, color: '#8b5cf6', icon: <BarChartOutlined /> },
-        ].map((card, i) => (
-          <Col xs={24} sm={12} md={8} lg={Math.floor(24 / 5)} key={i}>
-            <Card size="small" style={{ borderRadius: 8, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }} bodyStyle={{ padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 8, background: `${card.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {React.cloneElement(card.icon as React.ReactElement, { style: { color: card.color, fontSize: 14 } })}
-                </div>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 11 }}>{card.label}</Text>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: card.color }}>{card.value}</div>
-                </div>
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
+      {loading ? <Spin size="large" style={{ display: 'block', margin: '40px auto' }} /> : (
+        <>
+          {/* Top 素材卡片 */}
+          <div style={{ marginBottom: 20 }}>
+            <Text strong style={{ fontSize: 14, marginBottom: 12, display: 'block' }}>🏆 Top 6 高 CTR 素材</Text>
+            <Row gutter={[12, 12]}>
+              {topByCtr.map((c, i) => (
+                <Col xs={12} sm={8} md={4} key={c.creative_id}>
+                  <Card size="small" style={{ borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}>
+                    <div style={{ width: '100%', aspectRatio: '1', background: '#f8fafc', borderRadius: 8, marginBottom: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {c.thumbnail_url ? (
+                        <Image src={c.thumbnail_url} preview={false} style={{ width: '100%', height: '100%', objectFit: 'cover' }} fallback="data:image/svg+xml;base64,..." />
+                      ) : (
+                        <PictureOutlined style={{ fontSize: 28, color: '#cbd5e1' }} />
+                      )}
+                    </div>
+                    <Text strong style={{ fontSize: 13, display: 'block' }}>#{i + 1}</Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>CTR {c.ctr.toFixed(2)}%</Text>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </div>
 
-      {/* 图表 + 表格 */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={8}>
-          <Card
-            title={<span><BarChartOutlined style={{ color: BRAND, marginRight: 8 }} />Top 素材 ROI</span>}
-            style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', height: '100%' }}
-            bodyStyle={{ padding: '12px 16px' }}
-          >
-            <div id="creative-chart" style={{ height: 360 }} />
+          {/* 汇总数据 */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+            <Col xs={8}>
+              <Card size="small" style={{ borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>素材总数</Text>
+                <div style={{ fontSize: 20, fontWeight: 700, color: PRIMARY }}>{creatives.length}</div>
+              </Card>
+            </Col>
+            <Col xs={8}>
+              <Card size="small" style={{ borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>平均 CTR</Text>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#059669' }}>{avgCtr}%</div>
+              </Card>
+            </Col>
+            <Col xs={8}>
+              <Card size="small" style={{ borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>总消耗</Text>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b' }}>${totalSpend.toFixed(2)}</div>
+              </Card>
+            </Col>
+          </Row>
+
+          {/* Tabs + Table */}
+          <Card style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <Tabs activeKey={tab} onChange={setTab} style={{ marginBottom: 8 }} items={[
+              { key: 'all', label: `全部 (${creatives.length})` },
+              { key: 'image', label: `图片 (${creatives.filter(c => c.creative_type === 'IMAGE').length})` },
+              { key: 'video', label: `视频 (${creatives.filter(c => c.creative_type === 'VIDEO').length})` },
+            ]} />
+            <Table columns={columns} dataSource={filtered} rowKey="creative_id" size="middle"
+              scroll={{ x: 900 }} pagination={{ pageSize: 20 }} />
           </Card>
-        </Col>
-        <Col xs={24} lg={16}>
-          <Card
-            style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
-            bodyStyle={{ padding: '16px 20px' }}
-          >
-            <Tabs
-              activeKey={activeTab}
-              onChange={setActiveTab}
-              items={tabItems}
-              style={{ marginBottom: 0 }}
-              tabBarExtraContent={
-                <Input.Search
-                  placeholder="搜索素材..."
-                  allowClear
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                  style={{ width: 200 }}
-                  size="small"
-                />
-              }
-            />
-            <Table
-              dataSource={filtered}
-              columns={columns as any}
-              rowKey="id"
-              loading={loading}
-              pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-              size="small"
-              scroll={{ x: 1100 }}
-              style={{ borderRadius: 8, marginTop: 8 }}
-            />
-          </Card>
-        </Col>
-      </Row>
+        </>
+      )}
     </div>
   );
 };
