@@ -156,4 +156,31 @@ router.get('/token-status', authMiddleware, (_req: Request, res: Response) => {
   }
 });
 
+// POST /api/tiktok-ads/save-token — 手动写入 token（绕过服务器网络限制）
+router.post('/save-token', authMiddleware, (req: Request, res: Response) => {
+  try {
+    const { access_token, refresh_token, advertiser_ids } = req.body;
+    if (!access_token) return res.status(400).json({ success: false, error: '缺少 access_token' });
+
+    const db = getDb();
+    db.exec(`INSERT INTO settings (key, value) VALUES ('tt_ads_access_token', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [access_token]);
+    if (refresh_token) {
+      db.exec(`INSERT INTO settings (key, value) VALUES ('tt_ads_refresh_token', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [refresh_token]);
+    }
+    if (advertiser_ids) {
+      db.exec(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        [JSON.stringify(advertiser_ids)]);
+    }
+
+    console.log('[TikTok Ads] ✅ 手动写入 token 成功');
+    res.json({ success: true, message: 'Token 已保存' });
+  } catch (e: any) {
+    console.error('[TikTok Ads] 手动写入 token 失败:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 export default router;
