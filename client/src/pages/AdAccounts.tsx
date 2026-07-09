@@ -20,14 +20,9 @@ interface AuthStatus {
 }
 
 const AdAccounts: React.FC = () => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
-  const [accounts, setAccounts] = useState<AdAccount[]>(() => {
-    try {
-      const cached = localStorage.getItem('ad_accounts_cache');
-      return cached ? JSON.parse(cached) : [];
-    } catch { return []; }
-  });
+  const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
 
   const loadAuthStatus = useCallback(async () => {
@@ -39,14 +34,12 @@ const AdAccounts: React.FC = () => {
     }
   }, []);
 
-  const loadAccounts = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+  const loadAccounts = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await api.get('/ad-center/advertisers');
       if (res.data?.success) {
-        const list = res.data.data || [];
-        setAccounts(list);
-        try { localStorage.setItem('ad_accounts_cache', JSON.stringify(list)); } catch { /* ignore */ }
+        setAccounts(res.data.data || []);
         if (res.data.unauthorized) {
           message.info(res.data.message || 'TikTok Ads 尚未授权');
         }
@@ -54,17 +47,28 @@ const AdAccounts: React.FC = () => {
         message.error('加载失败: ' + res.data?.error);
       }
     } catch (e: any) {
-      if (!silent) message.error('加载失败: ' + (e.response?.data?.error || e.message));
+      message.error('加载失败: ' + (e.response?.data?.error || e.message));
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    const hasCache = !!localStorage.getItem('ad_accounts_cache');
-    loadAuthStatus();
-    loadAccounts(!hasCache);
-  }, [loadAuthStatus, loadAccounts]);
+  const refreshAccounts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/ad-center/advertisers', { params: { refresh: '1' } });
+      if (res.data?.success) {
+        setAccounts(res.data.data || []);
+        if (res.data.refreshed) message.success('已从 TikTok 刷新最新数据');
+      }
+    } catch (e: any) {
+      message.error('刷新失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAuthStatus(); loadAccounts(); }, [loadAuthStatus, loadAccounts]);
 
   const handleAuthorize = async () => {
     setAuthLoading(true);
@@ -125,7 +129,7 @@ const AdAccounts: React.FC = () => {
           <Button type="primary" icon={<LinkOutlined />} loading={authLoading} onClick={handleAuthorize} style={{ borderRadius: 8 }}>
             一键授权 TikTok Ads
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => { loadAuthStatus(); loadAccounts(); }} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
+          <Button icon={<ReloadOutlined />} onClick={refreshAccounts} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
         </Space>
       </div>
 

@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
+import getDb from '../db';
 import {
   connectToMCPServer,
   getAvailableTools,
@@ -22,7 +23,7 @@ const router = Router();
 // ══════════════════════════════════════
 
 // GET /api/ad-center/advertisers — 广告账户列表 + 余额
-router.get('/advertisers', authMiddleware, async (_req: Request, res: Response) => {
+router.get('/advertisers', authMiddleware, async (req: Request, res: Response) => {
   try {
     const status = Ads.getTokenStatus();
     if (!status.hasToken) {
@@ -34,15 +35,23 @@ router.get('/advertisers', authMiddleware, async (_req: Request, res: Response) 
       return res.json({ success: true, data: [] });
     }
 
-    // 快速兜底：先返回缓存 ID，避免页面 loading 超过 5 秒
-    const fallbackList = advertiserIds.map((id: string) => ({
-      advertiser_id: id,
-      advertiser_name: id,
-      status: 'ACTIVE',
-      balance_info: null,
-    }));
+    const forceRefresh = req.query.refresh === '1';
 
-    // 5 秒内尝试获取真实名称和余额
+    // 非强制刷新时，从数据库缓存读取
+    if (!forceRefresh) {
+      const db = getDb();
+      const cacheRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_accounts_cache'").get() as any;
+      if (cacheRow?.value) {
+        try {
+          const cached = JSON.parse(cacheRow.value);
+          if (cached.length > 0) {
+            return res.json({ success: true, data: cached, cached: true });
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
+    // 缓存为空或强制刷新：从 TikTok API 获取
     const timeout = <T>(p: Promise<T>, ms: number): Promise<T | undefined> =>
       Promise.race([p, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))]);
 
@@ -62,11 +71,6 @@ router.get('/advertisers', authMiddleware, async (_req: Request, res: Response) 
       (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
     } catch { /* ignore */ }
 
-    const hasDetails = Object.keys(nameMap).length > 0 || Object.keys(balanceMap).length > 0;
-    if (!hasDetails) {
-      return res.json({ success: true, data: fallbackList, partial: true });
-    }
-
     const list = advertiserIds.map((id: string) => ({
       advertiser_id: id,
       advertiser_name: nameMap[id] || id,
@@ -74,7 +78,14 @@ router.get('/advertisers', authMiddleware, async (_req: Request, res: Response) 
       balance_info: balanceMap[id] || null,
     }));
 
-    res.json({ success: true, data: list });
+    // 保存到数据库缓存（即使部分失败也保存）
+    try {
+      const db = getDb();
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(list));
+    } catch { /* ignore */ }
+
+    res.json({ success: true, data: list, refreshed: true });
   } catch (e: any) {
     console.error('[ad-center] 获取广告主失败:', e.message);
     res.json({ success: true, data: [], error: e.message });
