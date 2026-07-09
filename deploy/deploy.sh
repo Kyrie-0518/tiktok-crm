@@ -9,7 +9,7 @@ echo "=============================="
 
 # 1. 拉取最新代码
 echo "[1/6] 拉取最新代码..."
-cd /root/tiktok-crm
+cd /opt/tiktok-crm
 git pull
 
 # 2. 停止 Nginx（释放 80/443 端口）
