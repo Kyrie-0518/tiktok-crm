@@ -123,11 +123,10 @@ export default function CreatorMarket() {
     setSyncing(true);
     try {
       const res = await api.post('/influencers/sync-from-tiktok', { shop_id: selectedShop });
-      if (res.data?.discovered > 0) {
-        const enriched = res.data?.enriched || 0;
-        message.success(res.data?.message || `发现 ${res.data?.discovered} 位达人${enriched > 0 ? `，已拉取 ${enriched} 位表现数据` : ''}`);
+      if (res.data?.updated > 0) {
+        message.success(res.data?.message || `已为 ${res.data?.updated} 位达人更新 TikTok 数据`);
       } else {
-        message.info(res.data?.message || '未发现带货达人');
+        message.info(res.data?.message || '暂无需要更新的达人数据');
       }
       loadCreators();
     } catch (e: any) {
@@ -180,7 +179,7 @@ export default function CreatorMarket() {
               disabled={shops.length === 0}
             />
             <Button icon={<CloudDownloadOutlined />} onClick={handleSyncFromTikTok} loading={syncing} style={{ borderRadius: 8 }}>
-              从TikTok同步达人资料
+              同步达人 TikTok 数据
             </Button>
             <Button icon={<ReloadOutlined />} onClick={loadCreators} style={{ borderRadius: 8 }}>刷新</Button>
           </Space>
@@ -240,7 +239,8 @@ export default function CreatorMarket() {
               <div>
                 <div style={{ marginBottom: 8 }}>暂无达人数据</div>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  请先在「达人列表」页面手动添加达人，或通过 Excel 批量导入
+                  请先在「达人列表」页面添加达人，或导入达人 Excel 数据<br />
+                  添加后点击「同步达人 TikTok 数据」可拉取粉丝数、GMV、评分等 marketplace 数据
                 </Text>
               </div>
             }
