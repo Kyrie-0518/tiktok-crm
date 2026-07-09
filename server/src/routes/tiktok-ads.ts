@@ -113,7 +113,7 @@ router.get('/callback', async (req: Request, res: Response) => {
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `).run(JSON.stringify(advertiserIds));
 
-    // 返回成功页面（用户可关闭）
+    // 返回成功页面（自动跳转回系统）
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(`
       <html>
@@ -121,7 +121,10 @@ router.get('/callback', async (req: Request, res: Response) => {
           <h1 style="color: #059669;">TikTok 广告授权成功</h1>
           <p>access_token 已自动保存到系统。</p>
           <p>广告账号ID: ${Array.isArray(advertiserIds) ? advertiserIds.join(', ') : advertiserIds}</p>
-          <p style="margin-top: 24px; color: #666;">请回到虾掌柜系统继续操作。</p>
+          <p style="margin-top: 24px; color: #666;">3 秒后自动跳转回系统...</p>
+          <script>
+            setTimeout(() => { window.location.href = '/ad-accounts'; }, 3000);
+          </script>
         </body>
       </html>
     `);

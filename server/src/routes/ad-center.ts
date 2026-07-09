@@ -24,41 +24,45 @@ const router = Router();
 // GET /api/ad-center/advertisers — 广告账户列表 + 余额
 router.get('/advertisers', authMiddleware, async (_req: Request, res: Response) => {
   try {
-    // 优先从数据库读取已授权的广告账号ID列表，避免每次调用 TikTok API
     const status = Ads.getTokenStatus();
     if (!status.hasToken) {
       return res.json({ success: true, data: [], unauthorized: true, message: 'TikTok Ads 尚未授权' });
     }
 
-    // 如果数据库里有 advertiser_ids，直接构造账户列表返回
-    if (status.advertiserIds && status.advertiserIds.length > 0) {
-      const cachedList = status.advertiserIds.map((id: string) => ({
-        advertiser_id: id,
-        advertiser_name: id,
-        status: 'ACTIVE',
-        balance_info: null,
-      }));
-      return res.json({ success: true, data: cachedList });
+    const advertiserIds = status.advertiserIds || [];
+    if (advertiserIds.length === 0) {
+      return res.json({ success: true, data: [] });
     }
 
-    // 兜底：调用 TikTok API
-    const advertisers = await Ads.getMyAdvertisers();
-    const list = advertisers?.data?.list || advertisers?.data?.advertisers || [];
-    if (list.length > 0) {
-      try {
-        const ids = list.map((a: any) => a.advertiser_id || a.id).filter(Boolean);
-        const balance = await Ads.getAdvertiserBalance(ids);
-        const balanceMap: Record<string, any> = {};
-        (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
-        list.forEach((a: any) => {
-          a.balance_info = balanceMap[a.advertiser_id || a.id] || null;
-        });
-      } catch { /* balance optional */ }
-    }
+    // 尝试获取真实名称和余额（网络不稳定时可能失败，使用 ID 作为名称兜底）
+    const nameMap: Record<string, string> = {};
+    const balanceMap: Record<string, any> = {};
+
+    try {
+      await Promise.all(advertiserIds.map(async (id: string) => {
+        try {
+          const info = await Ads.getAdvertiserInfo(id);
+          const name = info?.data?.advertiser_name || info?.data?.name;
+          if (name) nameMap[id] = name;
+        } catch { /* ignore single failure */ }
+      }));
+    } catch { /* ignore */ }
+
+    try {
+      const balance = await Ads.getAdvertiserBalance(advertiserIds);
+      (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
+    } catch { /* ignore */ }
+
+    const list = advertiserIds.map((id: string) => ({
+      advertiser_id: id,
+      advertiser_name: nameMap[id] || id,
+      status: 'ACTIVE',
+      balance_info: balanceMap[id] || null,
+    }));
+
     res.json({ success: true, data: list });
   } catch (e: any) {
     console.error('[ad-center] 获取广告主失败:', e.message);
-    // 失败时返回空列表，避免前端一直 loading
     res.json({ success: true, data: [], error: e.message });
   }
 });
