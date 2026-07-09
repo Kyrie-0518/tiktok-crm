@@ -33,6 +33,8 @@ import { startAutoSync } from './services/auto-sync';
 import auditLogRoutes from './routes/audit-logs';
 import aiStudioRoutes from './routes/ai-studio';
 import productsTiktokRoutes from './routes/products-tiktok';
+import adCenterRoutes from './routes/ad-center';
+import { connectToMCPServer } from './services/tiktok-mcp/client';
 import getDb from './db';
 
 // ── 启动时强制检查 tiktok_shops 表结构迁移 ──
@@ -92,6 +94,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/ai-studio', aiStudioRoutes);
 app.use('/api/products-tiktok', productsTiktokRoutes);
+app.use('/api/ad-center', adCenterRoutes);
 
 
 // Serve uploaded images
@@ -156,4 +159,18 @@ app.listen(PORT, () => {
   const syncInterval = parseInt(process.env.AUTO_SYNC_INTERVAL_MINUTES || '10', 10);
   console.log(`[Scheduler] 订单自动同步: 每 ${syncInterval} 分钟执行一次`);
   startAutoSync(syncInterval);
+
+  // 尝试连接 TikTok Ads MCP Server（非阻塞，失败不阻止服务启动）
+  if (process.env.TT_MCP_SERVER_URL) {
+    console.log('[MCP] 检测到 MCP Server 配置，正在自动连接...');
+    connectToMCPServer().then(ok => {
+      if (ok) {
+        console.log('[MCP] ✅ TikTok Ads MCP Server 已自动连接');
+      } else {
+        console.log('[MCP] ⚠️ 自动连接失败，可通过 POST /api/ad-center/connect 手动重试');
+      }
+    });
+  } else {
+    console.log('[MCP] 未配置 TT_MCP_SERVER_URL，跳过自动连接。使用 POST /api/ad-center/connect 手动连接');
+  }
 });

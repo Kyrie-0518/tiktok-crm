@@ -1,0 +1,35 @@
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - link "tt4b logo" [ref=e6] [cursor=pointer]:
+        - /url: https://business-api.tiktok.com/portal
+        - img "tt4b logo" [ref=e7]
+      - img "header_hamburger" [ref=e9]
+    - generic [ref=e10]:
+      - iframe [ref=e14]:
+        
+      - img [ref=e19]
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27]: © 2026 TikTok for Business
+        - link "Terms & policies" [ref=e28] [cursor=pointer]:
+          - /url: https://ads.tiktok.com/i18n/official/policy/terms
+        - link "Privacy & cookie policy" [ref=e29] [cursor=pointer]:
+          - /url: https://ads.tiktok.com/i18n/official/policy/privacy?
+      - generic [ref=e30]:
+        - link "TikTok" [ref=e31] [cursor=pointer]:
+          - /url: https://www.tiktok.com/@tiktokforbusiness?lang=en
+          - img "TikTok" [ref=e32]
+        - link "LinkedIn" [ref=e33] [cursor=pointer]:
+          - /url: https://www.linkedin.com/company/tiktokbusiness/
+          - img "LinkedIn" [ref=e34]
+        - link "Facebook" [ref=e35] [cursor=pointer]:
+          - /url: https://www.facebook.com/TikTokforBusiness/
+          - img "Facebook" [ref=e36]
+        - link "Instagram" [ref=e37] [cursor=pointer]:
+          - /url: https://www.instagram.com/tiktok.forbusiness/
+          - img "Instagram" [ref=e38]
+        - link "Twitter" [ref=e39] [cursor=pointer]:
+          - /url: https://www.twitter.com/TikTokBusiness
+          - img "Twitter" [ref=e40]
+  - alert [ref=e41]: Docs | TikTok API for Business
