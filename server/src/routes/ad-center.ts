@@ -34,24 +34,38 @@ router.get('/advertisers', authMiddleware, async (_req: Request, res: Response) 
       return res.json({ success: true, data: [] });
     }
 
-    // 尝试获取真实名称和余额（网络不稳定时可能失败，使用 ID 作为名称兜底）
+    // 快速兜底：先返回缓存 ID，避免页面 loading 超过 5 秒
+    const fallbackList = advertiserIds.map((id: string) => ({
+      advertiser_id: id,
+      advertiser_name: id,
+      status: 'ACTIVE',
+      balance_info: null,
+    }));
+
+    // 5 秒内尝试获取真实名称和余额
+    const timeout = <T>(p: Promise<T>, ms: number): Promise<T | undefined> =>
+      Promise.race([p, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))]);
+
     const nameMap: Record<string, string> = {};
     const balanceMap: Record<string, any> = {};
 
     try {
       await Promise.all(advertiserIds.map(async (id: string) => {
-        try {
-          const info = await Ads.getAdvertiserInfo(id);
-          const name = info?.data?.advertiser_name || info?.data?.name;
-          if (name) nameMap[id] = name;
-        } catch { /* ignore single failure */ }
+        const info = await timeout(Ads.getAdvertiserInfo(id), 5000);
+        const name = info?.data?.advertiser_name || info?.data?.name;
+        if (name) nameMap[id] = name;
       }));
     } catch { /* ignore */ }
 
     try {
-      const balance = await Ads.getAdvertiserBalance(advertiserIds);
+      const balance = await timeout(Ads.getAdvertiserBalance(advertiserIds), 5000);
       (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
     } catch { /* ignore */ }
+
+    const hasDetails = Object.keys(nameMap).length > 0 || Object.keys(balanceMap).length > 0;
+    if (!hasDetails) {
+      return res.json({ success: true, data: fallbackList, partial: true });
+    }
 
     const list = advertiserIds.map((id: string) => ({
       advertiser_id: id,
