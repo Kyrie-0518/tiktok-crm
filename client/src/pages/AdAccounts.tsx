@@ -60,8 +60,7 @@ const AdAccounts: React.FC = () => {
     try {
       const res = await api.get('/tiktok-ads/auth-url');
       if (res.data?.success && res.data.authUrl) {
-        window.open(res.data.authUrl, '_blank', 'noopener,noreferrer');
-        message.success('请在弹出的 TikTok 授权页面完成登录授权');
+        window.location.href = res.data.authUrl;
       } else {
         message.error('获取授权链接失败');
       }
