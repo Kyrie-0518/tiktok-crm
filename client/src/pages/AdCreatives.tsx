@@ -134,7 +134,7 @@ const AdCreatives: React.FC = () => {
                       )}
                     </div>
                     <Text strong style={{ fontSize: 13, display: 'block' }}>#{i + 1}</Text>
-                    <Text type="secondary" style={{ fontSize: 11 }}>CTR {c.ctr.toFixed(2)}%</Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>CTR {(c.ctr ?? 0).toFixed(2)}%</Text>
                   </Card>
                 </Col>
               ))}
