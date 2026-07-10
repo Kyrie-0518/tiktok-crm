@@ -269,6 +269,14 @@ export async function getCreativePortfolio(params: { advertiser_id: string; page
 
 // ── 余额 / 财务 ──
 
+export async function getBusinessCenterBalance() {
+  const token = getAccessToken();
+  if (!token) throw new Error('TikTok Ads 未授权');
+  const res = await tiktokAdsGet('/open_api/v1.3/bc/balance/get/', token);
+  console.log('[TikTok Ads] /bc/balance/get/ response:', JSON.stringify(res));
+  return res;
+}
+
 export async function getBusinessCenters() {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
@@ -284,6 +292,9 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
   const list: any[] = [];
+
+  // 尝试查 BC 级余额
+  try { await getBusinessCenterBalance(); } catch { /* ignore */ }
 
   // 1. 获取 bc_id
   let bcId = '';
