@@ -113,18 +113,21 @@ export async function getAdvertiserInfo(advertiserId?: string) {
     advertiser_ids: [advertiserId],
     fields: ADVERTISER_INFO_FIELDS,
   });
-  const item = res?.data?.advertiser_info_list?.[0] || {};
+  const item = res?.data?.list?.[0] || res?.data?.advertiser_info_list?.[0] || {};
   return { data: item };
 }
 
 export async function getAdvertisersInfo(advertiserIds: string[]) {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
-  if (!advertiserIds.length) return { data: { advertiser_info_list: [] } };
+  if (!advertiserIds.length) return { data: { list: [] } };
   const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
     advertiser_ids: advertiserIds,
     fields: ADVERTISER_INFO_FIELDS,
   });
+  if (res.data && !res.data.list && res.data.advertiser_info_list) {
+    res.data.list = res.data.advertiser_info_list;
+  }
   return res;
 }
 
@@ -280,7 +283,7 @@ export async function getCreativePortfolio(params: { advertiser_id: string; page
 export async function getAdvertiserBalance(advertiserIds: string[]) {
   // BCApi.advertiserBalanceGet 需要 bc_id，这里改用 advertiserInfo 批量接口取余额
   const res = await getAdvertisersInfo(advertiserIds);
-  const list = (res?.data?.advertiser_info_list || []).map((item: any) => ({
+  const list = (res?.data?.list || []).map((item: any) => ({
     advertiser_id: item.advertiser_id,
     balance: item.balance || 0,
     currency: item.currency || '',
