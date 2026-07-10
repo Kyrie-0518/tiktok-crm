@@ -331,18 +331,28 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
     console.log('[TikTok Ads] bc_id from /bc/get/:', bcId);
   } catch { /* ignore */ }
 
-  // 1. 优先调 /advertiser/balance/get/ 拿账户级余额
+  // 1. 优先调 /advertiser/balance/get/ 拿账户级余额（必须传 fields + page_size=1 才返回 budget_remaining）
   if (bcId) {
     try {
+      const balanceFields = [
+        'budget_remaining', 'budget_frequency_restriction', 'budget_amount_restriction',
+        'min_transferable_amount', 'max_transferable_amount', 'balance_info',
+      ];
       const res = await tiktokAdsGet('/open_api/v1.3/advertiser/balance/get/', token, {
         bc_id: bcId,
-        page_size: '50',
+        page_size: '1',
+        fields: balanceFields,
       });
       console.log('[TikTok Ads] /advertiser/balance/get/ response:', JSON.stringify(res));
       if (res.code === 0 || res.code === undefined) {
-        const balanceList = res?.data?.list || res?.data?.advertiser_account_list || [];
+        const balanceList = res?.data?.advertiser_account_list || res?.data?.list || [];
         balanceList.forEach((b: any) => {
-          list.push({ advertiser_id: b.advertiser_id, balance: b.balance || 0, currency: b.currency || '' });
+          list.push({
+            advertiser_id: b.advertiser_id,
+            // budget_remaining 是剩余预算，balance_info 是余额详情
+            balance: b.budget_remaining || b.valid_account_balance || b.account_balance || 0,
+            currency: b.currency || '',
+          });
         });
       }
     } catch (e: any) { console.error('[TikTok Ads] /advertiser/balance/get/ failed:', e.message); }
