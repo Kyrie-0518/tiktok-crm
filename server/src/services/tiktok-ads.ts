@@ -66,13 +66,23 @@ export function getTokenStatus(): { hasToken: boolean; advertiserIds: string[] }
 
 // ── 广告主 / 账户 ──
 
+const ADVERTISER_INFO_FIELDS = [
+  'advertiser_id', 'advertiser_name', 'status', 'currency', 'timezone',
+  'company', 'industry', 'phone_number', 'email', 'address', 'country',
+  'promotion_area', 'promotion_center', 'advertiser_account_type', 'description',
+  'reason', 'rejection_reason', 'create_time', 'language', 'license_no',
+  'license_url', 'taxpayer_id', 'official_website_url', 'business_center_id',
+  'owner_bcm_user_id', 'owner_bcm_user_name', 'balance', 'spend_cap',
+];
+
 export async function getAdvertiserInfo(advertiserId?: string) {
   const sdk = await getSDK();
   const api = new sdk.AccountManagementApi();
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
   const id = advertiserId || '';
-  const res: any = await promisify(cb => api.advertiserInfo([id], token, {}, cb));
+  const res: any = await promisify(cb => api.advertiserInfo([id], token, { fields: ADVERTISER_INFO_FIELDS }, cb));
+  console.log('[TikTok Ads] advertiserInfo raw res:', JSON.stringify(res));
   const item = res?.data?.advertiser_info_list?.[0] || {};
   return { data: item };
 }
@@ -83,7 +93,8 @@ export async function getAdvertisersInfo(advertiserIds: string[]) {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
   if (!advertiserIds.length) return { data: { advertiser_info_list: [] } };
-  const res: any = await promisify(cb => api.advertiserInfo(advertiserIds, token, {}, cb));
+  const res: any = await promisify(cb => api.advertiserInfo(advertiserIds, token, { fields: ADVERTISER_INFO_FIELDS }, cb));
+  console.log('[TikTok Ads] advertisersInfo raw res:', JSON.stringify(res));
   return res;
 }
 
@@ -246,6 +257,7 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
     balance: item.balance || 0,
     currency: item.currency || '',
   }));
+  console.log('[TikTok Ads] advertiserBalance derived list:', JSON.stringify(list));
   return { data: { list } };
 }
 

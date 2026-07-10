@@ -75,6 +75,7 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       promotion_area: infoMap[id]?.promotion_area || undefined,
       balance_info: balanceMap[id] || null,
     }));
+    console.log('[ad-center] refreshed advertisers list:', JSON.stringify(list));
     db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(list));
 
