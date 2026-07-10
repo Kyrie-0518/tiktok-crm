@@ -62,7 +62,7 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
 
     if (advertiserIds.length === 0) return res.json({ success: true, data: [] });
 
-    const infoMap: Record<string, { promotion_area?: string }> = {};
+    const infoMap: Record<string, { country?: string }> = {};
     const balanceMap: Record<string, any> = {};
 
     // 批量调 advertiserInfo 拉 promotion_area
@@ -72,7 +72,7 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       (infoRes?.data?.list || []).forEach((item: any) => {
         const id = item.advertiser_id;
         if (item.advertiser_name) baseNameMap[id] = item.advertiser_name;
-        infoMap[id] = { promotion_area: item.promotion_area || '' };
+        infoMap[id] = { country: item.country || '' };
       });
     } catch (e: any) { console.error('[ad-center] getAdvertisersInfo failed:', e.message); }
     // 批量调 getAdvertiserBalance 拉余额
@@ -86,7 +86,7 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       advertiser_id: id,
       advertiser_name: baseNameMap[id] || id,
       status: 'ACTIVE',
-      promotion_area: infoMap[id]?.promotion_area || undefined,
+      country: infoMap[id]?.country || undefined,
       balance_info: balanceMap[id] || null,
     }));
     console.log('[ad-center] refreshed advertisers list:', JSON.stringify(list));

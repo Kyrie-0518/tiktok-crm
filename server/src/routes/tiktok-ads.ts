@@ -54,7 +54,7 @@ async function saveAccountsCache(idsArray: string[]) {
   try {
     const { getAdvertisersInfo, getAdvertiserBalance } = await import('../services/tiktok-ads');
     const nameMap: Record<string, string> = {};
-    const infoMap: Record<string, { promotion_area?: string }> = {};
+    const infoMap: Record<string, { country?: string }> = {};
     const balanceMap: Record<string, any> = {};
 
     try {
@@ -62,7 +62,7 @@ async function saveAccountsCache(idsArray: string[]) {
       (infoRes?.data?.list || []).forEach((item: any) => {
         const id = item.advertiser_id;
         if (item.advertiser_name) nameMap[id] = item.advertiser_name;
-        infoMap[id] = { promotion_area: item.promotion_area || '' };
+        infoMap[id] = { country: item.country || '' };
       });
     } catch { /* ignore */ }
     try {
@@ -74,7 +74,7 @@ async function saveAccountsCache(idsArray: string[]) {
       advertiser_id: id,
       advertiser_name: nameMap[id] || id,
       status: 'ACTIVE',
-      promotion_area: infoMap[id]?.promotion_area || undefined,
+      country: infoMap[id]?.country || undefined,
       balance_info: balanceMap[id] || null,
     }));
     console.log('[tiktok-ads] saveAccountsCache:', JSON.stringify(cache));

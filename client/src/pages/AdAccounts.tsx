@@ -11,7 +11,7 @@ interface AdAccount {
   advertiser_id: string;
   advertiser_name: string;
   status: string;
-  promotion_area?: string;
+  country?: string;
   balance_info?: { balance: number; currency?: string };
 }
 
@@ -128,7 +128,7 @@ const AdAccounts: React.FC = () => {
         const isActive = s === 'ACTIVE' || s === 'APPROVED';
         return <Tag icon={isActive ? <CheckCircleOutlined /> : <WarningOutlined />} color={isActive ? 'green' : 'orange'}>{s}</Tag>;
       } },
-    { title: '投放地区', dataIndex: 'promotion_area', key: 'promotion_area', width: 200, ellipsis: true,
+    { title: '国家/地区', dataIndex: 'country', key: 'country', width: 120,
       render: (v: string) => v || '-' },
     { title: '余额', dataIndex: 'balance_info', key: 'balance', width: 160,
       render: (b: any) => <Text strong style={{ color: b?.balance > 0 ? PRIMARY : '#ef4444' }}>
@@ -195,7 +195,7 @@ const AdAccounts: React.FC = () => {
           {/* Table */}
           <Card style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <Table columns={columns} dataSource={accounts} rowKey="advertiser_id"
-              size="middle" scroll={{ x: 880 }} pagination={{ pageSize: 20 }}
+              size="middle" scroll={{ x: 860 }} pagination={{ pageSize: 20 }}
               locale={{ emptyText: '暂无授权账户，请先点击右上角「一键授权」' }} />
           </Card>
         </>
