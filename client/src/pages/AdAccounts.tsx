@@ -20,6 +20,12 @@ interface AuthStatus {
   advertiserIds: string[];
 }
 
+// 从后端获取 TikTok Ads OAuth 配置（包含 secret，内部 ERP 使用）
+async function getTikTokAdsConfig() {
+  const res = await api.get('/tiktok-ads/config');
+  return res.data;
+}
+
 const AdAccounts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
@@ -71,7 +77,7 @@ const AdAccounts: React.FC = () => {
 
   useEffect(() => { loadAuthStatus(); loadAccounts(); }, [loadAuthStatus, loadAccounts]);
 
-  // OAuth 回调：从 URL 中读取 auth_code 并自动换 token
+  // OAuth 回调：从 URL 中读取 auth_code，浏览器直接调 TikTok 换 token
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authCode = params.get('auth_code') || params.get('code');
@@ -80,15 +86,56 @@ const AdAccounts: React.FC = () => {
     const exchange = async () => {
       setLoading(true);
       try {
-        const res = await api.post('/tiktok-ads/exchange-code', { auth_code: authCode });
-        if (res.data?.success) {
+        // 优先尝试用浏览器本地代理直接换 token
+        let tokenData: any = null;
+        let directError = '';
+        try {
+          const config = await getTikTokAdsConfig();
+          const res = await fetch('https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              app_id: config.appId,
+              secret: config.appSecret,
+              auth_code: authCode,
+              grant_type: 'authorization_code',
+            }),
+          });
+          const json = await res.json();
+          console.log('[TikTok Ads] 前端换 token 响应:', json);
+          if (json.code === 0 && json.data?.access_token) {
+            tokenData = json.data;
+          } else {
+            directError = json.message || '前端换 token 失败';
+          }
+        } catch (e: any) {
+          directError = e.message || '前端换 token 网络错误（可能是 CORS）';
+        }
+
+        // 浏览器直接失败，回退到后端换 token
+        if (!tokenData) {
+          console.log('[TikTok Ads] 前端换 token 失败，回退后端:', directError);
+          const res = await api.post('/tiktok-ads/exchange-code', { auth_code: authCode });
+          if (res.data?.success) {
+            tokenData = res.data.data;
+          } else {
+            throw new Error(res.data?.error || '后端换 token 失败');
+          }
+        }
+
+        // 保存 token 到后端
+        const saveRes = await api.post('/tiktok-ads/save-token', {
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          advertiser_ids: tokenData.advertiser_ids || tokenData.advertiser_id || [],
+        });
+        if (saveRes.data?.success) {
           message.success('TikTok Ads 授权成功');
-          // 清除 URL 参数，避免刷新时重复执行
           window.history.replaceState({}, '', '/ad-accounts');
           loadAuthStatus();
           loadAccounts();
         } else {
-          message.error('授权失败: ' + res.data?.error);
+          throw new Error(saveRes.data?.error || '保存 token 失败');
         }
       } catch (e: any) {
         message.error('授权失败: ' + (e.response?.data?.error || e.message));
@@ -102,14 +149,12 @@ const AdAccounts: React.FC = () => {
   const handleAuthorize = async () => {
     setAuthLoading(true);
     try {
-      const res = await api.get('/tiktok-ads/auth-url');
-      if (res.data?.success && res.data.authUrl) {
-        window.location.href = res.data.authUrl;
-      } else {
-        message.error('获取授权链接失败');
-      }
+      const config = await getTikTokAdsConfig();
+      const state = 'bozone-' + Date.now();
+      const authUrl = `https://business-api.tiktok.com/portal/auth?app_id=${config.appId}&state=${state}&redirect_uri=${encodeURIComponent(config.redirectUri)}`;
+      window.location.href = authUrl;
     } catch (e: any) {
-      message.error('获取授权链接失败: ' + (e.response?.data?.error || e.message));
+      message.error('获取授权配置失败: ' + (e.response?.data?.error || e.message));
     } finally {
       setAuthLoading(false);
     }

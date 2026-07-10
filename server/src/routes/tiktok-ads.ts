@@ -74,16 +74,7 @@ async function saveAccountsCache(idsArray: string[]) {
   }
 }
 
-async function handleAuthCodeAndSave(authCode: string) {
-  const result = await exchangeAuthCode(authCode);
-  if (result.code !== 0) throw new Error(result.message || '换取 token 失败');
-
-  const data = result.data || {};
-  const accessToken = data.access_token;
-  const refreshToken = data.refresh_token;
-  const advertiserIds = data.advertiser_ids || data.advertiser_id || [];
-  if (!accessToken) throw new Error('响应中缺少 access_token');
-
+async function saveTokenData(accessToken: string, refreshToken: string | undefined, advertiserIds: any) {
   const db = getDb();
   db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_access_token', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(accessToken);
@@ -94,10 +85,21 @@ async function handleAuthCodeAndSave(authCode: string) {
   const idsArray = Array.isArray(advertiserIds) ? advertiserIds : (advertiserIds ? [advertiserIds] : []);
   db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(idsArray));
-
   await saveAccountsCache(idsArray);
   return { accessToken, advertiserIds: idsArray };
 }
+
+async function handleAuthCodeAndSave(authCode: string) {
+  const result = await exchangeAuthCode(authCode);
+  if (result.code !== 0) throw new Error(result.message || '换取 token 失败');
+
+  const data = result.data || {};
+  const accessToken = data.access_token;
+  const refreshToken = data.refresh_token;
+  if (!accessToken) throw new Error('响应中缺少 access_token');
+  return saveTokenData(accessToken, refreshToken, data.advertiser_ids || data.advertiser_id || []);
+}
+
 
 // ── 路由 ──
 
@@ -139,6 +141,29 @@ router.get('/callback', async (req: Request, res: Response) => {
     console.error('[TikTok Ads] 回调处理失败:', e.message);
     console.error('[TikTok Ads] 错误堆栈:', e.stack);
     res.status(500).json({ success: false, error: e.message, stack: e.stack });
+  }
+});
+
+// GET /api/tiktok-ads/token-status — 查看当前是否已保存 token
+router.get('/config', authMiddleware, (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    appId: APP_ID,
+    appSecret: APP_SECRET,
+    redirectUri: REDIRECT_URI,
+  });
+});
+
+// POST /api/tiktok-ads/save-token — 前端直接换到 token 后保存
+router.post('/save-token', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { access_token, refresh_token, advertiser_ids } = req.body;
+    if (!access_token) return res.status(400).json({ success: false, error: '缺少 access_token' });
+    const result = await saveTokenData(access_token, refresh_token, advertiser_ids);
+    res.json({ success: true, data: result });
+  } catch (e: any) {
+    console.error('[TikTok Ads] 保存 token 失败:', e.message);
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
