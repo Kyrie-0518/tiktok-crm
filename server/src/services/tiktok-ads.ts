@@ -310,7 +310,7 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
     try {
       const url = new URL(TIKTOK_ADS_API_BASE + '/open_api/v1.3/advertiser/balance/get/');
       url.searchParams.set('bc_id', bcId);
-      url.searchParams.set('filtering', JSON.stringify({ advertiser_status: ['SHOW_ACCOUNT_STATUS_APPROVED', 'SHOW_ACCOUNT_STATUS_IN_REVIEW', 'SHOW_ACCOUNT_STATUS_NOT_APPROVED', 'SHOW_ACCOUNT_STATUS_PUNISHED'] }));
+
       const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
       const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
       console.log('[TikTok Ads] /advertiser/balance/get/ BC:', bcId);
