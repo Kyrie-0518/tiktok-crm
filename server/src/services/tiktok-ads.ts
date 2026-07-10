@@ -97,7 +97,7 @@ async function tiktokAdsGet(path: string, token: string, query: Record<string, a
     dispatcher,
   } as any);
   const text = await res.text();
-  console.log('[TikTok Ads] undici response', text.slice(0, 500));
+  console.log('[TikTok Ads] undici response', text.slice(0, 2000));
   let json: any = {};
   try { json = JSON.parse(text); } catch { /* ignore */ }
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
