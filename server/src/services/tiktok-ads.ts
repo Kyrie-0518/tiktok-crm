@@ -67,15 +67,6 @@ export function getTokenStatus(): { hasToken: boolean; advertiserIds: string[] }
 
 // ── 广告主 / 账户 ──
 
-const ADVERTISER_INFO_FIELDS = [
-  'advertiser_id', 'advertiser_name', 'status', 'currency', 'timezone',
-  'company', 'industry', 'phone_number', 'email', 'address', 'country',
-  'promotion_area', 'promotion_center', 'advertiser_account_type', 'description',
-  'reason', 'rejection_reason', 'create_time', 'language', 'license_no',
-  'license_url', 'taxpayer_id', 'official_website_url', 'business_center_id',
-  'owner_bcm_user_id', 'owner_bcm_user_name', 'balance', 'spend_cap',
-];
-
 const TIKTOK_ADS_API_BASE = 'https://business-api.tiktok.com';
 
 async function tiktokAdsGet(path: string, token: string, query: Record<string, any> = {}) {
@@ -111,7 +102,6 @@ export async function getAdvertiserInfo(advertiserId?: string) {
   if (!advertiserId) return { data: {} };
   const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
     advertiser_ids: [advertiserId],
-    fields: ADVERTISER_INFO_FIELDS,
   });
   const item = res?.data?.list?.[0] || res?.data?.advertiser_info_list?.[0] || {};
   return { data: item };
@@ -123,7 +113,6 @@ export async function getAdvertisersInfo(advertiserIds: string[]) {
   if (!advertiserIds.length) return { data: { list: [] } };
   const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
     advertiser_ids: advertiserIds,
-    fields: ADVERTISER_INFO_FIELDS,
   });
   if (res.data && !res.data.list && res.data.advertiser_info_list) {
     res.data.list = res.data.advertiser_info_list;
