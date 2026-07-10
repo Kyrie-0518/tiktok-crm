@@ -149,7 +149,6 @@ router.get('/config', authMiddleware, (_req: Request, res: Response) => {
   res.json({
     success: true,
     appId: APP_ID,
-    appSecret: APP_SECRET,
     redirectUri: REDIRECT_URI,
   });
 });
