@@ -62,7 +62,7 @@ async function saveAccountsCache(idsArray: string[]) {
       (infoRes?.data?.advertiser_info_list || []).forEach((item: any) => {
         const id = item.advertiser_id;
         if (item.advertiser_name) nameMap[id] = item.advertiser_name;
-        if (item.promotion_area) infoMap[id] = { promotion_area: item.promotion_area };
+        infoMap[id] = { promotion_area: item.promotion_area || '' };
       });
     } catch { /* ignore */ }
     try {

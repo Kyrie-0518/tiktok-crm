@@ -68,15 +68,17 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
     // 批量调 advertiserInfo 拉 promotion_area
     try {
       const infoRes = await Ads.getAdvertisersInfo(advertiserIds);
+      console.log('[ad-center] advertisersInfo raw:', JSON.stringify(infoRes?.data?.advertiser_info_list?.slice(0, 2)));
       (infoRes?.data?.advertiser_info_list || []).forEach((item: any) => {
         const id = item.advertiser_id;
         if (item.advertiser_name) baseNameMap[id] = item.advertiser_name;
-        if (item.promotion_area) infoMap[id] = { promotion_area: item.promotion_area };
+        infoMap[id] = { promotion_area: item.promotion_area || '' };
       });
     } catch (e: any) { console.error('[ad-center] getAdvertisersInfo failed:', e.message); }
     // 批量调 getAdvertiserBalance 拉余额
     try {
       const balance = await Ads.getAdvertiserBalance(advertiserIds);
+      console.log('[ad-center] advertiserBalance raw:', JSON.stringify(balance?.data?.list));
       (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
     } catch (e: any) { console.error('[ad-center] getAdvertiserBalance failed:', e.message); }
 
