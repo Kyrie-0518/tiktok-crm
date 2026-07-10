@@ -290,11 +290,14 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
 }
 
 // ── 通用：获取所有广告主 ──
-// oauth2AdvertiserGet(app_id, secret, Access_Token, callback) — 必须传 3 个参数
+// oauth2AdvertiserGet — 获取当前 token 下有效的广告主列表（用 undici 绕过 SDK superagent 代理限制）
 export async function getMyAdvertisers() {
-  const sdk = await getSDK();
-  const api = new sdk.AuthenticationApi();
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权，请先完成 OAuth 授权');
-  return promisify(cb => api.oauth2AdvertiserGet(APP_ID, APP_SECRET, token, cb));
+  const res = await tiktokAdsGet('/open_api/v1.3/oauth2/advertiser/get/', token, {
+    app_id: APP_ID,
+    secret: APP_SECRET,
+  });
+  console.log('[TikTok Ads] oauth2AdvertiserGet response:', JSON.stringify(res));
+  return res;
 }

@@ -52,22 +52,23 @@ async function exchangeAuthCode(authCode: string) {
 
 async function saveAccountsCache(idsArray: string[]) {
   try {
-    const { getAdvertiserInfo, getAdvertiserBalance } = await import('../services/tiktok-ads');
-    const timeout = <T>(p: Promise<T>, ms: number) =>
-      Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
+    const { getAdvertisersInfo, getAdvertiserBalance } = await import('../services/tiktok-ads');
     const nameMap: Record<string, string> = {};
     const infoMap: Record<string, { promotion_area?: string }> = {};
     const balanceMap: Record<string, any> = {};
 
-    await Promise.all(idsArray.map(async (id: string) => {
-      const info = await timeout(getAdvertiserInfo(id), 10000);
-      const d = info?.data;
-      const name = d?.advertiser_name || d?.name;
-      if (name) nameMap[id] = name;
-      if (d) infoMap[id] = { promotion_area: d.promotion_area || undefined };
-    }));
-    const balance = await timeout(getAdvertiserBalance(idsArray), 10000);
-    (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
+    try {
+      const infoRes = await getAdvertisersInfo(idsArray);
+      (infoRes?.data?.advertiser_info_list || []).forEach((item: any) => {
+        const id = item.advertiser_id;
+        if (item.advertiser_name) nameMap[id] = item.advertiser_name;
+        if (item.promotion_area) infoMap[id] = { promotion_area: item.promotion_area };
+      });
+    } catch { /* ignore */ }
+    try {
+      const balance = await getAdvertiserBalance(idsArray);
+      (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
+    } catch { /* ignore */ }
 
     const cache = idsArray.map((id: string) => ({
       advertiser_id: id,

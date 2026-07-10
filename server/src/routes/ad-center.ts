@@ -46,31 +46,43 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       })) });
     }
 
-    // 强制刷新：调 TikTok API 并更新缓存
-    const advertiserIds = status.advertiserIds || [];
+    // 强制刷新：先获取最新广告主列表，再拉详情和余额
+    let advertiserIds: string[] = [];
+    let baseNameMap: Record<string, string> = {};
+
+    try {
+      const authResult = await Ads.getMyAdvertisers();
+      const authList = authResult?.data?.list || [];
+      advertiserIds = authList.map((a: any) => a.advertiser_id).filter(Boolean);
+      authList.forEach((a: any) => { if (a.advertiser_name) baseNameMap[a.advertiser_id] = a.advertiser_name; });
+      // 更新数据库中的 advertiser_ids
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(advertiserIds));
+    } catch { /* ignore */ }
+
     if (advertiserIds.length === 0) return res.json({ success: true, data: [] });
 
-    const timeout = <T>(p: Promise<T>, ms: number) =>
-      Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
-    const nameMap: Record<string, string> = {};
     const infoMap: Record<string, { promotion_area?: string }> = {};
     const balanceMap: Record<string, any> = {};
 
-    try { await Promise.all(advertiserIds.map(async (id: string) => {
-      const info = await timeout(Ads.getAdvertiserInfo(id), 10000);
-      const d = info?.data;
-      const name = d?.advertiser_name || d?.name;
-      if (name) nameMap[id] = name;
-      if (d) infoMap[id] = { promotion_area: d.promotion_area || undefined };
-    })); } catch { /* ignore */ }
+    // 批量调 advertiserInfo 拉 promotion_area
     try {
-      const balance = await timeout(Ads.getAdvertiserBalance(advertiserIds), 10000);
+      const infoRes = await Ads.getAdvertisersInfo(advertiserIds);
+      (infoRes?.data?.advertiser_info_list || []).forEach((item: any) => {
+        const id = item.advertiser_id;
+        if (item.advertiser_name) baseNameMap[id] = item.advertiser_name;
+        if (item.promotion_area) infoMap[id] = { promotion_area: item.promotion_area };
+      });
+    } catch { /* ignore */ }
+    // 批量调 getAdvertiserBalance 拉余额
+    try {
+      const balance = await Ads.getAdvertiserBalance(advertiserIds);
       (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
     } catch { /* ignore */ }
 
     const list = advertiserIds.map((id: string) => ({
       advertiser_id: id,
-      advertiser_name: nameMap[id] || id,
+      advertiser_name: baseNameMap[id] || id,
       status: 'ACTIVE',
       promotion_area: infoMap[id]?.promotion_area || undefined,
       balance_info: balanceMap[id] || null,
