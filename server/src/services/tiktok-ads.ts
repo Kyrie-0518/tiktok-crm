@@ -72,7 +72,19 @@ export async function getAdvertiserInfo(advertiserId?: string) {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
   const id = advertiserId || '';
-  return promisify(cb => api.advertiserInfo(token, { advertiser_id: id }, cb));
+  const res: any = await promisify(cb => api.advertiserInfo([id], token, {}, cb));
+  const item = res?.data?.advertiser_info_list?.[0] || {};
+  return { data: item };
+}
+
+export async function getAdvertisersInfo(advertiserIds: string[]) {
+  const sdk = await getSDK();
+  const api = new sdk.AccountManagementApi();
+  const token = getAccessToken();
+  if (!token) throw new Error('TikTok Ads 未授权');
+  if (!advertiserIds.length) return { data: { advertiser_info_list: [] } };
+  const res: any = await promisify(cb => api.advertiserInfo(advertiserIds, token, {}, cb));
+  return res;
 }
 
 // ── Campaign 系列管理 ──
@@ -227,12 +239,14 @@ export async function getCreativePortfolio(params: { advertiser_id: string; page
 // ── 余额 / 财务 ──
 
 export async function getAdvertiserBalance(advertiserIds: string[]) {
-  const sdk = await getSDK();
-  const api = new sdk.BCApi();
-  const token = getAccessToken();
-  return promisify(cb => api.advertiserBalanceGet(token, {
-    advertiser_ids: advertiserIds,
-  }, cb));
+  // BCApi.advertiserBalanceGet 需要 bc_id，这里改用 advertiserInfo 批量接口取余额
+  const res = await getAdvertisersInfo(advertiserIds);
+  const list = (res?.data?.advertiser_info_list || []).map((item: any) => ({
+    advertiser_id: item.advertiser_id,
+    balance: item.balance || 0,
+    currency: item.currency || '',
+  }));
+  return { data: { list } };
 }
 
 // ── 通用：获取所有广告主 ──
