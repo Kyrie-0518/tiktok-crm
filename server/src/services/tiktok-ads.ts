@@ -83,7 +83,7 @@ async function tiktokAdsGet(path: string, token: string, query: Record<string, a
   Object.entries(query).forEach(([k, v]) => {
     if (v === undefined || v === null) return;
     if (Array.isArray(v)) {
-      v.forEach(item => url.searchParams.append(k, String(item)));
+      url.searchParams.set(k, v.join(','));
     } else {
       url.searchParams.set(k, String(v));
     }
@@ -108,9 +108,9 @@ async function tiktokAdsGet(path: string, token: string, query: Record<string, a
 export async function getAdvertiserInfo(advertiserId?: string) {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
-  const id = advertiserId || '';
+  if (!advertiserId) return { data: {} };
   const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
-    advertiser_ids: [id],
+    advertiser_ids: [advertiserId],
     fields: ADVERTISER_INFO_FIELDS,
   });
   const item = res?.data?.advertiser_info_list?.[0] || {};
