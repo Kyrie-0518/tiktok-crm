@@ -65,7 +65,7 @@ function makeWelcomeMsg(): ChatMessage {
   };
 }
 
-export default function SkiisWorkbody() {
+export default function Kyrie() {
   // ── 核心状态 ──
   const [messages, setMessages] = useState<ChatMessage[]>([makeWelcomeMsg()]);
   const [sessions, setSessions] = useState<Session[]>([]);

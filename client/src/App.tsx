@@ -29,7 +29,7 @@ import SystemSettings from './pages/SystemSettings';
 import AdminLayout from './pages/AdminLayout';
 import AIStudioLayout from './pages/AIStudioLayout';
 import InfluencerLayout from './pages/InfluencerLayout';
-import SkiisWorkbody from './pages/SkiisWorkbody';
+import Kyrie from './pages/Kyrie';
 import AdDashboard from './pages/AdDashboard';
 import AdAccounts from './pages/AdAccounts';
 import AdCampaigns from './pages/AdCampaigns';
@@ -64,7 +64,7 @@ const MENU_GROUPS = [
     label: '智汇中台',
     icon: <ThunderboltOutlined />,
     items: [
-      { key: '/skiis-workbody', icon: <ThunderboltOutlined />, label: '欧文' },
+      { key: '/kyrie', icon: <ThunderboltOutlined />, label: '欧文' },
       { key: '/ai-studio', icon: <RobotOutlined />, label: 'AI工作室' },
     ],
   },
@@ -809,7 +809,7 @@ function AppLayout() {
             <Route path="/ad-creatives" element={<AdCreatives />} />
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/admin/*" element={<AdminLayout />} />
-            <Route path="/skiis-workbody" element={<SkiisWorkbody />} />
+            <Route path="/kyrie" element={<Kyrie />} />
             <Route path="/ai-studio/*" element={<AIStudioLayout />} />
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
