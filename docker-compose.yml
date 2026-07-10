@@ -30,10 +30,11 @@ services:
       - TT_ADS_APP_ID=7641162218708434960
       - TT_ADS_APP_SECRET=9c1115593f6199a22eecb3777b7890cbdb8c5445
       - TT_ADS_REDIRECT_URI=https://bvefdvp.cn/api/tiktok-ads/callback
-      # 代理配置（大陆访问 TikTok API 需要，格式: http://代理IP:端口）
-      # 如果代理在本机运行，用 host.docker.internal 或宿主机 IP
-      - HTTPS_PROXY=http://host.docker.internal:7890
-      - HTTP_PROXY=http://host.docker.internal:7890
+      # 代理配置（大陆访问 TikTok API 需要）
+      # 172.17.0.1 = docker0 网桥网关（宿主机），Clash 监听在 7890
+      # 如果网络不通，改成宿主机实际 IP（用 ip addr show docker0 确认）
+      - HTTPS_PROXY=http://172.17.0.1:7890
+      - HTTP_PROXY=http://172.17.0.1:7890
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
