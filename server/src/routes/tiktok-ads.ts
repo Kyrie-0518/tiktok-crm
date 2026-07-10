@@ -4,10 +4,9 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { fetch, ProxyAgent } from 'undici';
 import { authMiddleware } from '../middleware/auth';
 import getDb from '../db';
-import { getTokenStatus } from '../services/tiktok-ads';
+import { getTokenStatus, tiktokAdsPost } from '../services/tiktok-ads';
 
 const router = Router();
 
@@ -25,7 +24,6 @@ function buildAuthUrl(state: string): string {
 }
 
 async function exchangeAuthCode(authCode: string) {
-  const url = 'https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/';
   const body = {
     app_id: APP_ID,
     secret: APP_SECRET,
@@ -33,21 +31,7 @@ async function exchangeAuthCode(authCode: string) {
     grant_type: 'authorization_code',
   };
 
-  const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
-  const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    dispatcher,
-  } as any);
-
-  const text = await res.text();
-  let json: any = {};
-  try { json = JSON.parse(text); } catch { /* ignore */ }
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
-  return json;
+  return tiktokAdsPost('/open_api/v1.3/oauth2/access_token/', body);
 }
 
 async function saveAccountsCache(idsArray: string[]) {
@@ -153,7 +137,8 @@ router.get('/callback', async (req: Request, res: Response) => {
     res.redirect('/ad-accounts');
   } catch (e: any) {
     console.error('[TikTok Ads] 回调处理失败:', e.message);
-    res.status(500).json({ success: false, error: e.message });
+    console.error('[TikTok Ads] 错误堆栈:', e.stack);
+    res.status(500).json({ success: false, error: e.message, stack: e.stack });
   }
 });
 

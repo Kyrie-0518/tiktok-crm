@@ -69,6 +69,31 @@ export function getTokenStatus(): { hasToken: boolean; advertiserIds: string[] }
 
 const TIKTOK_ADS_API_BASE = 'https://business-api.tiktok.com';
 
+function getProxyCandidates(): string[] {
+  return [
+    process.env.HTTPS_PROXY,
+    process.env.HTTP_PROXY,
+    'http://host.docker.internal:10909',
+    'http://172.17.0.1:10909',
+  ].filter((u): u is string => typeof u === 'string' && u.length > 0);
+}
+
+async function fetchWithProxy(url: string, options: any) {
+  const proxies = getProxyCandidates();
+  let lastError: any;
+  for (const proxyUrl of proxies) {
+    try {
+      const dispatcher = new ProxyAgent(proxyUrl);
+      console.log(`[TikTok Ads] fetch via proxy ${proxyUrl} -> ${url}`);
+      return await fetch(url, { ...options, dispatcher } as any);
+    } catch (e: any) {
+      console.error(`[TikTok Ads] proxy ${proxyUrl} failed:`, e.message || e);
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
+
 async function tiktokAdsGet(path: string, token: string, query: Record<string, any> = {}) {
   const url = new URL(TIKTOK_ADS_API_BASE + path);
   Object.entries(query).forEach(([k, v]) => {
@@ -79,16 +104,32 @@ async function tiktokAdsGet(path: string, token: string, query: Record<string, a
       url.searchParams.set(k, String(v));
     }
   });
-  const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
-  const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
   console.log('[TikTok Ads] undici GET', url.toString());
-  const res = await fetch(url.toString(), {
+  const res = await fetchWithProxy(url.toString(), {
     method: 'GET',
     headers: { 'Access-Token': token, 'Content-Type': 'application/json' },
-    dispatcher,
-  } as any);
+  });
   const text = await res.text();
   console.log('[TikTok Ads] undici response', text.slice(0, 2000));
+  let json: any = {};
+  try { json = JSON.parse(text); } catch { /* ignore */ }
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
+  if (json.code !== 0 && json.code !== undefined) throw new Error(`TikTok API code ${json.code}: ${json.message}`);
+  return json;
+}
+
+export async function tiktokAdsPost(path: string, body: Record<string, any>, token?: string) {
+  const url = new URL(TIKTOK_ADS_API_BASE + path);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Access-Token'] = token;
+  console.log('[TikTok Ads] undici POST', url.toString(), 'body:', JSON.stringify(body).slice(0, 500));
+  const res = await fetchWithProxy(url.toString(), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  console.log('[TikTok Ads] undici POST response', text.slice(0, 2000));
   let json: any = {};
   try { json = JSON.parse(text); } catch { /* ignore */ }
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
@@ -290,6 +331,7 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
     console.log('[TikTok Ads] bc_id from /bc/get/:', bcId);
   } catch { /* ignore */ }
 
+  // 1. 优先调 /advertiser/balance/get/ 拿账户级余额
   if (bcId) {
     try {
       const res = await tiktokAdsGet('/open_api/v1.3/advertiser/balance/get/', token, {
@@ -297,7 +339,7 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
         page_size: '50',
       });
       console.log('[TikTok Ads] /advertiser/balance/get/ response:', JSON.stringify(res));
-      if (res.code === 0) {
+      if (res.code === 0 || res.code === undefined) {
         const balanceList = res?.data?.list || res?.data?.advertiser_account_list || [];
         balanceList.forEach((b: any) => {
           list.push({ advertiser_id: b.advertiser_id, balance: b.balance || 0, currency: b.currency || '' });
@@ -306,6 +348,23 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
     } catch (e: any) { console.error('[TikTok Ads] /advertiser/balance/get/ failed:', e.message); }
   }
 
+  // 2. 账户级余额为空，尝试拿 BC 级共享余额
+  if (list.length === 0 && bcId) {
+    try {
+      const bcBalanceRes = await tiktokAdsGet('/open_api/v1.3/bc/balance/get/', token, { bc_id: bcId });
+      console.log('[TikTok Ads] /bc/balance/get/ response:', JSON.stringify(bcBalanceRes));
+      const bcBalance = bcBalanceRes?.data?.balance || bcBalanceRes?.data?.total_balance || bcBalanceRes?.data?.available_balance || 0;
+      const bcCurrency = bcBalanceRes?.data?.currency || 'MYR';
+      if (bcBalance > 0) {
+        // BC 余额是共享的，先给每个账户都打上相同余额（后续可在 UI 区分）
+        advertiserIds.forEach((id: string) => {
+          list.push({ advertiser_id: id, balance: bcBalance, currency: bcCurrency, source: 'bc' });
+        });
+      }
+    } catch (e: any) { console.error('[TikTok Ads] /bc/balance/get/ failed:', e.message); }
+  }
+
+  // 3. 兜底：用 advertiser/info 的 balance
   if (list.length === 0) {
     try {
       const infoRes = await getAdvertisersInfo(advertiserIds);
