@@ -83,7 +83,7 @@ async function tiktokAdsGet(path: string, token: string, query: Record<string, a
   Object.entries(query).forEach(([k, v]) => {
     if (v === undefined || v === null) return;
     if (Array.isArray(v)) {
-      url.searchParams.set(k, v.join(','));
+      url.searchParams.set(k, JSON.stringify(v));
     } else {
       url.searchParams.set(k, String(v));
     }
