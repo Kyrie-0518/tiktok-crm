@@ -284,8 +284,12 @@ export async function getBusinessCenters() {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
   const res = await tiktokAdsGet('/open_api/v1.3/bc/get/', token);
+  console.log('[TikTok Ads] /bc/get/ full response:', JSON.stringify(res));
   return res;
 }
+
+
+
 
 export async function getAdvertiserBalance(advertiserIds: string[]) {
   const token = getAccessToken();
