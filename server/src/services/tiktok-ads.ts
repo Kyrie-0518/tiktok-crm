@@ -299,6 +299,8 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
     try {
       const url = new URL(TIKTOK_ADS_API_BASE + '/open_api/v1.3/advertiser/balance/get/');
       url.searchParams.set('bc_id', bcId);
+      url.searchParams.set('advertiser_ids', JSON.stringify(advertiserIds));
+      url.searchParams.set('page_size', '100');
 
       const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
       const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
@@ -309,7 +311,7 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
         dispatcher,
       } as any);
       const text = await res.text();
-      console.log('[TikTok Ads] /advertiser/balance/get/ response:', text.slice(0, 500));
+      console.log('[TikTok Ads] /advertiser/balance/get/ full response:', text);
       const json: any = JSON.parse(text);
       if (json.code === 0) {
         const balanceList = json?.data?.advertiser_account_list || json?.data?.list || [];
