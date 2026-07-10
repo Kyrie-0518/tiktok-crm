@@ -8,13 +8,11 @@ services:
       dockerfile: Dockerfile
     container_name: bozone-server
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3000:3000"
+    # 网络模式：与宿主机共享网络栈，可直接访问宿主机 127.0.0.1:7890 代理
+    network_mode: host
     volumes:
       # 持久化数据库和上传文件
       - ./server/data:/app/data
-    # 网络模式：与宿主机共享网络栈，可直接访问宿主机 127.0.0.1:7890 代理
-    network_mode: host
     environment:
       - PORT=3000
       - DB_PATH=data/erp.db
@@ -35,8 +33,6 @@ services:
       # 代理配置：host 网络模式下直接用 127.0.0.1
       - HTTPS_PROXY=http://127.0.0.1:7890
       - HTTP_PROXY=http://127.0.0.1:7890
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -47,8 +43,6 @@ services:
     dns:
       - 8.8.8.8
       - 114.114.114.114
-    networks:
-      - bozone-net
 
   # ── 前端 Nginx 服务 ──
   client:
