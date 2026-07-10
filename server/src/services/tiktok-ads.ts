@@ -4,6 +4,9 @@
  * 提供 22 个 API 类的方法封装，统一 callback → Promise 转换
  */
 
+import { fetch, ProxyAgent } from 'undici';
+import getDb from '../db';
+
 // SDK 使用 ES Module，我们用动态 import
 let AdsSDK: any = null;
 async function getSDK() {
@@ -31,9 +34,7 @@ function promisify<T>(apiCall: (callback: (err: any, data: any, response: any) =
   });
 }
 
-import getDb from '../db';
 
-// ── 通用配置 ──
 const APP_ID = process.env.TT_ADS_APP_ID || '7641162218708434960';
 const APP_SECRET = process.env.TT_ADS_APP_SECRET || '9c1115593f6199a22eecb3777b7890cbdb8c5445';
 
@@ -75,30 +76,57 @@ const ADVERTISER_INFO_FIELDS = [
   'owner_bcm_user_id', 'owner_bcm_user_name', 'balance', 'spend_cap',
 ];
 
+const TIKTOK_ADS_API_BASE = 'https://business-api.tiktok.com';
+
+async function tiktokAdsGet(path: string, token: string, query: Record<string, any> = {}) {
+  const url = new URL(TIKTOK_ADS_API_BASE + path);
+  Object.entries(query).forEach(([k, v]) => {
+    if (v === undefined || v === null) return;
+    if (Array.isArray(v)) {
+      v.forEach(item => url.searchParams.append(k, String(item)));
+    } else {
+      url.searchParams.set(k, String(v));
+    }
+  });
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+  const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
+  console.log('[TikTok Ads] undici GET', url.toString());
+  const res = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { 'Access-Token': token, 'Content-Type': 'application/json' },
+    dispatcher,
+  } as any);
+  const text = await res.text();
+  console.log('[TikTok Ads] undici response', text.slice(0, 500));
+  let json: any = {};
+  try { json = JSON.parse(text); } catch { /* ignore */ }
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
+  if (json.code !== 0 && json.code !== undefined) throw new Error(`TikTok API code ${json.code}: ${json.message}`);
+  return json;
+}
+
 export async function getAdvertiserInfo(advertiserId?: string) {
-  const sdk = await getSDK();
-  const api = new sdk.AccountManagementApi();
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
   const id = advertiserId || '';
-  const res: any = await promisify(cb => api.advertiserInfo([id], token, { fields: ADVERTISER_INFO_FIELDS }, cb));
-  console.log('[TikTok Ads] advertiserInfo raw res:', JSON.stringify(res));
+  const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
+    advertiser_ids: [id],
+    fields: ADVERTISER_INFO_FIELDS,
+  });
   const item = res?.data?.advertiser_info_list?.[0] || {};
   return { data: item };
 }
 
 export async function getAdvertisersInfo(advertiserIds: string[]) {
-  const sdk = await getSDK();
-  const api = new sdk.AccountManagementApi();
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
   if (!advertiserIds.length) return { data: { advertiser_info_list: [] } };
-  const res: any = await promisify(cb => api.advertiserInfo(advertiserIds, token, { fields: ADVERTISER_INFO_FIELDS }, cb));
-  console.log('[TikTok Ads] advertisersInfo raw res:', JSON.stringify(res));
+  const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
+    advertiser_ids: advertiserIds,
+    fields: ADVERTISER_INFO_FIELDS,
+  });
   return res;
 }
-
-// ── Campaign 系列管理 ──
 
 export async function getCampaigns(params: { advertiser_id: string; page?: number; page_size?: number; campaign_ids?: string[]; status?: string; objective_type?: string }) {
   const sdk = await getSDK();
