@@ -224,8 +224,30 @@ router.post('/:type/test', authMiddleware, async (req: Request, res: Response) =
   const type = req.params.type;
   const { api_url, api_key, model_name } = req.body as any;
 
-  if (!api_url || !api_key || !model_name) {
-    return res.status(400).json({ error: '请填写完整的 API 地址、密钥和模型名称' });
+  if (!api_url || !model_name) {
+    return res.status(400).json({ error: '请填写完整的 API 地址和模型名称' });
+  }
+
+  // 密钥优先用前端传入的，否则从数据库读取（避免前端暴露密钥）
+  let key = api_key || '';
+  if (!key) {
+    if (type === 'llm') {
+      const row = db.prepare("SELECT value FROM settings WHERE key = ?").get('ai_config') as any;
+      if (row) {
+        try { key = JSON.parse(row.value).api_key || ''; } catch { /* ignore */ }
+      }
+      if (!key) {
+        const ch = db.prepare("SELECT api_key FROM ai_channels WHERE status = 'enabled' AND api_key != '' ORDER BY id ASC LIMIT 1").get() as any;
+        if (ch) key = ch.api_key;
+      }
+    } else if (type === 'video') {
+      const cfg = db.prepare("SELECT api_key FROM video_model_configs WHERE api_key != '' ORDER BY id ASC LIMIT 1").get() as any;
+      if (cfg) key = cfg.api_key;
+    }
+  }
+
+  if (!key) {
+    return res.status(400).json({ error: '未找到已保存的 API 密钥，请先编辑并保存完整配置' });
   }
 
   const baseUrl = api_url.replace(/\/+$/, '');
@@ -236,7 +258,7 @@ router.post('/:type/test', authMiddleware, async (req: Request, res: Response) =
     if (type === 'llm') {
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${api_key}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
         body: JSON.stringify({ model: model_name, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
         signal: controller.signal,
       });
@@ -252,7 +274,7 @@ router.post('/:type/test', authMiddleware, async (req: Request, res: Response) =
       const endpoint = `${baseUrl}/contents/generations/tasks`;
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${api_key}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
         body: JSON.stringify({ model: model_name.toLowerCase(), duration: 5, ratio: '16:9', content: [{ type: 'text', text: 'test' }] }),
         signal: controller.signal,
       });
