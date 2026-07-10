@@ -20,12 +20,6 @@ interface AuthStatus {
   advertiserIds: string[];
 }
 
-// 从后端获取 TikTok Ads OAuth 配置（包含 secret，内部 ERP 使用）
-async function getTikTokAdsConfig() {
-  const res = await api.get('/tiktok-ads/config');
-  return res.data;
-}
-
 const AdAccounts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
@@ -77,7 +71,7 @@ const AdAccounts: React.FC = () => {
 
   useEffect(() => { loadAuthStatus(); loadAccounts(); }, [loadAuthStatus, loadAccounts]);
 
-  // OAuth 回调：从 URL 中读取 auth_code，交由后端服务器用代理换 token
+  // OAuth 回调：从 URL 中读取 auth_code 并自动换 token
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authCode = params.get('auth_code') || params.get('code');
@@ -86,23 +80,18 @@ const AdAccounts: React.FC = () => {
     const exchange = async () => {
       setLoading(true);
       try {
-        // 后端用服务器代理换 token（不暴露 appSecret）
         const res = await api.post('/tiktok-ads/exchange-code', { auth_code: authCode });
         if (res.data?.success) {
           message.success('TikTok Ads 授权成功');
+          // 清除 URL 参数，避免刷新时重复执行
           window.history.replaceState({}, '', '/ad-accounts');
           loadAuthStatus();
           loadAccounts();
         } else {
-          message.error('授权失败: ' + (res.data?.error || '未知错误'));
+          message.error('授权失败: ' + res.data?.error);
         }
       } catch (e: any) {
-        const errMsg = e.response?.data?.error || e.message;
-        if (errMsg.includes('fetch failed')) {
-          message.warning('服务器代理可能不稳定，请稍后重试或联系管理员检查 Clash 代理', 8);
-        } else {
-          message.error('授权失败: ' + errMsg);
-        }
+        message.error('授权失败: ' + (e.response?.data?.error || e.message));
       } finally {
         setLoading(false);
       }
@@ -113,12 +102,14 @@ const AdAccounts: React.FC = () => {
   const handleAuthorize = async () => {
     setAuthLoading(true);
     try {
-      const config = await getTikTokAdsConfig();
-      const state = 'bozone-' + Date.now();
-      const authUrl = `https://business-api.tiktok.com/portal/auth?app_id=${config.appId}&state=${state}&redirect_uri=${encodeURIComponent(config.redirectUri)}`;
-      window.location.href = authUrl;
+      const res = await api.get('/tiktok-ads/auth-url');
+      if (res.data?.success && res.data.authUrl) {
+        window.location.href = res.data.authUrl;
+      } else {
+        message.error('获取授权链接失败');
+      }
     } catch (e: any) {
-      message.error('获取授权配置失败: ' + (e.response?.data?.error || e.message));
+      message.error('获取授权链接失败: ' + (e.response?.data?.error || e.message));
     } finally {
       setAuthLoading(false);
     }
