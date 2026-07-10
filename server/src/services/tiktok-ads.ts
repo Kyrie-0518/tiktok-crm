@@ -292,23 +292,13 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
 
   if (bcId) {
     try {
-      const url = new URL(TIKTOK_ADS_API_BASE + '/open_api/v1.3/advertiser/balance/get/');
-      url.searchParams.set('bc_id', bcId);
-      url.searchParams.set('page_size', '50');
-      const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
-      const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
-      console.log('[TikTok Ads] /advertiser/balance/get/ with bc_id:', bcId);
-      const res = await fetch(url.toString(), {
-        method: 'GET',
-        headers: { 'Access-Token': token, 'Content-Type': 'application/json' },
-        dispatcher,
-      } as any);
-      const text = await res.text();
-      console.log('[TikTok Ads] /advertiser/balance/get/ response:', text.slice(0, 2000));
-      let json: any = {};
-      try { json = JSON.parse(text); } catch { /* ignore */ }
-      if (json.code === 0) {
-        const balanceList = json?.data?.list || json?.data?.advertiser_account_list || [];
+      const res = await tiktokAdsGet('/open_api/v1.3/advertiser/balance/get/', token, {
+        bc_id: bcId,
+        page_size: '50',
+      });
+      console.log('[TikTok Ads] /advertiser/balance/get/ response:', JSON.stringify(res));
+      if (res.code === 0) {
+        const balanceList = res?.data?.list || res?.data?.advertiser_account_list || [];
         balanceList.forEach((b: any) => {
           list.push({ advertiser_id: b.advertiser_id, balance: b.balance || 0, currency: b.currency || '' });
         });

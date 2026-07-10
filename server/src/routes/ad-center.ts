@@ -73,7 +73,7 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       });
       (infoRes?.data?.list || []).forEach((item: any) => {
         const id = item.advertiser_id;
-        if (item.advertiser_name) baseNameMap[id] = item.advertiser_name;
+        if (item.advertiser_name || item.name) baseNameMap[id] = item.advertiser_name || item.name;
         infoMap[id] = { country: item.country || '' };
       });
     } catch (e: any) { console.error('[ad-center] getAdvertisersInfo failed:', e.message); }
