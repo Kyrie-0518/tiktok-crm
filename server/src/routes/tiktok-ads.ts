@@ -59,7 +59,7 @@ async function saveAccountsCache(idsArray: string[]) {
 
     try {
       const infoRes = await getAdvertisersInfo(idsArray);
-      (infoRes?.data?.advertiser_info_list || []).forEach((item: any) => {
+      (infoRes?.data?.list || []).forEach((item: any) => {
         const id = item.advertiser_id;
         if (item.advertiser_name) nameMap[id] = item.advertiser_name;
         infoMap[id] = { promotion_area: item.promotion_area || '' };

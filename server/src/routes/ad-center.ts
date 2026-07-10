@@ -68,8 +68,8 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
     // 批量调 advertiserInfo 拉 promotion_area
     try {
       const infoRes = await Ads.getAdvertisersInfo(advertiserIds);
-      console.log('[ad-center] advertisersInfo raw:', JSON.stringify(infoRes?.data?.advertiser_info_list?.slice(0, 2)));
-      (infoRes?.data?.advertiser_info_list || []).forEach((item: any) => {
+      console.log('[ad-center] advertisersInfo raw:', JSON.stringify(infoRes?.data?.list?.slice(0, 2)));
+      (infoRes?.data?.list || []).forEach((item: any) => {
         const id = item.advertiser_id;
         if (item.advertiser_name) baseNameMap[id] = item.advertiser_name;
         infoMap[id] = { promotion_area: item.promotion_area || '' };
