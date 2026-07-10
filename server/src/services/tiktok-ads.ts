@@ -312,9 +312,9 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
       console.log('[TikTok Ads] /advertiser/balance/get/ response:', text.slice(0, 500));
       const json: any = JSON.parse(text);
       if (json.code === 0) {
-        const balanceList = json?.data?.list || [];
+        const balanceList = json?.data?.advertiser_account_list || json?.data?.list || [];
         balanceList.forEach((b: any) => {
-          list.push({ advertiser_id: b.advertiser_id, balance: b.balance || 0, currency: b.currency || '' });
+          list.push({ advertiser_id: b.advertiser_id, balance: b.available_balance || b.balance || 0, currency: b.currency || '' });
         });
       }
     } catch (e: any) { console.error('[TikTok Ads] /advertiser/balance/get/ failed:', e.message); }
