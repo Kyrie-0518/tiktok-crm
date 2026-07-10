@@ -280,15 +280,64 @@ export async function getCreativePortfolio(params: { advertiser_id: string; page
 
 // ── 余额 / 财务 ──
 
+export async function getBusinessCenters() {
+  const token = getAccessToken();
+  if (!token) throw new Error('TikTok Ads 未授权');
+  const res = await tiktokAdsGet('/open_api/v1.3/bc/get/', token);
+  return res;
+}
+
 export async function getAdvertiserBalance(advertiserIds: string[]) {
-  // BCApi.advertiserBalanceGet 需要 bc_id，这里改用 advertiserInfo 批量接口取余额
-  const res = await getAdvertisersInfo(advertiserIds);
-  const list = (res?.data?.list || []).map((item: any) => ({
-    advertiser_id: item.advertiser_id,
-    balance: item.balance || 0,
-    currency: item.currency || '',
-  }));
-  console.log('[TikTok Ads] advertiserBalance derived list:', JSON.stringify(list));
+  const token = getAccessToken();
+  if (!token) throw new Error('TikTok Ads 未授权');
+  const list: any[] = [];
+
+  // 1. 获取 bc_id
+  let bcId = '';
+  try {
+    const bcRes = await getBusinessCenters();
+    const bcList = bcRes?.data?.list || [];
+    if (bcList.length > 0) bcId = bcList[0].bc_id || '';
+    console.log('[TikTok Ads] bc_id from /bc/get/:', bcId);
+  } catch (e: any) { console.error('[TikTok Ads] /bc/get/ failed:', e.message); }
+
+  if (bcId) {
+    // 2. 用 bc_id 调专门余额接口
+    try {
+      const url = new URL(TIKTOK_ADS_API_BASE + '/open_api/v1.3/advertiser/balance/get/');
+      url.searchParams.set('bc_id', bcId);
+      url.searchParams.set('filtering', JSON.stringify({ advertiser_status: ['STATUS_ENABLE', 'STATUS_DISABLE', 'STATUS_CONTRACT_PENDING'] }));
+      const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+      const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
+      console.log('[TikTok Ads] /advertiser/balance/get/ BC:', bcId);
+      const res = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { 'Access-Token': token, 'Content-Type': 'application/json' },
+        dispatcher,
+      } as any);
+      const text = await res.text();
+      console.log('[TikTok Ads] /advertiser/balance/get/ response:', text.slice(0, 500));
+      const json: any = JSON.parse(text);
+      if (json.code === 0) {
+        const balanceList = json?.data?.list || [];
+        balanceList.forEach((b: any) => {
+          list.push({ advertiser_id: b.advertiser_id, balance: b.balance || 0, currency: b.currency || '' });
+        });
+      }
+    } catch (e: any) { console.error('[TikTok Ads] /advertiser/balance/get/ failed:', e.message); }
+  }
+
+  // 3. 兜底：用 advertiserInfo 的 balance 补全
+  try {
+    const infoRes = await getAdvertisersInfo(advertiserIds);
+    (infoRes?.data?.list || []).forEach((item: any) => {
+      if (!list.find((b: any) => b.advertiser_id === item.advertiser_id)) {
+        list.push({ advertiser_id: item.advertiser_id, balance: item.balance || 0, currency: item.currency || '' });
+      }
+    });
+  } catch { /* ignore */ }
+
+  console.log('[TikTok Ads] advertiserBalance final list:', JSON.stringify(list));
   return { data: { list } };
 }
 
