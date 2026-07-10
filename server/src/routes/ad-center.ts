@@ -58,7 +58,7 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       // 更新数据库中的 advertiser_ids
       db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(advertiserIds));
-    } catch { /* ignore */ }
+    } catch (e: any) { console.error('[ad-center] getMyAdvertisers failed:', e.message); }
 
     if (advertiserIds.length === 0) return res.json({ success: true, data: [] });
 
@@ -73,12 +73,12 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
         if (item.advertiser_name) baseNameMap[id] = item.advertiser_name;
         if (item.promotion_area) infoMap[id] = { promotion_area: item.promotion_area };
       });
-    } catch { /* ignore */ }
+    } catch (e: any) { console.error('[ad-center] getAdvertisersInfo failed:', e.message); }
     // 批量调 getAdvertiserBalance 拉余额
     try {
       const balance = await Ads.getAdvertiserBalance(advertiserIds);
       (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
-    } catch { /* ignore */ }
+    } catch (e: any) { console.error('[ad-center] getAdvertiserBalance failed:', e.message); }
 
     const list = advertiserIds.map((id: string) => ({
       advertiser_id: id,
