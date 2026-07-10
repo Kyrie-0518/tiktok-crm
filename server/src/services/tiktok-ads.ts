@@ -323,16 +323,21 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
   if (!token) throw new Error('TikTok Ads 未授权');
   const list: any[] = [];
 
-  let bcId = '';
+  // 收集要查询的 BC ID（自己的 BC + 代理商 BC）
+  const bcIds: string[] = [];
   try {
     const bcRes = await getBusinessCenters();
     const bcList = bcRes?.data?.list || [];
-    if (bcList.length > 0) bcId = bcList[0]?.bc_info?.bc_id || '';
-    console.log('[TikTok Ads] bc_id from /bc/get/:', bcId);
+    const ownBcId = bcList[0]?.bc_info?.bc_id;
+    if (ownBcId) bcIds.push(ownBcId);
+    console.log('[TikTok Ads] own bc_id from /bc/get/:', ownBcId);
   } catch { /* ignore */ }
+  // 代理商 BC ID（资金由代理商管理，环境变量可配）
+  const agentBcId = process.env.TT_ADS_AGENT_BC_ID;
+  if (agentBcId && !bcIds.includes(agentBcId)) bcIds.push(agentBcId);
 
-  // 1. 优先调 /advertiser/balance/get/ 拿账户级余额（必须传 fields + page_size=1 才返回 budget_remaining）
-  if (bcId) {
+  // 1. 遍历所有 BC 查询余额
+  for (const bcId of bcIds) {
     try {
       const balanceFields = [
         'budget_remaining', 'budget_frequency_restriction', 'budget_amount_restriction',
@@ -347,38 +352,43 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
           page: String(page),
           fields: balanceFields,
         });
-        console.log(`[TikTok Ads] /advertiser/balance/get/ page ${page} response:`, JSON.stringify(res));
+        console.log(`[TikTok Ads] /advertiser/balance/get/ bc=${bcId} page ${page} response:`, JSON.stringify(res));
         if (res.code === 0 || res.code === undefined) {
           const balanceList = res?.data?.advertiser_account_list || res?.data?.list || [];
           balanceList.forEach((b: any) => {
-            list.push({
-              advertiser_id: b.advertiser_id,
-              // budget_remaining 是剩余预算，balance_info 是余额详情
-              balance: b.budget_remaining || b.valid_account_balance || b.account_balance || 0,
-              currency: b.currency || '',
-            });
+            const existing = list.find((x: any) => x.advertiser_id === b.advertiser_id);
+            if (!existing) {
+              list.push({
+                advertiser_id: b.advertiser_id,
+                balance: b.budget_remaining || b.valid_account_balance || b.account_balance || 0,
+                currency: b.currency || '',
+              });
+            }
           });
           totalPage = res?.data?.page_info?.total_page || 1;
         }
         page++;
       } while (page <= totalPage && page <= 50);
-    } catch (e: any) { console.error('[TikTok Ads] /advertiser/balance/get/ failed:', e.message); }
+    } catch (e: any) { console.error(`[TikTok Ads] /advertiser/balance/get/ bc=${bcId} failed:`, e.message); }
   }
 
   // 2. 账户级余额为空，尝试拿 BC 级共享余额
-  if (list.length === 0 && bcId) {
-    try {
-      const bcBalanceRes = await tiktokAdsGet('/open_api/v1.3/bc/balance/get/', token, { bc_id: bcId });
-      console.log('[TikTok Ads] /bc/balance/get/ response:', JSON.stringify(bcBalanceRes));
-      const bcBalance = bcBalanceRes?.data?.balance || bcBalanceRes?.data?.total_balance || bcBalanceRes?.data?.available_balance || 0;
-      const bcCurrency = bcBalanceRes?.data?.currency || 'MYR';
-      if (bcBalance > 0) {
-        // BC 余额是共享的，先给每个账户都打上相同余额（后续可在 UI 区分）
-        advertiserIds.forEach((id: string) => {
-          list.push({ advertiser_id: id, balance: bcBalance, currency: bcCurrency, source: 'bc' });
-        });
-      }
-    } catch (e: any) { console.error('[TikTok Ads] /bc/balance/get/ failed:', e.message); }
+  if (list.length === 0) {
+    for (const bcId of bcIds) {
+      try {
+        const bcBalanceRes = await tiktokAdsGet('/open_api/v1.3/bc/balance/get/', token, { bc_id: bcId });
+        console.log(`[TikTok Ads] /bc/balance/get/ bc=${bcId} response:`, JSON.stringify(bcBalanceRes));
+        const bcBalance = bcBalanceRes?.data?.balance || bcBalanceRes?.data?.total_balance || bcBalanceRes?.data?.available_balance || 0;
+        const bcCurrency = bcBalanceRes?.data?.currency || 'MYR';
+        if (bcBalance > 0) {
+          advertiserIds.forEach((id: string) => {
+            if (!list.find((x: any) => x.advertiser_id === id)) {
+              list.push({ advertiser_id: id, balance: bcBalance, currency: bcCurrency, source: 'bc' });
+            }
+          });
+        }
+      } catch (e: any) { /* ignore */ }
+    }
   }
 
   // 3. 兜底：用 advertiser/info 的 balance

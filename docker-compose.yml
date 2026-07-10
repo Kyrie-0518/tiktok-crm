@@ -30,6 +30,8 @@ services:
       - TT_ADS_APP_ID=7641162218708434960
       - TT_ADS_APP_SECRET=9c1115593f6199a22eecb3777b7890cbdb8c5445
       - TT_ADS_REDIRECT_URI=https://bvefdvp.cn/api/tiktok-ads/callback
+      # 代理商商务中心 ID（资金由代理商管理）
+      - TT_ADS_AGENT_BC_ID=7595409691837120513
       # 代理配置：host 网络模式下直接用 127.0.0.1
       - HTTPS_PROXY=http://127.0.0.1:7890
       - HTTP_PROXY=http://127.0.0.1:7890
