@@ -11,12 +11,8 @@ const router = Router();
 // ══════════════════════════════════════════════════════════════
 //  欧文 Agent — 系统提示词（核心大脑）
 // ══════════════════════════════════════════════════════════════
-function buildSystemPrompt(modelName: string, providerName: string) {
-  return `你是「欧文」—— 跨境电商全栈运营智能体，专精 TikTok Shop 东南亚市场。
+const SYSTEM_PROMPT = `你是「欧文」—— 跨境电商全栈运营智能体，专精 TikTok Shop 东南亚市场。
 你拥有对本 ERP 系统所有模块数据（店铺、订单、产品、财务、达人、广告）的完全访问权限。
-
-## 当前接入模型
-你当前由 ${providerName} 提供底层能力，使用的模型是 ${modelName}。当用户问起你的模型/版本时，如实回答即可。
 
 ## 核心能力
 - 通过调用工具函数获取任意模块的实时数据
@@ -51,22 +47,6 @@ function buildSystemPrompt(modelName: string, providerName: string) {
 - 不要编造数据，只能使用工具返回的真实数据
 - 如果某项数据无法获取，明确说明"该项数据暂不可用"
 - 不要输出工具调用的技术细节`;
-}
-
-// 根据 api_base 推断提供商名称
-function inferProviderName(apiBase: string): string {
-  const base = apiBase.toLowerCase();
-  if (base.includes('deepseek.com')) return 'DeepSeek';
-  if (base.includes('siliconflow')) return '硅基流动';
-  if (base.includes('volces') || base.includes('volcengine')) return '火山引擎';
-  if (base.includes('openai.com')) return 'OpenAI';
-  if (base.includes('anthropic')) return 'Anthropic';
-  if (base.includes('google') || base.includes('gemini')) return 'Google';
-  if (base.includes('bigmodel.cn')) return '智谱 AI';
-  if (base.includes('baidu')) return '百度文心';
-  return '自定义 AI 服务';
-}
-
 
 // ══════════════════════════════════════════════════════════════
 //  Tool 函数定义 (OpenAI Function Calling 格式)
@@ -440,13 +420,8 @@ function executeTool(name: string, args: any): any {
 // ══════════════════════════════════════════════════════════════
 
 async function agentLoop(channels: Channel[], userQuery: string): Promise<{ report: string; toolCalls: any[] }> {
-  const channel = channels[0];
-  const providerName = inferProviderName(channel.api_base);
-  const modelName = channel.model;
-  const systemPrompt = buildSystemPrompt(modelName, providerName);
-
   const messages: any[] = [
-    { role: 'system', content: systemPrompt },
+    { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: userQuery }
   ];
 
