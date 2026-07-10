@@ -301,7 +301,7 @@ export async function getAdvertiserBalance(advertiserIds: string[]) {
   try {
     const bcRes = await getBusinessCenters();
     const bcList = bcRes?.data?.list || [];
-    if (bcList.length > 0) bcId = bcList[0].bc_id || '';
+    if (bcList.length > 0) bcId = bcList[0]?.bc_info?.bc_id || '';
     console.log('[TikTok Ads] bc_id from /bc/get/:', bcId);
   } catch (e: any) { console.error('[TikTok Ads] /bc/get/ failed:', e.message); }
 
