@@ -53,12 +53,15 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
     const timeout = <T>(p: Promise<T>, ms: number) =>
       Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
     const nameMap: Record<string, string> = {};
+    const infoMap: Record<string, { promotion_area?: string }> = {};
     const balanceMap: Record<string, any> = {};
 
     try { await Promise.all(advertiserIds.map(async (id: string) => {
       const info = await timeout(Ads.getAdvertiserInfo(id), 10000);
-      const name = info?.data?.advertiser_name || info?.data?.name;
+      const d = info?.data;
+      const name = d?.advertiser_name || d?.name;
       if (name) nameMap[id] = name;
+      if (d) infoMap[id] = { promotion_area: d.promotion_area || undefined };
     })); } catch { /* ignore */ }
     try {
       const balance = await timeout(Ads.getAdvertiserBalance(advertiserIds), 10000);
@@ -66,7 +69,11 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
     } catch { /* ignore */ }
 
     const list = advertiserIds.map((id: string) => ({
-      advertiser_id: id, advertiser_name: nameMap[id] || id, status: 'ACTIVE', balance_info: balanceMap[id] || null,
+      advertiser_id: id,
+      advertiser_name: nameMap[id] || id,
+      status: 'ACTIVE',
+      promotion_area: infoMap[id]?.promotion_area || undefined,
+      balance_info: balanceMap[id] || null,
     }));
     db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(list));

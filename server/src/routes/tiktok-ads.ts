@@ -56,12 +56,15 @@ async function saveAccountsCache(idsArray: string[]) {
     const timeout = <T>(p: Promise<T>, ms: number) =>
       Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
     const nameMap: Record<string, string> = {};
+    const infoMap: Record<string, { promotion_area?: string }> = {};
     const balanceMap: Record<string, any> = {};
 
     await Promise.all(idsArray.map(async (id: string) => {
       const info = await timeout(getAdvertiserInfo(id), 10000);
-      const name = info?.data?.advertiser_name || info?.data?.name;
+      const d = info?.data;
+      const name = d?.advertiser_name || d?.name;
       if (name) nameMap[id] = name;
+      if (d) infoMap[id] = { promotion_area: d.promotion_area || undefined };
     }));
     const balance = await timeout(getAdvertiserBalance(idsArray), 10000);
     (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
@@ -70,6 +73,7 @@ async function saveAccountsCache(idsArray: string[]) {
       advertiser_id: id,
       advertiser_name: nameMap[id] || id,
       status: 'ACTIVE',
+      promotion_area: infoMap[id]?.promotion_area || undefined,
       balance_info: balanceMap[id] || null,
     }));
     getDb().prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
