@@ -40,6 +40,7 @@ import aiStudioRoutes from './routes/ai-studio';
 import productsTiktokRoutes from './routes/products-tiktok';
 import adCenterRoutes from './routes/ad-center';
 import { connectToMCPServer } from './services/tiktok-mcp/client';
+import { startFeishuWebSocket } from './routes/bot-feishu-ws';
 import getDb from './db';
 
 // ── 启动时强制检查 tiktok_shops 表结构迁移 ──
@@ -140,6 +141,9 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 
 app.listen(PORT, () => {
   console.log(`虾掌柜ERP服务端已启动: http://localhost:${PORT}`);
+
+  // 启动飞书长连接（如已配置 FEISHU_APP_ID/SECRET）
+  startFeishuWebSocket();
 
   // 启动时立即更新一次汇率
   autoUpdateExchangeRate();

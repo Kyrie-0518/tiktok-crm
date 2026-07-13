@@ -7,6 +7,7 @@
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.70.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.7.0",

@@ -1,0 +1,143 @@
+/**
+ * 飞书 Bot 长连接模式
+ * 文档: https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/connector/connector-overview
+ *
+ * 与 webhook 模式不同，长连接模式不需要公网回调地址，
+ * 由服务端主动连接飞书 WebSocket 网关接收事件。
+ *
+ * 优点：
+ * - 无需公网 IP/域名
+ * - 无需配置 HTTPS/防火墙
+ * - 加密鉴权由 SDK 自动处理
+ */
+import * as Lark from '@larksuiteoapi/node-sdk';
+import { getAvailableChannels } from './ai';
+import { agentLoop } from './agent-chat';
+import getDb from '../db';
+
+let wsClient: any = null;
+let isRunning = false;
+
+interface CachedToken {
+  token: string;
+  expiry: number;
+}
+let cachedToken: CachedToken | null = null;
+
+// 获取 tenant_access_token（用于发消息）
+async function getTenantAccessToken(appId: string, appSecret: string): Promise<string> {
+  if (cachedToken && Date.now() < cachedToken.expiry) return cachedToken.token;
+  const res = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+  });
+  const data = await res.json() as any;
+  if (data.code !== 0) throw new Error(`获取飞书token失败: ${data.msg}`);
+  cachedToken = {
+    token: data.tenant_access_token,
+    expiry: Date.now() + (data.expire - 300) * 1000,
+  };
+  return cachedToken.token;
+}
+
+// 发送消息到飞书
+async function sendMessage(appId: string, appSecret: string, chatId: string, content: string, msgId?: string) {
+  const token = await getTenantAccessToken(appId, appSecret);
+  const body: any = {
+    receive_id: chatId,
+    msg_type: 'text',
+    content: JSON.stringify({ text: content }),
+  };
+  if (msgId) body.root_id = msgId;
+  await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+}
+
+// 处理收到的消息
+async function handleMessage(appId: string, appSecret: string, data: any) {
+  try {
+    const message = data.message || {};
+    const chatId = message.chat_id;
+    const msgId = message.message_id;
+    const msgType = message.message_type;
+
+    // 只处理文本
+    if (msgType !== 'text') return;
+
+    const text = JSON.parse(message.content || '{}').text || '';
+    if (!text) return;
+
+    const sender = data.sender?.sender_id?.open_id || 'unknown';
+    console.log(`[Feishu/WS] ${sender}: ${text}`);
+
+    // 调用 Agent
+    const db = getDb();
+    const channels = getAvailableChannels(db);
+    if (channels.length === 0) {
+      await sendMessage(appId, appSecret, chatId, 'AI 服务暂不可用，请先在系统设置中配置 AI 模型。', msgId);
+      return;
+    }
+
+    const result = await agentLoop(channels, text);
+    const reply = result.report.length > 2000
+      ? result.report.slice(0, 1990) + '\n\n---\n[内容较长已截断，完整报告请登录PC查看]'
+      : result.report;
+    await sendMessage(appId, appSecret, chatId, reply, msgId);
+  } catch (e: any) {
+    console.error('[Feishu/WS] 处理消息失败:', e.message);
+  }
+}
+
+// 启动长连接客户端
+export function startFeishuWebSocket() {
+  const appId = process.env.FEISHU_APP_ID;
+  const appSecret = process.env.FEISHU_APP_SECRET;
+
+  if (!appId || !appSecret) {
+    console.log('[Feishu/WS] 未配置 FEISHU_APP_ID/FEISHU_APP_SECRET，跳过长连接启动');
+    return;
+  }
+
+  if (isRunning) {
+    console.log('[Feishu/WS] 已在运行中，跳过重复启动');
+    return;
+  }
+
+  console.log('[Feishu/WS] 正在启动长连接客户端...');
+
+  try {
+    const eventDispatcher = new Lark.EventDispatcher({}).register({
+      'im.message.receive_v1': (data: any) => handleMessage(appId, appSecret, data),
+    });
+
+    wsClient = new Lark.WSClient({
+      appId,
+      appSecret,
+      loggerLevel: Lark.LoggerLevel.info,
+    });
+
+    wsClient.start({ eventDispatcher });
+
+    isRunning = true;
+    console.log('[Feishu/WS] ✅ 长连接客户端已启动');
+  } catch (e: any) {
+    console.error('[Feishu/WS] 启动失败:', e.message);
+  }
+}
+
+// 停止长连接客户端
+export function stopFeishuWebSocket() {
+  if (wsClient) {
+    try {
+      wsClient.close();
+      isRunning = false;
+      console.log('[Feishu/WS] 已停止');
+    } catch (e: any) {
+      console.error('[Feishu/WS] 停止失败:', e.message);
+    }
+  }
+}
