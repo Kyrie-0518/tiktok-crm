@@ -18,6 +18,10 @@ import getDb from '../db';
 let wsClient: any = null;
 let isRunning = false;
 
+// 消息去重：记录最近 5 分钟内处理过的 msgId，防止重推
+const processedMessages = new Set<string>();
+setInterval(() => processedMessages.clear(), 5 * 60 * 1000);
+
 interface CachedToken {
   token: string;
   expiry: number;
@@ -74,6 +78,13 @@ async function handleMessage(appId: string, appSecret: string, data: any) {
     const chatId = message.chat_id;
     const msgId = message.message_id;
     const msgType = message.message_type;
+
+    // 消息去重：同一 msgId 只处理一次，避免飞书 3 秒超时重推导致重复回复
+    if (msgId && processedMessages.has(msgId)) {
+      console.log('[Feishu/WS] 跳过重复消息:', msgId);
+      return;
+    }
+    if (msgId) processedMessages.add(msgId);
 
     // 只处理文本
     if (msgType !== 'text') return;
