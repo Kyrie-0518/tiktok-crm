@@ -185,10 +185,7 @@ async function handleEvent(body: any, res: Response) {
     }
 
     res.json({ code: 0 });
-  } catch (e: any) {
-    console.error('[Feishu] 处理事件失败:', e.message);
-    res.json({ code: 0 });
   }
-});
+}
 
 export default router;
