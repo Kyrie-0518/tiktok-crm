@@ -43,18 +43,28 @@ async function getTenantAccessToken(appId: string, appSecret: string): Promise<s
 
 // 发送消息到飞书
 async function sendMessage(appId: string, appSecret: string, chatId: string, content: string, msgId?: string) {
-  const token = await getTenantAccessToken(appId, appSecret);
-  const body: any = {
-    receive_id: chatId,
-    msg_type: 'text',
-    content: JSON.stringify({ text: content }),
-  };
-  if (msgId) body.root_id = msgId;
-  await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
-  });
+  try {
+    const token = await getTenantAccessToken(appId, appSecret);
+    const body: any = {
+      receive_id: chatId,
+      msg_type: 'text',
+      content: JSON.stringify({ text: content }),
+    };
+    if (msgId) body.root_id = msgId;
+    const res = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json() as any;
+    if (data.code !== 0) {
+      console.error('[Feishu/WS] 发送消息失败:', JSON.stringify(data));
+    } else {
+      console.log('[Feishu/WS] 消息已发送，msg_id=', data.data?.message_id);
+    }
+  } catch (e: any) {
+    console.error('[Feishu/WS] 发送消息异常:', e.message);
+  }
 }
 
 // 处理收到的消息
@@ -73,22 +83,29 @@ async function handleMessage(appId: string, appSecret: string, data: any) {
 
     const sender = data.sender?.sender_id?.open_id || 'unknown';
     console.log(`[Feishu/WS] ${sender}: ${text}`);
+    console.log(`[Feishu/WS] chatId=${chatId} msgId=${msgId}`);
 
     // 调用 Agent
     const db = getDb();
     const channels = getAvailableChannels(db);
+    console.log(`[Feishu/WS] 可用AI通道数: ${channels.length}`);
     if (channels.length === 0) {
+      console.log('[Feishu/WS] 无可用AI通道，发送提示');
       await sendMessage(appId, appSecret, chatId, 'AI 服务暂不可用，请先在系统设置中配置 AI 模型。', msgId);
       return;
     }
 
+    console.log('[Feishu/WS] 开始调用 Agent...');
     const result = await agentLoop(channels, text);
+    console.log(`[Feishu/WS] Agent 返回，报告长度: ${result.report.length}`);
     const reply = result.report.length > 2000
       ? result.report.slice(0, 1990) + '\n\n---\n[内容较长已截断，完整报告请登录PC查看]'
       : result.report;
     await sendMessage(appId, appSecret, chatId, reply, msgId);
+    console.log('[Feishu/WS] 回复已发送');
   } catch (e: any) {
     console.error('[Feishu/WS] 处理消息失败:', e.message);
+    console.error('[Feishu/WS] 错误堆栈:', e.stack);
   }
 }
 
