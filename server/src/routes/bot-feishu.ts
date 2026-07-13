@@ -138,54 +138,53 @@ async function handleEvent(body: any, res: Response) {
   // ── 正常事件处理（需要配置） ──
   if (!isConfigured()) return res.status(503).json({ error: '飞书未配置' });
 
-    // 验证 token
-    const verificationToken = process.env.FEISHU_VERIFICATION_TOKEN;
-    if (body.token && body.token !== verificationToken) {
-      console.warn('[Feishu] Token不匹配');
-      return res.status(403).json({ error: 'invalid token' });
-    }
-
-    // 处理事件
-    if (body.header?.event_type === 'im.message.receive_v1') {
-      const event = body.event || {};
-      const message = event.message || {};
-      const msgType = message.message_type;
-
-      // 只处理文本消息
-      if (msgType !== 'text') {
-        return res.json({ code: 0 });
-      }
-
-      const content = JSON.parse(message.content || '{}').text || '';
-      const chatId = message.chat_id;
-      const userId = event.sender?.sender_id?.open_id;
-      const msgId = message.message_id;
-
-      if (!content) return res.json({ code: 0 });
-
-      console.log(`[Feishu] ${userId}: ${content}`);
-
-      // 调用 Agent
-      const db = getDb();
-      const channels = getAvailableChannels(db);
-      if (channels.length === 0) {
-        await sendMessage(chatId, 'AI 服务暂不可用，请先在系统设置中配置 AI 模型。', msgId);
-        return res.json({ code: 0 });
-      }
-
-      try {
-        const result = await agentLoop(channels, content);
-        const reply = result.report.length > 2000
-          ? result.report.slice(0, 1990) + '\n\n---\n[内容较长已截断，完整报告请登录PC查看]'
-          : result.report;
-        await sendMessage(chatId, reply, msgId);
-      } catch (e: any) {
-        await sendEphemeral(chatId, userId, `处理失败：${e.message}`);
-      }
-    }
-
-    res.json({ code: 0 });
+  // 验证 token
+  const verificationToken = process.env.FEISHU_VERIFICATION_TOKEN;
+  if (body.token && body.token !== verificationToken) {
+    console.warn('[Feishu] Token不匹配');
+    return res.status(403).json({ error: 'invalid token' });
   }
+
+  // 处理事件
+  if (body.header?.event_type === 'im.message.receive_v1') {
+    const event = body.event || {};
+    const message = event.message || {};
+    const msgType = message.message_type;
+
+    // 只处理文本消息
+    if (msgType !== 'text') {
+      return res.json({ code: 0 });
+    }
+
+    const content = JSON.parse(message.content || '{}').text || '';
+    const chatId = message.chat_id;
+    const userId = event.sender?.sender_id?.open_id;
+    const msgId = message.message_id;
+
+    if (!content) return res.json({ code: 0 });
+
+    console.log(`[Feishu] ${userId}: ${content}`);
+
+    // 调用 Agent
+    const db = getDb();
+    const channels = getAvailableChannels(db);
+    if (channels.length === 0) {
+      await sendMessage(chatId, 'AI 服务暂不可用，请先在系统设置中配置 AI 模型。', msgId);
+      return res.json({ code: 0 });
+    }
+
+    try {
+      const result = await agentLoop(channels, content);
+      const reply = result.report.length > 2000
+        ? result.report.slice(0, 1990) + '\n\n---\n[内容较长已截断，完整报告请登录PC查看]'
+        : result.report;
+      await sendMessage(chatId, reply, msgId);
+    } catch (e: any) {
+      await sendEphemeral(chatId, userId, `处理失败：${e.message}`);
+    }
+  }
+
+  res.json({ code: 0 });
 }
 
 export default router;
