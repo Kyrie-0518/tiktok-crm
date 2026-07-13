@@ -199,7 +199,7 @@ export default function MobileKyrie() {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                   border: msg.role === 'user' ? 'none' : '1px solid #e8e5e0',
                 }}>
-                  {msg.toolCalls?.length > 0 && (
+                  {msg.toolCalls && msg.toolCalls.length > 0 && (
                     <div style={{ marginBottom: 6 }}>
                       {msg.toolCalls.map((tc: any, i: number) => (
                         <Tag key={i} color="blue" style={{ fontSize: 10, borderRadius: 4, marginRight: 4 }}>
