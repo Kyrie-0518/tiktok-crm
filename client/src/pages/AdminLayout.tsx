@@ -4,13 +4,14 @@ import { Layout, Button, Typography, Avatar, Menu } from 'antd';
 import {
   SafetyOutlined,
   ArrowLeftOutlined,
-  SettingOutlined, KeyOutlined, AuditOutlined, ApiOutlined,
+  SettingOutlined, KeyOutlined, AuditOutlined, ApiOutlined, RobotOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
 import Settings from './Settings';
 import UserPermissions from './UserPermissions';
 import AuditLogs from './AuditLogs';
 import ApiConfig from './ApiConfig';
+import BotManagement from './BotManagement';
 
 const { Sider, Content } = Layout;
 const { Text } = Typography;
@@ -36,6 +37,7 @@ const ADMIN_MENU_ITEMS = [
   { key: '/admin/settings', icon: <SettingOutlined />, label: '系统配置' },
   { key: '/admin/permissions', icon: <KeyOutlined />, label: '用户与权限' },
   { key: '/admin/api-config', icon: <ApiOutlined />, label: 'API管理' },
+  { key: '/admin/bot-management', icon: <RobotOutlined />, label: 'Bot管理' },
   { key: '/admin/audit', icon: <AuditOutlined />, label: '操作日志' },
 ];
 
@@ -43,6 +45,7 @@ const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/admin/settings': Settings,
   '/admin/permissions': UserPermissions,
   '/admin/api-config': ApiConfig,
+  '/admin/bot-management': BotManagement,
   '/admin/audit': AuditLogs,
 };
 

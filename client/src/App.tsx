@@ -31,7 +31,6 @@ import AIStudioLayout from './pages/AIStudioLayout';
 import InfluencerLayout from './pages/InfluencerLayout';
 import Kyrie from './pages/Kyrie';
 import MobileKyrie from './pages/MobileKyrie';
-import BotManagement from './pages/BotManagement';
 import AdDashboard from './pages/AdDashboard';
 import AdAccounts from './pages/AdAccounts';
 import AdCampaigns from './pages/AdCampaigns';
@@ -67,7 +66,6 @@ const MENU_GROUPS = [
     icon: <ThunderboltOutlined />,
     items: [
       { key: '/kyrie', icon: <ThunderboltOutlined />, label: '欧文' },
-      { key: '/bot-management', icon: <RobotOutlined />, label: 'Bot管理' },
       { key: '/ai-studio', icon: <RobotOutlined />, label: 'AI工作室' },
     ],
   },
@@ -814,7 +812,6 @@ function AppLayout() {
             <Route path="/admin/*" element={<AdminLayout />} />
 <Route path="/kyrie" element={<Kyrie />} />
 <Route path="/m/kyrie" element={<MobileKyrie />} />
-<Route path="/bot-management" element={<BotManagement />} />
 <Route path="/ai-studio/*" element={<AIStudioLayout />} />
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
