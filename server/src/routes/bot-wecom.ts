@@ -10,6 +10,7 @@
  * - WECOM_ENCODING_AES_KEY
  */
 import { Router, Request, Response } from 'express';
+import express from 'express';
 import crypto from 'crypto';
 import getDb from '../db';
 import { getAvailableChannels } from './ai';
@@ -76,7 +77,7 @@ async function sendMessage(userId: string, content: string): Promise<void> {
   });
 }
 
-// GET — URL 验证
+// GET — URL 验证（需要配置才能解密）
 router.get('/callback', (req: Request, res: Response) => {
   if (!isConfigured()) return res.status(503).json({ error: '企业微信未配置' });
   const { msg_signature, timestamp, nonce, echostr } = req.query as any;
@@ -87,7 +88,6 @@ router.get('/callback', (req: Request, res: Response) => {
   const sig = sha1(sorted);
   if (sig !== msg_signature) return res.status(403).send('signature mismatch');
 
-  // 解密 echostr
   try {
     const aesKey = Buffer.from(process.env.WECOM_ENCODING_AES_KEY + '=', 'base64');
     const decipher = crypto.createDecipheriv('aes-256-cbc', aesKey, aesKey.slice(0, 16));
@@ -95,8 +95,7 @@ router.get('/callback', (req: Request, res: Response) => {
     let decrypted = Buffer.concat([decipher.update(echostr, 'base64'), decipher.final()]);
     const pad = decrypted[decrypted.length - 1];
     decrypted = decrypted.slice(0, decrypted.length - pad);
-    const result = decrypted.slice(16, decrypted.length).toString('utf-8');
-    // result = 4字节msg_len + corpId
+    const result = decrypted.slice(16).toString('utf-8');
     const len = result.readUInt32BE(0);
     const reply = result.slice(4, 4 + len).toString('utf-8');
     res.send(reply);
@@ -107,7 +106,7 @@ router.get('/callback', (req: Request, res: Response) => {
 });
 
 // POST — 接收消息
-router.post('/callback', async (req: Request, res: Response) => {
+router.post('/callback', express.text({ type: ['text/xml', 'application/xml'], limit: '5mb' }), async (req: Request, res: Response) => {
   if (!isConfigured()) return res.status(503).json({ error: '企业微信未配置' });
 
   try {

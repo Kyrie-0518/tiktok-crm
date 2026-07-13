@@ -71,15 +71,16 @@ async function sendEphemeral(chatId: string, userId: string, content: string): P
 
 // POST — 接收飞书事件
 router.post('/callback', async (req: Request, res: Response) => {
-  if (!isConfigured()) return res.status(503).json({ error: '飞书未配置' });
-
   try {
     const body = req.body as any;
 
-    // URL 验证
+    // URL 验证 — 不依赖环境变量配置
     if (body.type === 'url_verification') {
       return res.json({ challenge: body.challenge });
     }
+
+    // 环境变量检查（仅在真实事件处理时需要）
+    if (!isConfigured()) return res.status(503).json({ error: '飞书未配置' });
 
     // 验证 token
     const verificationToken = process.env.FEISHU_VERIFICATION_TOKEN;
