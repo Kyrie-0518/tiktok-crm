@@ -69,6 +69,11 @@ async function sendEphemeral(chatId: string, userId: string, content: string): P
   });
 }
 
+// GET/HEAD — 飞书 URL 连通性探测（必须返回 200）
+router.get('/callback', (_req: Request, res: Response) => {
+  res.status(200).send('ok');
+});
+
 // POST — 接收飞书事件
 router.post('/callback', async (req: Request, res: Response) => {
   try {
