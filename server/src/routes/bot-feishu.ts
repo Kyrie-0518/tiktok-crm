@@ -72,10 +72,37 @@ async function sendEphemeral(chatId: string, userId: string, content: string): P
 
 // GET/HEAD — 飞书 URL 连通性探测（必须返回 200）
 router.get('/callback', (_req: Request, res: Response) => {
+  // 写文件日志（避免 docker logs 时序问题）
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const logDir = path.resolve(__dirname, '../../../logs');
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(
+      path.join(logDir, 'feishu-requests.log'),
+      `[${new Date().toISOString()}] GET /callback from ${_req.ip} ua=${_req.headers['user-agent']}\n`
+    );
+  } catch {}
   res.status(200).json({ status: 'ok', path: '/api/bot/feishu/callback', timestamp: new Date().toISOString() });
 });
 router.head('/callback', (_req: Request, res: Response) => {
   res.status(200).end();
+});
+
+// POST 收到任何请求都先写日志（最早期诊断用）
+const _origPost = router.stack.find((l: any) => l.route?.path === '/callback' && l.route?.methods?.post);
+router.post('/callback-raw', (req: Request, res: Response) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const logDir = path.resolve(__dirname, '../../../logs');
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(
+      path.join(logDir, 'feishu-requests.log'),
+      `[${new Date().toISOString()}] POST /callback-raw from ${req.ip} ua=${req.headers['user-agent']} body=${JSON.stringify(req.body).slice(0, 300)}\n`
+    );
+  } catch {}
+  res.status(200).json({ received: true });
 });
 
 
