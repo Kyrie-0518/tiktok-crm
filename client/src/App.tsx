@@ -30,6 +30,7 @@ import AdminLayout from './pages/AdminLayout';
 import AIStudioLayout from './pages/AIStudioLayout';
 import InfluencerLayout from './pages/InfluencerLayout';
 import Kyrie from './pages/Kyrie';
+import MobileKyrie from './pages/MobileKyrie';
 import AdDashboard from './pages/AdDashboard';
 import AdAccounts from './pages/AdAccounts';
 import AdCampaigns from './pages/AdCampaigns';
@@ -810,6 +811,7 @@ function AppLayout() {
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/admin/*" element={<AdminLayout />} />
             <Route path="/kyrie" element={<Kyrie />} />
+<Route path="/m/kyrie" element={<MobileKyrie />} />
             <Route path="/ai-studio/*" element={<AIStudioLayout />} />
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

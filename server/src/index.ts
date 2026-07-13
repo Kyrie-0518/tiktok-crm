@@ -24,6 +24,9 @@ import influencerReportRoutes from './routes/influencer-reports';
 import skiisAnalysisRoutes from './routes/skiis-analysis';
 import skiisChatRoutes from './routes/skiis-chat';
 import agentChatRoutes from './routes/agent-chat';
+import botWecomRoutes from './routes/bot-wecom';
+import botFeishuRoutes from './routes/bot-feishu';
+import mobileAuthRoutes from './routes/mobile-auth';
 import adminRoutes from './routes/admin';
 import adminApiConfigRoutes from './routes/admin-api-configs';
 // import plan1688Routes from './routes/1688-plan';
@@ -73,6 +76,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', mobileAuthRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/influencers', influencerRoutes);
@@ -80,6 +84,8 @@ app.use('/api/influencer-reports', influencerReportRoutes);
 app.use('/api/skiis', skiisAnalysisRoutes);
 app.use('/api/skiis-chat', skiisChatRoutes);
 app.use('/api/agent', agentChatRoutes);
+app.use('/api/bot/wecom', botWecomRoutes);
+app.use('/api/bot/feishu', botFeishuRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/api-configs', adminApiConfigRoutes);
 app.use('/api/settings', settingsRoutes);

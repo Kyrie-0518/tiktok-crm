@@ -419,7 +419,7 @@ function executeTool(name: string, args: any): any {
 //  Agent 核心循环：LLM 决策 → 工具执行 → 结果分析 → 报告
 // ══════════════════════════════════════════════════════════════
 
-async function agentLoop(channels: Channel[], userQuery: string): Promise<{ report: string; toolCalls: any[] }> {
+export async function agentLoop(channels: Channel[], userQuery: string): Promise<{ report: string; toolCalls: any[] }> {
   const messages: any[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: userQuery }

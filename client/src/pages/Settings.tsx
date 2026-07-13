@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, Button, Modal, Form, Input, Space, message, List, Spin, Alert, Tag } from 'antd';
-import { ThunderboltOutlined, RobotOutlined, SettingOutlined, SendOutlined } from '@ant-design/icons';
+import { ThunderboltOutlined, RobotOutlined, SettingOutlined, SendOutlined, QrcodeOutlined, CopyOutlined, ReloadOutlined } from '@ant-design/icons';
 import api from '../api';
 import { useAIStore } from '../stores/aiStore';
 import { useIsDeveloper, useIsManager, useHasPerm } from '../stores/authStore';
@@ -20,6 +20,36 @@ export default function Settings() {
   // 飞书配置
   const [feishuWebhookUrl, setFeishuWebhookUrl] = useState('');
   const [feishuSaved, setFeishuSaved] = useState(false);
+
+  // 移动端入口
+  const [mobileToken, setMobileToken] = useState('');
+  const [mobileUrl, setMobileUrl] = useState('');
+  const [mobileGenerating, setMobileGenerating] = useState(false);
+
+  const handleGenerateMobileToken = async () => {
+    setMobileGenerating(true);
+    try {
+      const res = await api.post('/auth/generate-mobile-token');
+      setMobileToken(res.data.token);
+      setMobileUrl(res.data.url);
+      message.success('移动端入口已生成，有效期30天');
+    } catch (e: any) {
+      message.error(e.response?.data?.error || '生成失败');
+    } finally {
+      setMobileGenerating(false);
+    }
+  };
+
+  const handleRevokeMobileToken = async () => {
+    try {
+      await api.post('/auth/revoke-mobile-token');
+      setMobileToken('');
+      setMobileUrl('');
+      message.success('移动端入口已撤销');
+    } catch (e: any) {
+      message.error(e.response?.data?.error || '撤销失败');
+    }
+  };
 
   // Role-based visibility
   const isDeveloper = useIsDeveloper();
@@ -242,6 +272,55 @@ export default function Settings() {
           </Space>
         </Card>
       )}
+
+
+      {/* 移动端入口 */}
+      <Card
+        title={<span><QrcodeOutlined style={{ color: '#2563eb', marginRight: 8 }} />移动端入口</span>}
+        style={{ marginBottom: 16 }}
+      >
+        <Alert
+          type="info" showIcon style={{ marginBottom: 16 }}
+          message="手机扫码即可使用欧文智能体"
+          description={
+            <div style={{ fontSize: 12 }}>
+              点击「生成入口」获取专属链接，用手机扫码或浏览器打开即可。支持添加到主屏幕变成类App体验。
+            </div>
+          }
+        />
+        {mobileUrl ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                flex: 1, background: '#f8fafc', border: '1px solid #e2e8f0',
+                borderRadius: 8, padding: '10px 14px', fontSize: 13,
+                fontFamily: 'monospace', color: '#475569', wordBreak: 'break-all'
+              }}>
+                {mobileUrl}
+              </div>
+              <Button icon={<CopyOutlined />} size="small" onClick={() => {
+                navigator.clipboard.writeText(mobileUrl);
+                message.success('已复制链接');
+              }}>复制</Button>
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              此链接有效期30天，每人仅限1个活跃入口
+            </div>
+            <Space>
+              <Button icon={<ReloadOutlined />} size="small" onClick={handleGenerateMobileToken} loading={mobileGenerating}>
+                重新生成
+              </Button>
+              <Button danger size="small" onClick={handleRevokeMobileToken}>
+                撤销入口
+              </Button>
+            </Space>
+          </div>
+        ) : (
+          <Button type="primary" icon={<QrcodeOutlined />} onClick={handleGenerateMobileToken} loading={mobileGenerating}>
+            生成移动端入口
+          </Button>
+        )}
+      </Card>
 
       {/* System Info — all roles */}
       <Card title="系统信息">
