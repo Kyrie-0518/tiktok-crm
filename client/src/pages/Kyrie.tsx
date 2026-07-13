@@ -21,6 +21,10 @@ import api from '../api';
 
 const { Text, Title } = Typography;
 
+// Agent can make several model/tool turns. Keep ordinary API requests fast,
+// but allow this long-running analysis request to finish before Axios aborts it.
+const AGENT_REQUEST_TIMEOUT_MS = 180_000;
+
 const QUICK_COMMANDS = [
   { label: '日常询盘', query: '帮我完成今天的询盘工作：查看昨日各店铺销售数据、达人视频表现、广告花费、订单发货情况，复盘整体数据，找出问题并给出优化建议', icon: <BarChartOutlined /> },
   { label: '利润诊断', query: '分析本月各店铺利润情况，定位亏损的订单和产品，给出改进建议', icon: <DollarOutlined /> },
@@ -105,10 +109,14 @@ export default function Kyrie() {
     setInputValue('');
     setSending(true);
     setProgressText('正在分析你的需求...');
+    let progressTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const timer = setTimeout(() => setProgressText('正在调取系统数据...'), 1500);
-      const res = await api.post('/agent/chat', { query: query.trim() });
-      clearTimeout(timer);
+      progressTimer = setTimeout(() => setProgressText('正在调取系统数据...'), 1500);
+      const res = await api.post(
+        '/agent/chat',
+        { query: query.trim() },
+        { timeout: AGENT_REQUEST_TIMEOUT_MS },
+      );
       setProgressText('');
       const data = res.data;
       let header = '';
@@ -124,10 +132,15 @@ export default function Kyrie() {
       }]);
     } catch (err: any) {
       setProgressText('');
-      const errMsg = err.response?.data?.error || err.message || '请求失败';
+      const errMsg = err.code === 'ECONNABORTED'
+        ? '欧文分析超时，请稍后重试或缩小问题范围'
+        : err.response?.data?.error || err.message || '请求失败';
       message.error(errMsg);
       setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: `❌ 出错了：${errMsg}`, timestamp: Date.now() }]);
-    } finally { setSending(false); }
+    } finally {
+      if (progressTimer) clearTimeout(progressTimer);
+      setSending(false);
+    }
   };
 
   const handleQuickCommand = (cmd: typeof QUICK_COMMANDS[0]) => { setInputValue(cmd.query); inputRef.current?.focus(); };
