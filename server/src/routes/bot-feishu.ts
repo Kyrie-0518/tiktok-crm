@@ -8,6 +8,7 @@
  * - FEISHU_VERIFICATION_TOKEN
  */
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import getDb from '../db';
 import { getAvailableChannels } from './ai';
 import { agentLoop } from './agent-chat';
@@ -76,16 +77,66 @@ router.get('/callback', (_req: Request, res: Response) => {
 
 // POST — 接收飞书事件
 router.post('/callback', async (req: Request, res: Response) => {
+  console.log('[Feishu] 收到回调:', JSON.stringify(req.body).slice(0, 500));
+
   try {
     const body = req.body as any;
 
-    // URL 验证 — 不依赖环境变量配置
-    if (body.type === 'url_verification') {
-      return res.json({ challenge: body.challenge });
+    // ── 处理加密事件 ──
+    // 如果 body.encrypt 存在，说明飞书启用了事件加密，需要先解密
+    if (body.encrypt) {
+      const encryptKey = process.env.FEISHU_ENCRYPT_KEY;
+      if (!encryptKey) {
+        console.error('[Feishu] 事件已加密但未配置 FEISHU_ENCRYPT_KEY');
+        return res.status(200).json({ code: -1, msg: 'encryption key not configured' });
+      }
+      try {
+        const decipher = crypto.createDecipheriv(
+          'aes-256-cbc',
+          Buffer.from(encryptKey, 'base64'),
+          Buffer.from(encryptKey, 'base64').slice(0, 16)
+        );
+        let decrypted = Buffer.concat([
+          decipher.update(Buffer.from(body.encrypt, 'base64')),
+          decipher.final()
+        ]);
+        const pad = decrypted[decrypted.length - 1];
+        decrypted = decrypted.slice(0, decrypted.length - pad);
+        // 飞书加密格式: [16字节随机 + 4字节长度 + 实际JSON]
+        const realBody = JSON.parse(decrypted.slice(20).toString('utf-8'));
+        console.log('[Feishu] 解密后:', JSON.stringify(realBody).slice(0, 500));
+        // 用解密后的 body 继续处理
+        return handleEvent(realBody, res);
+      } catch (e: any) {
+        console.error('[Feishu] 解密失败:', e.message);
+        return res.status(200).json({ code: -1, msg: 'decrypt failed' });
+      }
     }
 
-    // 环境变量检查（仅在真实事件处理时需要）
-    if (!isConfigured()) return res.status(503).json({ error: '飞书未配置' });
+    // ── 未加密，直接用 body ──
+    return handleEvent(body, res);
+  } catch (e: any) {
+    console.error('[Feishu] 处理异常:', e.message);
+    res.json({ code: 0 });
+  }
+});
+
+// 统一事件处理
+async function handleEvent(body: any, res: Response) {
+  // URL 验证 — v1.0 格式
+  if (body.type === 'url_verification') {
+    console.log('[Feishu] URL验证(v1.0), challenge:', body.challenge);
+    return res.json({ challenge: body.challenge });
+  }
+
+  // URL 验证 — v2.0 格式
+  if (body.schema === '2.0' && body.header?.event_type === 'url_verification') {
+    console.log('[Feishu] URL验证(v2.0), challenge:', body.event?.challenge);
+    return res.json({ challenge: body.event?.challenge || body.challenge });
+  }
+
+  // ── 正常事件处理（需要配置） ──
+  if (!isConfigured()) return res.status(503).json({ error: '飞书未配置' });
 
     // 验证 token
     const verificationToken = process.env.FEISHU_VERIFICATION_TOKEN;

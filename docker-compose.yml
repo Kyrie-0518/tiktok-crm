@@ -42,6 +42,7 @@ services:
       - FEISHU_APP_ID=
       - FEISHU_APP_SECRET=
       - FEISHU_VERIFICATION_TOKEN=
+      - FEISHU_ENCRYPT_KEY=
       # 代理配置：host 网络模式下直接用 127.0.0.1
       - HTTPS_PROXY=http://127.0.0.1:7890
       - HTTP_PROXY=http://127.0.0.1:7890

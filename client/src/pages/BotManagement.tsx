@@ -36,13 +36,14 @@ const BOT_CONFIGS: BotConfig[] = [
     platform: 'feishu',
     name: '飞书',
     icon: <ThunderboltOutlined />,
-    envKeys: ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_VERIFICATION_TOKEN'],
+    envKeys: ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_VERIFICATION_TOKEN', 'FEISHU_ENCRYPT_KEY'],
     instructions: `1. 登录 open.feishu.cn → 开发者后台 → 创建企业自建应用
 2. 在「凭证与基础信息」获取 App ID 和 App Secret
 3. 在「应用功能」→ 添加「机器人」能力
 4. 在「事件订阅」→ 配置请求地址：
    URL: https://bvefdvp.cn/api/bot/feishu/callback
-5. 在下方填入3个参数，保存即可`,
+5. 在「安全设置」→ 查看「事件加密」Encrypt Key（如果关闭了事件加密，该项留空）
+6. 在下方填入4个参数，保存即可`,
   },
 ];
 
