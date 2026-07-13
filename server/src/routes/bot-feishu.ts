@@ -72,12 +72,17 @@ async function sendEphemeral(chatId: string, userId: string, content: string): P
 
 // GET/HEAD — 飞书 URL 连通性探测（必须返回 200）
 router.get('/callback', (_req: Request, res: Response) => {
-  res.status(200).send('ok');
+  res.status(200).json({ status: 'ok', path: '/api/bot/feishu/callback', timestamp: new Date().toISOString() });
 });
+router.head('/callback', (_req: Request, res: Response) => {
+  res.status(200).end();
+});
+
 
 // POST — 接收飞书事件
 router.post('/callback', async (req: Request, res: Response) => {
   console.log('[Feishu] 收到回调:', JSON.stringify(req.body).slice(0, 500));
+  console.log('[Feishu] 请求头:', JSON.stringify(req.headers));
 
   try {
     const body = req.body as any;
@@ -91,22 +96,27 @@ router.post('/callback', async (req: Request, res: Response) => {
         return res.status(200).json({ code: -1, msg: 'encryption key not configured' });
       }
       try {
-        const decipher = crypto.createDecipheriv(
-          'aes-256-cbc',
-          Buffer.from(encryptKey, 'base64'),
-          Buffer.from(encryptKey, 'base64').slice(0, 16)
-        );
+        // 飞书加密原理（文档：https://open.feishu.cn/document/ukTMukTMukTM/uYDNxYjL2QTM24iN0EjN/event-subscription-configure-/encrypt-key-encryption-configuration-case）
+        // 1. key = SHA256(Encrypt Key)
+        // 2. 密文格式 = base64(iv(16字节) + encrypted_event)
+        const key = crypto.createHash('sha256').update(encryptKey).digest();
+        const ciphertext = Buffer.from(body.encrypt, 'base64');
+        const iv = ciphertext.slice(0, 16);
+        const encrypted = ciphertext.slice(16);
+
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
         let decrypted = Buffer.concat([
-          decipher.update(Buffer.from(body.encrypt, 'base64')),
+          decipher.update(encrypted),
           decipher.final()
         ]);
+        // PKCS7Padding: 去掉末尾补位
         const pad = decrypted[decrypted.length - 1];
         decrypted = decrypted.slice(0, decrypted.length - pad);
-        // 飞书加密格式: [16字节随机 + 4字节长度 + 实际JSON]
-        const realBody = JSON.parse(decrypted.slice(20).toString('utf-8'));
+        // 解密后就是飞书原始 JSON（无需额外切分）
+        const realBody = JSON.parse(decrypted.toString('utf-8'));
         console.log('[Feishu] 解密后:', JSON.stringify(realBody).slice(0, 500));
         // 用解密后的 body 继续处理
-        return handleEvent(realBody, res);
+        return await handleEvent(realBody, res);
       } catch (e: any) {
         console.error('[Feishu] 解密失败:', e.message);
         return res.status(200).json({ code: -1, msg: 'decrypt failed' });
@@ -114,11 +124,39 @@ router.post('/callback', async (req: Request, res: Response) => {
     }
 
     // ── 未加密，直接用 body ──
-    return handleEvent(body, res);
+    return await handleEvent(body, res);
   } catch (e: any) {
     console.error('[Feishu] 处理异常:', e.message);
     res.json({ code: 0 });
   }
+});
+
+// 诊断接口：检查网络可达性、环境变量配置、当前服务器时间
+router.get('/diagnose', (_req: Request, res: Response) => {
+  const configured = isConfigured();
+  const hasEncryptKey = !!process.env.FEISHU_ENCRYPT_KEY;
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    feishu: {
+      configured,
+      has_app_id: !!process.env.FEISHU_APP_ID,
+      has_app_secret: !!process.env.FEISHU_APP_SECRET,
+      has_verification_token: !!process.env.FEISHU_VERIFICATION_TOKEN,
+      has_encrypt_key: hasEncryptKey,
+    },
+    note: '如果飞书保存 URL 时仍显示 url invalid，且此处没有收到请求，说明网络/DNS/SSL/防火墙未放行飞书服务器。',
+  });
+});
+
+// 模拟飞书 URL 验证（本地自测 + 可临时作为飞书回调地址测试连通性）
+router.post('/test', async (req: Request, res: Response) => {
+  const body = req.body as any;
+  console.log('[Feishu/Test] 收到请求:', JSON.stringify(body));
+
+  // 兼容飞书真实格式 + 手动模拟格式
+  const challenge = body.challenge || body.event?.challenge || 'test-passed';
+  return res.json({ challenge });
 });
 
 // 统一事件处理

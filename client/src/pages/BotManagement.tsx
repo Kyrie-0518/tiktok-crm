@@ -73,9 +73,11 @@ export default function BotManagement() {
 
   const handleSave = async (platform: string, envKeys: string[]) => {
     const values = configs[platform] || {};
-    const missing = envKeys.filter(k => !values[k]);
+    // FEISHU_ENCRYPT_KEY 仅在飞书开启事件加密时才需要
+    const optionalKeys = platform === 'feishu' ? ['FEISHU_ENCRYPT_KEY'] : [];
+    const missing = envKeys.filter(k => !values[k] && !optionalKeys.includes(k));
     if (missing.length > 0) {
-      message.warning(`请填写所有必填项：${missing.join(', ')}`);
+      message.warning(`请填写必填项：${missing.join(', ')}`);
       return;
     }
 
