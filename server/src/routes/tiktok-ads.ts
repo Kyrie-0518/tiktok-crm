@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import getDb from '../db';
 import { getTokenStatus, tiktokAdsPost } from '../services/tiktok-ads';
+import { Agent } from 'undici';
 
 const router = Router();
 
@@ -41,6 +42,7 @@ async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
   const relayToken = process.env.TT_ADS_RELAY_TOKEN || 'change-me';
   if (!relayUrl) throw new Error('未配置 TT_ADS_RELAY_URL');
 
+  // 使用 undici Agent 直连，强制绕过 HTTPS_PROXY（服务器代理不一定可用）
   const res = await fetch(relayUrl, {
     method: 'POST',
     headers: {
@@ -53,6 +55,7 @@ async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
       secret: APP_SECRET,
       auth_code: authCode,
     }),
+    dispatcher: new Agent({ connectTimeout: 15_000 }),
   });
   const json = await res.json() as any;
   if (!json.success) throw new Error(json.error || 'Worker relay failed');
