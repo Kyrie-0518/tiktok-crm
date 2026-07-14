@@ -33,7 +33,7 @@ import botConfigRoutes from './routes/bot-config';
 // import plan1688Routes from './routes/1688-plan';
 // import douyinSearchRoutes from './routes/douyin-search';
 import { startAutoBackup } from './utils/backup';
-import { startAuditLogCleanup } from './middleware/audit';
+import { startAuditLogCleanup, auditMiddleware } from './middleware/audit';
 import { startAutoSync } from './services/auto-sync';
 import auditLogRoutes from './routes/audit-logs';
 import aiStudioRoutes from './routes/ai-studio';
@@ -71,6 +71,11 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// 信任 Nginx 反向代理，读取 X-Forwarded-For 获取真实客户端 IP
+app.set('trust proxy', true);
+
+// 全局审计日志：记录所有 API 请求的 IP + User-Agent + 状态码
+app.use('/api', auditMiddleware);
 
 // Health Check（Docker 健康检查用）
 app.get('/api/health', (_req, res) => {

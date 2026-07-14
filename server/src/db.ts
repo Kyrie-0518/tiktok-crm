@@ -532,6 +532,16 @@ function initTables() {
   if (!allUserCols.includes('role_id')) {
     db.exec('ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id) ON DELETE SET NULL');
   }
+  // 登录追踪：记录最后登录 IP / 时间 / 用户设备
+  if (!allUserCols.includes('last_login_ip')) {
+    db.exec("ALTER TABLE users ADD COLUMN last_login_ip TEXT DEFAULT ''");
+  }
+  if (!allUserCols.includes('last_login_at')) {
+    db.exec("ALTER TABLE users ADD COLUMN last_login_at DATETIME");
+  }
+  if (!allUserCols.includes('last_user_agent')) {
+    db.exec("ALTER TABLE users ADD COLUMN last_user_agent TEXT DEFAULT ''");
+  }
 
   // Seed default admin if not exist — 随机生成密码+首次强制修改
   const existingAdmin = db.prepare("SELECT id, role_id FROM users WHERE username = 'admin'").get() as any;

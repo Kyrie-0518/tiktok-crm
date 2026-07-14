@@ -18,6 +18,16 @@ router.post('/login', (req: Request, res: Response) => {
   }
 
   const token = signToken({ userId: user.id, username: user.username });
+
+  // 记录登录 IP + 设备信息
+  try {
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    const ua = req.get('User-Agent') || '';
+    db.prepare(
+      `UPDATE users SET last_login_ip = ?, last_login_at = datetime('now'), last_user_agent = ? WHERE id = ?`
+    ).run(ip, ua, user.id);
+  } catch { /* 不影响登录流程 */ }
+
   res.json({
     token,
     username: user.username,
