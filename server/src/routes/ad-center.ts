@@ -209,11 +209,119 @@ router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
 // GET /api/ad-center/rules — 自动化规则列表
 router.get('/rules', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { advertiser_id, page, page_size } = req.query;
+    const { advertiser_id, page, page_size, status } = req.query;
     const result = await Ads.getOptimizerRules({
       advertiser_id: advertiser_id as string || '',
       page: Number(page) || 1,
       page_size: Number(page_size) || 50,
+      status: status as string || undefined,
+    });
+    res.json({ success: true, data: result?.data || result });
+  } catch (e: any) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/ad-center/rules — 创建自动化规则
+router.post('/rules', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { advertiser_id, name, conditions, actions, apply_objects, rule_exec_info, notification, tzone, lang } = req.body;
+    if (!advertiser_id || !name) {
+      return res.status(400).json({ success: false, error: '缺少 advertiser_id 或 name' });
+    }
+    const body = {
+      advertiser_id,
+      lang: lang || 'EN',
+      rules: [{
+        name,
+        conditions: conditions || [],
+        actions: actions || [],
+        apply_objects: apply_objects || [{ dimension: 'CAMPAIGN', pre_condition_type: 'ALL' }],
+        rule_exec_info: rule_exec_info || { exec_time_type: 'ALWAYS' },
+        notification: notification || { notification_type: 'NONE' },
+        tzone: tzone || 'UTC',
+      }],
+    };
+    const result = await Ads.createOptimizerRule(body);
+    res.json({ success: true, data: result?.data || result });
+  } catch (e: any) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// PUT /api/ad-center/rules/:id — 更新自动化规则（含启停）
+router.put('/rules/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { advertiser_id, name, conditions, actions, apply_objects, rule_exec_info, notification, tzone, lang, rule_status } = req.body;
+    if (!advertiser_id) {
+      return res.status(400).json({ success: false, error: '缺少 advertiser_id' });
+    }
+    const ruleData: any = {
+      rule_id: req.params.id,
+      name: name || 'Untitled Rule',
+      conditions: conditions || [],
+      actions: actions || [],
+      apply_objects: apply_objects || [{ dimension: 'CAMPAIGN', pre_condition_type: 'ALL' }],
+      rule_exec_info: rule_exec_info || { exec_time_type: 'ALWAYS' },
+      notification: notification || { notification_type: 'NONE' },
+      tzone: tzone || 'UTC',
+    };
+    // rule_status 用于控制规则启用/停用
+    if (rule_status) ruleData.rule_status = rule_status;
+    const body = {
+      advertiser_id,
+      lang: lang || 'EN',
+      rules: [ruleData],
+    };
+    const result = await Ads.updateOptimizerRule(body);
+    res.json({ success: true, data: result?.data || result });
+  } catch (e: any) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/ad-center/rules/:id — 单条规则详情
+router.get('/rules/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const advertiser_id = req.query.advertiser_id as string;
+    if (!advertiser_id) return res.status(400).json({ success: false, error: '缺少 advertiser_id' });
+    const result = await Ads.getOptimizerRuleDetail(advertiser_id, req.params.id);
+    const ruleData = result?.data?.list?.[0] || result?.data || result;
+    res.json({ success: true, data: ruleData });
+  } catch (e: any) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/ad-center/rules/:id/bind — 绑定作用对象
+router.post('/rules/:id/bind', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { advertiser_id, bind_info, lang } = req.body;
+    if (!advertiser_id || !bind_info) {
+      return res.status(400).json({ success: false, error: '缺少 advertiser_id 或 bind_info' });
+    }
+    const boundInfo = bind_info.map((b: any) => ({ ...b, rule_id: req.params.id }));
+    const result = await Ads.bindOptimizerRule({
+      advertiser_id,
+      lang: lang || 'EN',
+      bind_info: boundInfo,
+    });
+    res.json({ success: true, data: result?.data || result });
+  } catch (e: any) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/ad-center/rules/:id/results — 规则执行结果
+router.get('/rules/:id/results', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const advertiser_id = req.query.advertiser_id as string;
+    if (!advertiser_id) return res.status(400).json({ success: false, error: '缺少 advertiser_id' });
+    const result = await Ads.getOptimizerRuleResults({
+      advertiser_id,
+      rule_id: req.params.id,
+      page: Number(req.query.page) || 1,
+      page_size: Number(req.query.page_size) || 50,
     });
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
