@@ -421,4 +421,128 @@ router.get('/test-relay', authMiddleware, async (_req: Request, res: Response) =
   });
 });
 
+// GET /api/tiktok-ads/diagnose — 全维度诊断（直连 vs 代理 / HTTP vs HTTPS / 多目标）
+// 返回：4 种组合的连通性 + 根本原因定位
+router.get('/diagnose', authMiddleware, async (_req: Request, res: Response) => {
+  const proxyUrl = process.env.HTTPS_PROXY || 'http://127.0.0.1:7890';
+
+  // 4 个目标：分别代表国内 / 国外 / 普通 / 关键依赖
+  const targets = [
+    { name: 'tiktok_business_api', url: 'https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', method: 'POST', expectStatuses: [400, 401, 405] },
+    { name: 'tiktok_creative_portal', url: 'https://business-api.tiktok.com/portal/auth', method: 'GET', expectStatuses: [200, 302, 400] },
+    { name: 'cloudflare_worker', url: process.env.TT_ADS_RELAY_URL || 'https://kyrie.yangyue0505.workers.dev', method: 'POST', expectStatuses: [200, 400, 401] },
+    { name: 'google_connectivity', url: 'https://www.google.com/generate_204', method: 'GET', expectStatuses: [204, 200, 301, 302] },
+  ];
+
+  const directAgent = new Agent({ connect: { timeout: 5_000 }, bodyTimeout: 8_000, headersTimeout: 5_000 });
+  const proxyDispatcher = new ProxyAgent({ uri: proxyUrl, connect: { timeout: 5_000 }, bodyTimeout: 8_000, headersTimeout: 5_000 });
+
+  // 测试一项：返回 { ok, status, latency_ms, root_code, root_message, hint }
+  async function probe(target: typeof targets[number], dispatcher: any, label: string) {
+    const t0 = Date.now();
+    try {
+      const opts: any = {
+        method: target.method,
+        headers: { 'Content-Type': 'application/json' },
+        dispatcher,
+      };
+      // POST 需要 body
+      if (target.method === 'POST') {
+        opts.body = JSON.stringify({ __test__: 1 });
+      }
+      const r = await undiciFetch(target.url, opts);
+      const text = await r.text();
+      return {
+        target: target.name,
+        via: label,
+        ok: r.status >= 200 && r.status < 500,
+        http_status: r.status,
+        latency_ms: Date.now() - t0,
+        body_preview: text.slice(0, 150),
+        hint: target.expectStatuses.includes(r.status)
+          ? `网络通，目标可达（${r.status}）`
+          : r.status === 401
+            ? '可达但鉴权失败（正常，目标需要 token）'
+            : `HTTP ${r.status}`,
+      };
+    } catch (e: any) {
+      const chain = extractErrorChain(e);
+      const root = chain[chain.length - 1];
+      const code = root?.code || '-';
+      return {
+        target: target.name,
+        via: label,
+        ok: false,
+        latency_ms: Date.now() - t0,
+        root_code: code,
+        root_message: root?.message || e?.message,
+        hint: code === 'ETIMEDOUT' ? 'TCP 握手超时 — 目标域名不可达（可能被 GFW 拦截）'
+          : code === 'ECONNRESET' ? '连接被重置 — 代理 / 防火墙 / 协议不匹配'
+          : code === 'ENOTFOUND' ? 'DNS 解析失败 — 容器内 DNS 问题'
+          : code === 'ECONNREFUSED' ? '端口被拒 — 防火墙拦截 / 端口未开'
+          : code === 'CERT_' ? 'TLS 证书错误'
+          : '未知错误',
+      };
+    }
+  }
+
+  // 8 个组合（4 目标 × 2 通道）顺序探测（避免同时打爆代理）
+  const results: any[] = [];
+  for (const t of targets) {
+    results.push(await probe(t, directAgent, 'direct'));
+    results.push(await probe(t, proxyDispatcher, `proxy(${proxyUrl})`));
+  }
+
+  // 总结：判断每种通道的整体可用性
+  const direct = results.filter(r => r.via === 'direct');
+  const proxy = results.filter(r => r.via.startsWith('proxy('));
+  const directOkCount = direct.filter(r => r.ok).length;
+  const proxyOkCount = proxy.filter(r => r.ok).length;
+
+  // 根因诊断
+  const diagnosis: string[] = [];
+  if (directOkCount === 0 && proxyOkCount === 0) {
+    diagnosis.push('🚨 直连和代理都不通 — 容器可能完全没网，或所有目标都被 GFW 阻断');
+  } else if (directOkCount === 0) {
+    diagnosis.push('⚠️  直连完全不通（GFW 阻断，符合预期）');
+  } else if (directOkCount === direct.length) {
+    diagnosis.push('✅ 直连全部通 — 代理其实没必要用');
+  }
+  if (proxyOkCount === 0) {
+    diagnosis.push(`🚨 代理 ${proxyUrl} 完全不通 — 这是 TikTok OAuth 失败的核心原因`);
+    const proxyFails = proxy.filter(r => r.root_code === 'ECONNRESET');
+    if (proxyFails.length >= 3) {
+      diagnosis.push('   └─ 90% 概率是 SOCKS 代理（不是 HTTP），undici ProxyAgent 不支持');
+      diagnosis.push('   └─ 或者代理需要认证（HTTP 407）');
+      diagnosis.push('   └─ 建议：SSH 到服务器，手动测试 `curl -x ' + proxyUrl + ' https://www.google.com` 看是否成功');
+    }
+  } else if (proxyOkCount < proxy.length) {
+    diagnosis.push(`⚠️  代理部分通（${proxyOkCount}/${proxy.length}）— 可能是路由规则把某些目标 block 了`);
+  } else {
+    diagnosis.push('✅ 代理全部通 — 但 OAuth 仍失败，可能是别的问题');
+  }
+
+  // 给出可执行的建议
+  const recommendations: string[] = [];
+  if (proxyOkCount === 0) {
+    recommendations.push('1. SSH 到 ECS，执行：`curl -v -x ' + proxyUrl + ' https://www.google.com` — 验证代理本身是否工作');
+    recommendations.push('2. 如果 7890 真的是 SOCKS 代理，找一下 SOCKS 端口（通常是 7891），用 socks-proxy-agent');
+    recommendations.push('3. 临时方案：给 Cloudflare Worker 绑定自定义域名（绕过 *.workers.dev 域名封锁）');
+    recommendations.push('4. 终极方案：让运维帮你直连 TikTok 的 IP 加白名单（白嫖不了，认栽）');
+  } else {
+    recommendations.push('代理可用但 OAuth 仍失败 — 可能是 auth_code 已过期（5分钟），重试一次');
+  }
+
+  return res.json({
+    proxy_url: proxyUrl,
+    summary: {
+      direct_pass: `${directOkCount}/${direct.length}`,
+      proxy_pass: `${proxyOkCount}/${proxy.length}`,
+    },
+    results,
+    diagnosis,
+    recommendations,
+  });
+});
+
 export default router;
