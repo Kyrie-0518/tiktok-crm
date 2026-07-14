@@ -19,6 +19,25 @@ import * as Ads from '../services/tiktok-ads';
 const router = Router();
 
 // ══════════════════════════════════════
+//  通用错误处理：检测 token 过期
+// ══════════════════════════════════════
+
+function handleApiError(e: any, res: Response) {
+  const msg = e?.message || String(e);
+  // TikTok 401 / token 过期错误码
+  if (/HTTP 401|code 10102|code 40001|code 40002|Expired credentials|invalid_token/i.test(msg)) {
+    console.warn('[ad-center] 检测到 token 过期:', msg.slice(0, 200));
+    return res.json({
+      success: false,
+      error: 'token_expired',
+      message: 'TikTok Ads 授权已过期，请前往 [广告账户] 页面重新授权',
+      details: msg,
+    });
+  }
+  return res.json({ success: false, error: msg });
+}
+
+// ══════════════════════════════════════
 //  通用缓存助手（缓解流量引擎菜单加载慢）
 // ══════════════════════════════════════
 
@@ -163,7 +182,7 @@ router.get('/campaigns', authMiddleware, async (req: Request, res: Response) => 
     }), { forceRefresh, ttl: 3 * 60 * 1000 });
     res.json({ success: true, data: result.data, cached: result.cached, last_updated: result.last_updated });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -174,7 +193,7 @@ router.post('/campaign/:id/status', authMiddleware, async (req: Request, res: Re
     const result = await Ads.updateCampaignStatus(advertiser_id as string, req.params.id, status);
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -185,7 +204,7 @@ router.post('/campaign/:id', authMiddleware, async (req: Request, res: Response)
     const result = await Ads.updateCampaign(advertiser_id as string, req.params.id, updates);
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -204,7 +223,7 @@ router.get('/adgroups', authMiddleware, async (req: Request, res: Response) => {
     }), { forceRefresh, ttl: 3 * 60 * 1000 });
     res.json({ success: true, data: result.data, cached: result.cached, last_updated: result.last_updated });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -224,7 +243,7 @@ router.get('/ads', authMiddleware, async (req: Request, res: Response) => {
     }), { forceRefresh, ttl: 3 * 60 * 1000 });
     res.json({ success: true, data: result.data, cached: result.cached, last_updated: result.last_updated });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -235,7 +254,7 @@ router.post('/ad/:id/status', authMiddleware, async (req: Request, res: Response
     const result = await Ads.updateAdStatus(advertiser_id as string, req.params.id, status);
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -255,7 +274,7 @@ router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -279,7 +298,7 @@ router.get('/rules', authMiddleware, async (req: Request, res: Response) => {
     });
   } catch (e: any) {
     console.error('[ad-center] rules list failed:', e.message);
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -306,7 +325,7 @@ router.post('/rules', authMiddleware, async (req: Request, res: Response) => {
     const result = await Ads.createOptimizerRule(body);
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -337,7 +356,7 @@ router.put('/rules/:id', authMiddleware, async (req: Request, res: Response) => 
     const result = await Ads.updateOptimizerRule(body);
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -350,7 +369,7 @@ router.get('/rules/:id', authMiddleware, async (req: Request, res: Response) => 
     const ruleData = result?.data?.list?.[0] || result?.data || result;
     res.json({ success: true, data: ruleData });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -369,7 +388,7 @@ router.post('/rules/:id/bind', authMiddleware, async (req: Request, res: Respons
     });
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -386,7 +405,7 @@ router.get('/rules/:id/results', authMiddleware, async (req: Request, res: Respo
     });
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -402,7 +421,7 @@ router.get('/rules/:id/logs', authMiddleware, async (req: Request, res: Response
     });
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 
@@ -417,7 +436,7 @@ router.get('/creatives', authMiddleware, async (req: Request, res: Response) => 
     });
     res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
-    res.json({ success: false, error: e.message });
+    return handleApiError(e, res);
   }
 });
 

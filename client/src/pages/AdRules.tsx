@@ -232,6 +232,22 @@ function formatRelativeTime(ts: number): string {
   return new Date(ts).toLocaleString('zh-CN', { hour12: false });
 }
 
+/* ── Token 过期检测助手 ── */
+
+function isTokenExpiredError(res: any): boolean {
+  return res?.data?.error === 'token_expired';
+}
+
+function showTokenExpiredModal() {
+  Modal.confirm({
+    title: 'TikTok Ads 授权已过期',
+    content: '当前 TikTok Ads access_token 已失效，无法加载数据。请前往 [广告账户] 页面重新授权。',
+    okText: '前往授权',
+    cancelText: '稍后',
+    onOk: () => { window.location.href = '/ad-accounts'; },
+  });
+}
+
 /* ══════════════════════════════════════ */
 
 const AdRules: React.FC = () => {
@@ -297,7 +313,11 @@ const AdRules: React.FC = () => {
         setLastUpdated(res.data.last_updated || null);
         setIsCached(!!res.data.cached);
       } else {
-        message.error('加载失败: ' + (res.data?.error || '未知错误'));
+        if (isTokenExpiredError(res)) {
+          showTokenExpiredModal();
+        } else {
+          message.error('加载失败: ' + (res.data?.error || '未知错误'));
+        }
       }
     } catch (e: any) {
       message.error('加载失败: ' + (e.response?.data?.error || e.message));

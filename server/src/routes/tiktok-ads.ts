@@ -122,7 +122,17 @@ router.post('/exchange-code', authMiddleware, async (req: Request, res: Response
     res.json({ success: true, data: result });
   } catch (e: any) {
     console.error('[TikTok Ads] 换 token 失败:', e.message);
-    res.status(500).json({ success: false, error: e.message });
+    // 区分网络瞬时错误 vs 业务错误
+    const isTransient = ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED'].includes(e?.code || e?.cause?.code)
+      || /fetch failed|ClientNetworkError/i.test(e?.message || '');
+    res.status(isTransient ? 503 : 500).json({
+      success: false,
+      error: e.message,
+      error_type: isTransient ? 'network_transient' : 'business',
+      hint: isTransient
+        ? '网络瞬时错误，已自动重试 9 次（3 代理 × 3 次）。请稍后手动重试，或检查代理端口 10909 是否正常。'
+        : '请确认 auth_code 有效且未过期（auth_code 仅 5 分钟有效）',
+    });
   }
 });
 

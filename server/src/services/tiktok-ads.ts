@@ -78,17 +78,37 @@ function getProxyCandidates(): string[] {
   ].filter((u): u is string => typeof u === 'string' && u.length > 0);
 }
 
+// 瞬时网络错误——重试能解决的
+function isTransientError(e: any): boolean {
+  if (!e) return false;
+  const code = e?.code || e?.cause?.code;
+  if (['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED', 'EPIPE', 'ENETUNREACH'].includes(code)) return true;
+  const msg = String(e?.message || e?.cause?.message || '');
+  return /fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|ClientNetworkError/i.test(msg);
+}
+
+async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
 async function fetchWithProxy(url: string, options: any) {
   const proxies = getProxyCandidates();
+  const maxRetries = 3;
   let lastError: any;
+  // 1. 顺序尝试每个代理
   for (const proxyUrl of proxies) {
-    try {
-      const dispatcher = new ProxyAgent(proxyUrl);
-      console.log(`[TikTok Ads] fetch via proxy ${proxyUrl} -> ${url}`);
-      return await fetch(url, { ...options, dispatcher } as any);
-    } catch (e: any) {
-      console.error(`[TikTok Ads] proxy ${proxyUrl} failed:`, e.message || e);
-      lastError = e;
+    // 2. 每个代理内部重试 3 次（指数退避 500ms / 1s / 2s）
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const dispatcher = new ProxyAgent(proxyUrl);
+        const res = await fetch(url, { ...options, dispatcher } as any);
+        if (attempt > 1) console.log(`[TikTok Ads] retry success on attempt ${attempt} via ${proxyUrl}`);
+        return res;
+      } catch (e: any) {
+        lastError = e;
+        const transient = isTransientError(e);
+        console.error(`[TikTok Ads] proxy ${proxyUrl} attempt ${attempt}/${maxRetries} failed:`, e?.code || e?.message || e);
+        if (!transient || attempt === maxRetries) break; // 致命错误或重试用完，跳到下一个代理
+        await sleep(500 * Math.pow(2, attempt - 1)); // 500 → 1000 → 2000
+      }
     }
   }
   throw lastError;
