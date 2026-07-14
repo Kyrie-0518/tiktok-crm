@@ -91,11 +91,11 @@ async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 async function fetchWithProxy(url: string, options: any) {
   const proxies = getProxyCandidates();
-  const maxRetries = 3;
+  const maxRetries = 2; // 每个通道重试 2 次，节省总耗时
   let lastError: any;
   // 1. 顺序尝试每个代理
   for (const proxyUrl of proxies) {
-    // 2. 每个代理内部重试 3 次（指数退避 500ms / 1s / 2s）
+    // 2. 每个代理内部重试 2 次（避免在不可达代理上浪费太多时间）
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const dispatcher = new ProxyAgent(proxyUrl);
@@ -105,10 +105,27 @@ async function fetchWithProxy(url: string, options: any) {
       } catch (e: any) {
         lastError = e;
         const transient = isTransientError(e);
-        console.error(`[TikTok Ads] proxy ${proxyUrl} attempt ${attempt}/${maxRetries} failed:`, e?.code || e?.message || e);
-        if (!transient || attempt === maxRetries) break; // 致命错误或重试用完，跳到下一个代理
-        await sleep(500 * Math.pow(2, attempt - 1)); // 500 → 1000 → 2000
+        const code = e?.code || e?.cause?.code || '-';
+        console.error(`[TikTok Ads] proxy ${proxyUrl} attempt ${attempt}/${maxRetries} failed: code=${code} msg=${e?.message || e}`);
+        if (!transient || attempt === maxRetries) break;
+        await sleep(500 * Math.pow(2, attempt - 1));
       }
+    }
+  }
+  // 3. 兜底：所有代理都不可达 → 尝试直连（TikTok API 国内可访问，只是慢）
+  console.warn('[TikTok Ads] all proxies unreachable, trying direct connection (no proxy)');
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, options as any);
+      if (attempt > 1) console.log(`[TikTok Ads] direct retry success on attempt ${attempt}`);
+      console.log('[TikTok Ads] direct connection works — consider disabling proxies in production');
+      return res;
+    } catch (e: any) {
+      lastError = e;
+      const code = e?.code || e?.cause?.code || '-';
+      console.error(`[TikTok Ads] direct attempt ${attempt}/${maxRetries} failed: code=${code} msg=${e?.message || e}`);
+      if (attempt === maxRetries) break;
+      await sleep(500 * Math.pow(2, attempt - 1));
     }
   }
   throw lastError;
