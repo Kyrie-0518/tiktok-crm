@@ -43,24 +43,39 @@ async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
   if (!relayUrl) throw new Error('未配置 TT_ADS_RELAY_URL');
 
   // 使用 undici Agent 直连，强制绕过 HTTPS_PROXY（服务器代理不一定可用）
-  const res = await fetch(relayUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${relayToken}`,
-    },
-    body: JSON.stringify({
-      action: 'exchange_code',
-      app_id: APP_ID,
-      secret: APP_SECRET,
-      auth_code: authCode,
-    }),
-    dispatcher: new Agent({ connectTimeout: 15_000 }),
-  });
-  const json = await res.json() as any;
-  if (!json.success) throw new Error(json.error || 'Worker relay failed');
-  // Worker 返回 { success: true, data: TikTok API response }
-  return json.data;
+  const directAgent = new Agent({ connectTimeout: 15_000 });
+  try {
+    const res = await fetch(relayUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${relayToken}`,
+      },
+      body: JSON.stringify({
+        action: 'exchange_code',
+        app_id: APP_ID,
+        secret: APP_SECRET,
+        auth_code: authCode,
+      }),
+      dispatcher: directAgent,
+    });
+    const text = await res.text();
+    console.log(`[TikTok Ads] relay response status=${res.status} body=${text.slice(0, 500)}`);
+    let json: any;
+    try { json = JSON.parse(text); } catch { throw new Error(`relay non-JSON response: ${text.slice(0, 200)}`); }
+    if (!json.success) throw new Error(json.error || 'Worker relay failed');
+    return json.data;
+  } catch (e: any) {
+    // 输出详细错误便于诊断
+    console.error('[TikTok Ads] relay failed:', {
+      url: relayUrl,
+      code: e?.code || e?.cause?.code,
+      message: e?.message,
+      cause: e?.cause?.message,
+      stack: e?.stack?.slice(0, 500),
+    });
+    throw e;
+  }
 }
 
 async function saveAccountsCache(idsArray: string[]) {
