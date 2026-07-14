@@ -270,111 +270,70 @@ export async function getReport(params: {
   }, cb));
 }
 
-// ── 自动规则 ──
+// ── 自动规则（统一走 undici 代理，不依赖 SDK 的 superagent） ──
 
 export async function getOptimizerRules(params: { advertiser_id: string; page?: number; page_size?: number; status?: string }) {
-  const sdk = await getSDK();
-  const api = new sdk.AutomatedRulesApi();
   const token = getAccessToken();
-  const filtering: any = {};
-  if (params.status) filtering.status = params.status;
-  return promisify(cb => api.optimizerRuleList(params.advertiser_id, token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  const query: Record<string, any> = {
+    advertiser_id: params.advertiser_id,
     page: params.page || 1,
     page_size: params.page_size || 50,
-    filtering: Object.keys(filtering).length ? filtering : undefined,
-  }, cb));
+  };
+  if (params.status) {
+    query.filtering = JSON.stringify({ status: params.status });
+  }
+  return tiktokAdsGet('/open_api/v1.3/optimizer/rule/list/', token, query);
 }
 
 export async function getOptimizerRuleDetail(advertiserId: string, ruleId: string) {
-  const sdk = await getSDK();
-  const api = new sdk.AutomatedRulesApi();
   const token = getAccessToken();
-  return promisify(cb => api.optimizerRuleGet(advertiserId, [ruleId], token, cb));
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsGet('/open_api/v1.3/optimizer/rule/get/', token, {
+    advertiser_id: advertiserId,
+    rule_ids: [ruleId],
+  });
 }
 
-export async function createOptimizerRule(body: {
-  advertiser_id: string;
-  lang?: string;
-  rules: Array<{
-    name: string;
-    conditions: Array<{ subject_type: string; calculation_type?: string; match_type?: string; range_type?: string; values?: string[] }>;
-    actions: Array<{ subject_type: string; action_type?: string; value?: any; value_type?: string; frequency_info?: any }>;
-    apply_objects: Array<{ dimension: string; dimension_ids?: string[]; bind_type?: string; pre_condition_type: string }>;
-    rule_exec_info: { exec_time_type: string; exec_time?: string; time_period_info?: any[] };
-    notification: { notification_type: string; email_setting?: any };
-    tzone?: string;
-  }>;
-}) {
-  const sdk = await getSDK();
-  const api = new sdk.AutomatedRulesApi();
+export async function createOptimizerRule(body: any) {
   const token = getAccessToken();
-  return promisify(cb => api.optimizerRuleCreate(token, { body }, cb));
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsPost('/open_api/v1.3/optimizer/rule/create/', body, token);
 }
 
-export async function updateOptimizerRule(body: {
-  advertiser_id: string;
-  lang?: string;
-  rules: Array<{
-    rule_id: string;
-    name: string;
-    conditions: Array<{ subject_type: string; calculation_type?: string; match_type?: string; range_type?: string; values?: string[] }>;
-    actions: Array<{ subject_type: string; action_type?: string; value?: any; value_type?: string; frequency_info?: any }>;
-    apply_objects: Array<{ dimension: string; dimension_ids?: string[]; bind_type?: string; pre_condition_type: string }>;
-    rule_exec_info: { exec_time_type: string; exec_time?: string; time_period_info?: any[] };
-    notification: { notification_type: string; email_setting?: any };
-    tzone?: string;
-  }>;
-}) {
-  const sdk = await getSDK();
-  const api = new sdk.AutomatedRulesApi();
+export async function updateOptimizerRule(body: any) {
   const token = getAccessToken();
-  return promisify(cb => api.optimizerRuleUpdate(token, { body }, cb));
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsPost('/open_api/v1.3/optimizer/rule/update/', body, token);
 }
 
-export async function bindOptimizerRule(body: {
-  advertiser_id: string;
-  lang?: string;
-  bind_info: Array<{
-    bind_type: string;
-    dimension: string;
-    dimension_ids: string[];
-    rule_id: string;
-  }>;
-}) {
-  const sdk = await getSDK();
-  const api = new sdk.AutomatedRulesApi();
+export async function bindOptimizerRule(body: any) {
   const token = getAccessToken();
-  return promisify(cb => api.optimizerRuleBatchBind(token, { body }, cb));
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsPost('/open_api/v1.3/optimizer/rule/batch_bind/', body, token);
 }
 
-export async function getOptimizerRuleResults(params: {
-  advertiser_id: string;
-  rule_id: string;
-  page?: number;
-  page_size?: number;
-  lang?: string;
-}) {
-  const sdk = await getSDK();
-  const api = new sdk.AutomatedRulesApi();
+export async function getOptimizerRuleResults(params: { advertiser_id: string; rule_id: string; page?: number; page_size?: number; lang?: string }) {
   const token = getAccessToken();
-  return promisify(cb => api.optimizerRuleResultList(params.advertiser_id, token, {
-    filtering: { rule_info: [params.rule_id] },
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsGet('/open_api/v1.3/optimizer/rule/result/list/', token, {
+    advertiser_id: params.advertiser_id,
+    filtering: JSON.stringify({ rule_info: [params.rule_id] }),
     page: params.page || 1,
     page_size: params.page_size || 50,
     lang: params.lang || 'EN',
-  }, cb));
+  });
 }
 
 export async function getOptimizerRuleLogs(params: { advertiser_id: string; rule_id: string; page?: number; page_size?: number }) {
-  const sdk = await getSDK();
-  const api = new sdk.AutomatedRulesApi();
   const token = getAccessToken();
-  return promisify(cb => api.optimizerRuleLogGet(token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsGet('/open_api/v1.3/optimizer/rule/log/get/', token, {
     advertiser_id: params.advertiser_id,
     rule_id: params.rule_id,
     page: params.page || 1,
     page_size: params.page_size || 50,
-  }, cb));
+  });
 }
 
 // ── 创意素材 ──

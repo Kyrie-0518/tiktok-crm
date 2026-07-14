@@ -19,6 +19,53 @@ import * as Ads from '../services/tiktok-ads';
 const router = Router();
 
 // ══════════════════════════════════════
+//  通用缓存助手（缓解流量引擎菜单加载慢）
+// ══════════════════════════════════════
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+
+interface CachedResult<T = any> {
+  data: T;
+  cached: boolean;
+  last_updated: number;
+}
+
+async function getCachedOrFetch<T = any>(
+  cacheKey: string,
+  fetcher: () => Promise<{ data: T } | T>,
+  opts: { forceRefresh?: boolean; ttl?: number } = {}
+): Promise<CachedResult<T>> {
+  const db = getDb();
+  const tsKey = `${cacheKey}__ts`;
+  const ttl = opts.ttl ?? CACHE_TTL;
+  const forceRefresh = opts.forceRefresh === true;
+
+  if (!forceRefresh) {
+    const cacheRow = db.prepare('SELECT value FROM settings WHERE key = ?').get(cacheKey) as any;
+    const tsRow = db.prepare('SELECT value FROM settings WHERE key = ?').get(tsKey) as any;
+    if (cacheRow?.value && tsRow?.value) {
+      const lastUpdated = Number(tsRow.value);
+      if (Date.now() - lastUpdated < ttl) {
+        try {
+          return { data: JSON.parse(cacheRow.value), cached: true, last_updated: lastUpdated };
+        } catch { /* 解析失败则忽略缓存 */ }
+      }
+    }
+  }
+
+  const raw = await fetcher();
+  const data: T = (raw as any)?.data ?? (raw as T);
+  const now = Date.now();
+  try {
+    db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(cacheKey, JSON.stringify(data));
+    db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(tsKey, String(now));
+  } catch (e) { console.error('[ad-center] cache write failed:', e); }
+  return { data, cached: false, last_updated: now };
+}
+
+// ══════════════════════════════════════
 //  SDK 直连通道（流量引擎图表/表格）
 // ══════════════════════════════════════
 
@@ -101,18 +148,20 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
   }
 });
 
-// GET /api/ad-center/campaigns — 广告系列列表
+// GET /api/ad-center/campaigns — 广告系列列表（带缓存）
 router.get('/campaigns', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { advertiser_id, page, page_size, status, objective_type } = req.query;
-    const result = await Ads.getCampaigns({
-      advertiser_id: advertiser_id as string || '',
-      page: Number(page) || 1,
-      page_size: Number(page_size) || 50,
-      status: status as string || undefined,
-      objective_type: objective_type as string || undefined,
-    });
-    res.json({ success: true, data: result?.data || result });
+    const advertiserId = req.query.advertiser_id as string || '';
+    const forceRefresh = req.query.force_refresh === '1';
+    const cacheKey = `tt_ads_campaigns_${advertiserId}_${req.query.status || 'all'}_${req.query.objective_type || 'all'}`;
+    const result = await getCachedOrFetch(cacheKey, () => Ads.getCampaigns({
+      advertiser_id: advertiserId,
+      page: Number(req.query.page) || 1,
+      page_size: Number(req.query.page_size) || 50,
+      status: req.query.status as string || undefined,
+      objective_type: req.query.objective_type as string || undefined,
+    }), { forceRefresh, ttl: 3 * 60 * 1000 });
+    res.json({ success: true, data: result.data, cached: result.cached, last_updated: result.last_updated });
   } catch (e: any) {
     res.json({ success: false, error: e.message });
   }
@@ -140,36 +189,40 @@ router.post('/campaign/:id', authMiddleware, async (req: Request, res: Response)
   }
 });
 
-// GET /api/ad-center/adgroups — 广告组列表
+// GET /api/ad-center/adgroups — 广告组列表（带缓存）
 router.get('/adgroups', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { advertiser_id, campaign_id, page, page_size, status } = req.query;
-    const result = await Ads.getAdgroups({
-      advertiser_id: advertiser_id as string || '',
-      campaign_id: campaign_id as string || undefined,
-      page: Number(page) || 1,
-      page_size: Number(page_size) || 50,
-      status: status as string || undefined,
-    });
-    res.json({ success: true, data: result?.data || result });
+    const advertiserId = req.query.advertiser_id as string || '';
+    const forceRefresh = req.query.force_refresh === '1';
+    const cacheKey = `tt_ads_adgroups_${advertiserId}_${req.query.campaign_id || 'all'}_${req.query.status || 'all'}`;
+    const result = await getCachedOrFetch(cacheKey, () => Ads.getAdgroups({
+      advertiser_id: advertiserId,
+      campaign_id: req.query.campaign_id as string || undefined,
+      page: Number(req.query.page) || 1,
+      page_size: Number(req.query.page_size) || 50,
+      status: req.query.status as string || undefined,
+    }), { forceRefresh, ttl: 3 * 60 * 1000 });
+    res.json({ success: true, data: result.data, cached: result.cached, last_updated: result.last_updated });
   } catch (e: any) {
     res.json({ success: false, error: e.message });
   }
 });
 
-// GET /api/ad-center/ads — 广告列表
+// GET /api/ad-center/ads — 广告列表（带缓存）
 router.get('/ads', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { advertiser_id, adgroup_id, campaign_id, page, page_size, status } = req.query;
-    const result = await Ads.getAds({
-      advertiser_id: advertiser_id as string || '',
-      adgroup_id: adgroup_id as string || undefined,
-      campaign_id: campaign_id as string || undefined,
-      page: Number(page) || 1,
-      page_size: Number(page_size) || 50,
-      status: status as string || undefined,
-    });
-    res.json({ success: true, data: result?.data || result });
+    const advertiserId = req.query.advertiser_id as string || '';
+    const forceRefresh = req.query.force_refresh === '1';
+    const cacheKey = `tt_ads_ads_${advertiserId}_${req.query.campaign_id || 'all'}_${req.query.adgroup_id || 'all'}_${req.query.status || 'all'}`;
+    const result = await getCachedOrFetch(cacheKey, () => Ads.getAds({
+      advertiser_id: advertiserId,
+      adgroup_id: req.query.adgroup_id as string || undefined,
+      campaign_id: req.query.campaign_id as string || undefined,
+      page: Number(req.query.page) || 1,
+      page_size: Number(req.query.page_size) || 50,
+      status: req.query.status as string || undefined,
+    }), { forceRefresh, ttl: 3 * 60 * 1000 });
+    res.json({ success: true, data: result.data, cached: result.cached, last_updated: result.last_updated });
   } catch (e: any) {
     res.json({ success: false, error: e.message });
   }
@@ -206,18 +259,26 @@ router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/ad-center/rules — 自动化规则列表
+// GET /api/ad-center/rules — 自动化规则列表（带 5min 缓存）
 router.get('/rules', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { advertiser_id, page, page_size, status } = req.query;
-    const result = await Ads.getOptimizerRules({
-      advertiser_id: advertiser_id as string || '',
-      page: Number(page) || 1,
-      page_size: Number(page_size) || 50,
-      status: status as string || undefined,
+    const advertiserId = req.query.advertiser_id as string || '';
+    const forceRefresh = req.query.force_refresh === '1';
+    const cacheKey = `tt_ads_rules_${advertiserId}`;
+    const result = await getCachedOrFetch(cacheKey, () => Ads.getOptimizerRules({
+      advertiser_id: advertiserId,
+      page: Number(req.query.page) || 1,
+      page_size: Number(req.query.page_size) || 50,
+      status: req.query.status as string || undefined,
+    }), { forceRefresh, ttl: 3 * 60 * 1000 });
+    res.json({
+      success: true,
+      data: result.data,
+      cached: result.cached,
+      last_updated: result.last_updated,
     });
-    res.json({ success: true, data: result?.data || result });
   } catch (e: any) {
+    console.error('[ad-center] rules list failed:', e.message);
     res.json({ success: false, error: e.message });
   }
 });

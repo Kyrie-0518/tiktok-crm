@@ -222,6 +222,16 @@ interface RuleResult {
   after_value?: any;
 }
 
+/* ── 时间格式化助手 ── */
+
+function formatRelativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return '刚刚';
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`;
+  return new Date(ts).toLocaleString('zh-CN', { hour12: false });
+}
+
 /* ══════════════════════════════════════ */
 
 const AdRules: React.FC = () => {
@@ -232,6 +242,8 @@ const AdRules: React.FC = () => {
   const [selectedAdv, setSelectedAdv] = useState('');
   const [rules, setRules] = useState<OptimizerRule[]>([]);
   const [keyword, setKeyword] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [isCached, setIsCached] = useState(false);
 
   // 创建/编辑抽屉
   const [formOpen, setFormOpen] = useState(false);
@@ -262,11 +274,13 @@ const AdRules: React.FC = () => {
     } catch { /* ignore */ }
   }, [selectedAdv]);
 
-  const loadRules = useCallback(async () => {
+  const loadRules = useCallback(async (force = false) => {
     if (!selectedAdv) { setLoading(false); return; }
     setLoading(true);
     try {
-      const res = await api.get('/ad-center/rules', { params: { advertiser_id: selectedAdv } });
+      const res = await api.get('/ad-center/rules', {
+        params: { advertiser_id: selectedAdv, force_refresh: force ? 1 : 0 },
+      });
       if (res.data?.success) {
         const rawList = res.data.data?.list || [];
         const list: OptimizerRule[] = rawList.map((r: any) => ({
@@ -280,8 +294,10 @@ const AdRules: React.FC = () => {
           create_time: r.create_time || '-',
         }));
         setRules(list);
+        setLastUpdated(res.data.last_updated || null);
+        setIsCached(!!res.data.cached);
       } else {
-        message.error(res.data?.error || '加载规则失败');
+        message.error('加载失败: ' + (res.data?.error || '未知错误'));
       }
     } catch (e: any) {
       message.error('加载失败: ' + (e.response?.data?.error || e.message));
@@ -650,7 +666,7 @@ const AdRules: React.FC = () => {
           <Text type="secondary">TikTok 自动化广告优化规则，按条件自动调整预算 / 出价 / 状态</Text>
         </div>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadRules} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
+          <Button icon={<ReloadOutlined />} onClick={() => loadRules(true)} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate} style={{ borderRadius: 8, background: PRIMARY }}>创建规则</Button>
         </Space>
       </div>
@@ -666,6 +682,11 @@ const AdRules: React.FC = () => {
             共 <Text strong style={{ color: PRIMARY }}>{filtered.length}</Text> 条
             <Tag color="green" style={{ marginLeft: 6 }}>{activeCount} 生效</Tag>
             <Tag color="#94a3b8" style={{ marginLeft: 4 }}>{disabledCount} 停用</Tag>
+            {lastUpdated && (
+              <Text type="secondary" style={{ marginLeft: 10, fontSize: 11 }}>
+                {isCached ? '🟢 缓存' : '🔵 实时'} · {formatRelativeTime(lastUpdated)}
+              </Text>
+            )}
           </Text>
         </Space>
       </Card>
