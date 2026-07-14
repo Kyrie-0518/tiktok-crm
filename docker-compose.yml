@@ -49,6 +49,8 @@ services:
       # Cloudflare Worker 中继（国内 ECS 直连 TikTok 不通时自动走这个）
       - TT_ADS_RELAY_URL=https://kyrie.yangyue0505.workers.dev
       - TT_ADS_RELAY_TOKEN=kyrie-tiktok-relay-2026-a8f3d9c7
+      # 绕过代理直连 Worker（Worker 本身在 Cloudflare 全球边缘，不需要再走本机代理）
+      - NO_PROXY=kyrie.yangyue0505.workers.dev,*.workers.dev
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
