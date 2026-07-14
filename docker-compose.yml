@@ -46,6 +46,9 @@ services:
       # 代理配置：host 网络模式下直接用 127.0.0.1
       - HTTPS_PROXY=http://127.0.0.1:7890
       - HTTP_PROXY=http://127.0.0.1:7890
+      # Cloudflare Worker 中继（国内 ECS 直连 TikTok 不通时自动走这个）
+      - TT_ADS_RELAY_URL=https://kyrie.yangyue0505.workers.dev
+      - TT_ADS_RELAY_TOKEN=kyrie-tiktok-relay-2026-a8f3d9c7
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
