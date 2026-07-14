@@ -1042,7 +1042,7 @@ const AdRules: React.FC = () => {
       <Drawer title="规则详情" open={detailOpen} onClose={() => setDetailOpen(false)} width={560}>
         {detailRule && (
           <>
-            <Descriptions column={1} bordered size="small" column={{ sm: 1 }}>
+            <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="规则名称">{detailRule.rule_name}</Descriptions.Item>
               <Descriptions.Item label="规则ID"><Text code>{detailRule.rule_id}</Text></Descriptions.Item>
               <Descriptions.Item label="状态">
