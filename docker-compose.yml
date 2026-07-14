@@ -51,6 +51,9 @@ services:
       - TT_ADS_RELAY_TOKEN=kyrie-tiktok-relay-2026-a8f3d9c7b2e1
       # 绕过代理直连 Worker（Worker 本身在 Cloudflare 全球边缘，不需要再走本机代理）
       - NO_PROXY=kyrie.yangyue0505.workers.dev,*.workers.dev
+      # Relay 通道配置：直连失败时回退走 7890 代理（国内 ECS 经常需要这一跳才能到 workers.dev）
+      # TT_ADS_RELAY_VIA_PROXY=http://127.0.0.1:7890  # 留空默认用 HTTPS_PROXY
+      # TT_ADS_RELAY_SKIP_PROXY=1  # 设为 1 完全跳过代理（仅直连）
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
