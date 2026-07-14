@@ -79,16 +79,69 @@ const AdAccounts: React.FC = () => {
 
     const exchange = async () => {
       setLoading(true);
+      // 清除 URL 参数，避免刷新时重复执行
+      window.history.replaceState({}, '', '/ad-accounts');
       try {
-        const res = await api.post('/tiktok-ads/exchange-code', { auth_code: authCode });
-        if (res.data?.success) {
-          message.success('TikTok Ads 授权成功');
-          // 清除 URL 参数，避免刷新时重复执行
-          window.history.replaceState({}, '', '/ad-accounts');
+        // Step 1: 获取 OAuth 配置（appId / appSecret）
+        const configRes = await api.get('/tiktok-ads/auth-url');
+        if (!configRes.data?.success) {
+          message.error('获取 OAuth 配置失败');
+          return;
+        }
+        const { appId, appSecret } = configRes.data;
+
+        // Step 2: 浏览器直接调 TikTok OAuth 端点（走本地网络/本地代理，不经服务器）
+        let tokenData: any = null;
+        try {
+          const tiktokRes = await fetch('https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              app_id: appId,
+              secret: appSecret,
+              auth_code: authCode,
+              grant_type: 'authorization_code',
+            }),
+          });
+          const tiktokJson = await tiktokRes.json();
+          if (tiktokJson.code === 0 && tiktokJson.data) {
+            tokenData = tiktokJson.data;
+            console.log('[TikTok Auth] client-side exchange success');
+          } else {
+            console.warn('[TikTok Auth] client-side exchange failed:', tiktokJson);
+          }
+        } catch (corsErr: any) {
+          // CORS 错误或其他网络错误 → 回退到服务器代理
+          console.warn('[TikTok Auth] client-side exchange failed (probably CORS), falling back to server:', corsErr?.message);
+        }
+
+        // Step 3: 如果客户端成功，调用 /save-token 让服务器保存
+        if (tokenData) {
+          const saveRes = await api.post('/tiktok-ads/save-token', {
+            access_token: tokenData.access_token,
+            refresh_token: tokenData.refresh_token,
+            advertiser_ids: tokenData.advertiser_ids || tokenData.advertiser_id || [],
+            expires_in: tokenData.expires_in,
+          });
+          if (saveRes.data?.success) {
+            message.success('TikTok Ads 授权成功（本地换 token）');
+            loadAuthStatus();
+            loadAccounts();
+            return;
+          }
+          message.error('保存 token 失败: ' + saveRes.data?.error);
+          return;
+        }
+
+        // Step 4: 客户端失败 → 回退到服务器端 exchange
+        console.log('[TikTok Auth] falling back to server-side exchange');
+        const fallbackRes = await api.post('/tiktok-ads/exchange-code', { auth_code: authCode });
+        if (fallbackRes.data?.success) {
+          message.success('TikTok Ads 授权成功（服务器换 token）');
           loadAuthStatus();
           loadAccounts();
         } else {
-          message.error('授权失败: ' + res.data?.error);
+          message.error('授权失败: ' + (fallbackRes.data?.error || '未知错误') + '。如服务器无法访问 TikTok，请开启浏览器本地代理。');
         }
       } catch (e: any) {
         message.error('授权失败: ' + (e.response?.data?.error || e.message));

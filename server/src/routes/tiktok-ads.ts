@@ -108,8 +108,48 @@ router.get('/auth-url', authMiddleware, (req: Request, res: Response) => {
     success: true,
     authUrl: buildAuthUrl(state),
     appId: APP_ID,
+    appSecret: APP_SECRET, // 暴露给前端做客户端 token 交换（避免服务器访问 TikTok）
     redirectUri: REDIRECT_URI,
   });
+});
+
+// POST /api/tiktok-ads/save-token — 前端已换取 token，服务器直接保存（用于本地代理场景）
+router.post('/save-token', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { access_token, refresh_token, advertiser_ids, expires_in } = req.body;
+    if (!access_token) return res.status(400).json({ success: false, error: '缺少 access_token' });
+
+    const db = getDb();
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_access_token', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(access_token);
+    if (refresh_token) {
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_refresh_token', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(refresh_token);
+    }
+    if (expires_in) {
+      const expiresAt = Date.now() + Number(expires_in) * 1000;
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_token_expires_at', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(String(expiresAt));
+    }
+    const idsArray = Array.isArray(advertiser_ids) ? advertiser_ids : (advertiser_ids ? [advertiser_ids] : []);
+    if (idsArray.length) {
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(idsArray));
+    }
+
+    // 重新拉取账户缓存
+    try {
+      const { saveAccountsCache } = await import('../services/tiktok-ads');
+      // saveAccountsCache 是 async 但内部用了 tiktokAdsPost，国内服务器可能访问不到
+      // 这里用 try/catch 包住，失败不影响 token 保存
+      saveAccountsCache(idsArray).catch((e: any) => console.warn('[TikTok Ads] saveAccountsCache failed (non-fatal):', e.message));
+    } catch (e: any) { /* ignore */ }
+
+    res.json({ success: true, data: { accessToken: '***', advertiserIds: idsArray } });
+  } catch (e: any) {
+    console.error('[TikTok Ads] save-token failed:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // POST /api/tiktok-ads/exchange-code — 前端用 auth_code 换 token（回调地址现在是 /ad-accounts）
