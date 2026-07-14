@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Tag, Button, Space, Typography, message, Spin, Badge, Alert } from 'antd';
-import { SafetyOutlined, ReloadOutlined, CheckCircleOutlined, WarningOutlined, LinkOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Button, Space, Typography, message, Spin, Badge, Alert, Input, Collapse } from 'antd';
+import { SafetyOutlined, ReloadOutlined, CheckCircleOutlined, WarningOutlined, LinkOutlined, CodeOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
 
@@ -25,6 +25,10 @@ const AdAccounts: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  // 手动换 token 模式（客户端/服务器代理都失败时启用）
+  const [manualAuth, setManualAuth] = useState<{ authCode: string; appId: string; appSecret: string; errorMsg: string } | null>(null);
+  const [manualResponse, setManualResponse] = useState('');
+  const [manualSaving, setManualSaving] = useState(false);
 
   const loadAuthStatus = useCallback(async () => {
     try {
@@ -141,7 +145,10 @@ const AdAccounts: React.FC = () => {
           loadAuthStatus();
           loadAccounts();
         } else {
-          message.error('授权失败: ' + (fallbackRes.data?.error || '未知错误') + '。如服务器无法访问 TikTok，请开启浏览器本地代理。');
+          // Step 5: 服务器也失败 → 启用手动换 token 模式
+          const errMsg = fallbackRes.data?.error || '未知错误';
+          message.warning('自动换 token 失败，已切换到手动模式');
+          setManualAuth({ authCode, appId, appSecret, errorMsg: errMsg });
         }
       } catch (e: any) {
         message.error('授权失败: ' + (e.response?.data?.error || e.message));
@@ -165,6 +172,44 @@ const AdAccounts: React.FC = () => {
       message.error('获取授权链接失败: ' + (e.response?.data?.error || e.message));
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  // 手动换 token：解析用户粘贴的 TikTok API JSON 响应，提交给服务器
+  const handleManualSubmit = async () => {
+    if (!manualResponse.trim()) { message.warning('请先粘贴 TikTok API 响应'); return; }
+    let parsed: any;
+    try {
+      parsed = JSON.parse(manualResponse);
+    } catch {
+      message.error('JSON 解析失败，请检查粘贴内容');
+      return;
+    }
+    if (parsed.code !== 0 || !parsed.data) {
+      message.error('TikTok 返回错误: ' + (parsed.message || `code=${parsed.code}`));
+      return;
+    }
+    setManualSaving(true);
+    try {
+      const res = await api.post('/tiktok-ads/save-token', {
+        access_token: parsed.data.access_token,
+        refresh_token: parsed.data.refresh_token,
+        advertiser_ids: parsed.data.advertiser_ids || parsed.data.advertiser_id || [],
+        expires_in: parsed.data.expires_in,
+      });
+      if (res.data?.success) {
+        message.success('Token 保存成功！');
+        setManualAuth(null);
+        setManualResponse('');
+        loadAuthStatus();
+        loadAccounts();
+      } else {
+        message.error('保存失败: ' + res.data?.error);
+      }
+    } catch (e: any) {
+      message.error('保存失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setManualSaving(false);
     }
   };
 
@@ -223,6 +268,56 @@ const AdAccounts: React.FC = () => {
           showIcon
           style={{ marginBottom: 20, borderRadius: 12 }}
         />
+      )}
+
+      {/* ── 手动换 token 面板（CORS/网络都失败时启用） ── */}
+      {manualAuth && (
+        <Card
+          style={{ marginBottom: 20, borderRadius: 12, border: '1px solid #fbbf24', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+          title={<Text strong style={{ color: '#d97706' }}><ThunderboltOutlined /> 手动换 token 模式</Text>}
+        >
+          <Alert
+            type="error" showIcon style={{ marginBottom: 16, borderRadius: 8 }}
+            message="自动换 token 失败（浏览器 CORS + 服务器无法访问 TikTok）"
+            description={`最后错误: ${manualAuth.errorMsg}`}
+          />
+          <Text style={{ display: 'block', marginBottom: 8 }}>
+            <strong>步骤 1：</strong>在你<strong>本机终端</strong>（不是服务器）执行以下命令（可开启代理）：
+          </Text>
+          <pre style={{
+            background: '#1e293b', color: '#e2e8f0', padding: 12, borderRadius: 8, fontSize: 12,
+            overflow: 'auto', marginBottom: 16, lineHeight: 1.5,
+          }}>
+{`curl -X POST https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/ \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "app_id": "${manualAuth.appId}",
+    "secret": "${manualAuth.appSecret}",
+    "auth_code": "${manualAuth.authCode}",
+    "grant_type": "authorization_code"
+  }'`}
+          </pre>
+          <Text style={{ display: 'block', marginBottom: 8 }}>
+            <strong>步骤 2：</strong>把命令的<strong>完整 JSON 响应</strong>粘贴到下面文本框：
+          </Text>
+          <Input.TextArea
+            value={manualResponse} onChange={e => setManualResponse(e.target.value)}
+            placeholder='粘贴 TikTok API 的 JSON 响应，例如：{"code":0,"message":"OK","data":{"access_token":"...","refresh_token":"...","advertiser_ids":["..."],"expires_in":86400}}'
+            autoSize={{ minRows: 6, maxRows: 12 }}
+            style={{ fontFamily: 'monospace', fontSize: 12, marginBottom: 12, borderRadius: 8 }}
+          />
+          <Space>
+            <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleManualSubmit} loading={manualSaving} style={{ borderRadius: 8, background: PRIMARY }}>
+              提交并保存
+            </Button>
+            <Button onClick={() => { setManualAuth(null); setManualResponse(''); }} style={{ borderRadius: 8 }}>
+              取消
+            </Button>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              <CodeOutlined /> 终端执行：auth_code 5 分钟内有效，请尽快完成
+            </Text>
+          </Space>
+        </Card>
       )}
 
       {loading ? <Spin size="large" style={{ display: 'block', margin: '40px auto' }} /> : (
