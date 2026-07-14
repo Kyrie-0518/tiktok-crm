@@ -7,7 +7,7 @@ import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import getDb from '../db';
 import { getTokenStatus, tiktokAdsPost } from '../services/tiktok-ads';
-import { Agent } from 'undici';
+import { fetch as undiciFetch, Agent } from 'undici';
 
 const router = Router();
 
@@ -36,16 +36,37 @@ async function exchangeAuthCode(authCode: string) {
   return tiktokAdsPost('/open_api/v1.3/oauth2/access_token/', body);
 }
 
+/** 递归提取错误的完整根因链（undici 的 fetch failed 经常套 3-4 层 cause） */
+function extractErrorChain(e: any, depth = 0, max = 5): any[] {
+  if (!e || depth >= max) return [];
+  return [{
+    depth,
+    name: e?.name,
+    code: e?.code,
+    message: e?.message,
+    // 一些 undici 错误把状态码放在 cause.status / cause.statusCode
+    status: e?.status ?? e?.statusCode,
+  }, ...extractErrorChain(e?.cause, depth + 1, max)];
+}
+
 /** 通过 Cloudflare Worker 中继换 token（解决国内 ECS 无法访问 TikTok 的问题） */
 async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
   const relayUrl = process.env.TT_ADS_RELAY_URL;
   const relayToken = process.env.TT_ADS_RELAY_TOKEN || 'change-me';
   if (!relayUrl) throw new Error('未配置 TT_ADS_RELAY_URL');
 
-  // 使用 undici Agent 直连，强制绕过 HTTPS_PROXY（服务器代理不一定可用）
-  const directAgent = new Agent({ connectTimeout: 15_000 });
+  // 关键修复：用 undici 显式 fetch + 显式 Agent，强制不走 HTTPS_PROXY
+  // undici v7 的 Agent 顶层没有 connectTimeout，要用 connect.timeout
+  // 同时显式设置 bodyTimeout / headersTimeout 防止长时间挂起
+  const directAgent = new Agent({
+    connect: { timeout: 15_000 }, // undici v7 没有顶层 connectTimeout，要嵌套
+    bodyTimeout: 30_000,
+    headersTimeout: 20_000,
+    keepAliveTimeout: 5_000,
+  });
+
   try {
-    const res = await fetch(relayUrl, {
+    const res = await undiciFetch(relayUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -62,19 +83,29 @@ async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
     const text = await res.text();
     console.log(`[TikTok Ads] relay response status=${res.status} body=${text.slice(0, 500)}`);
     let json: any;
-    try { json = JSON.parse(text); } catch { throw new Error(`relay non-JSON response: ${text.slice(0, 200)}`); }
+    try { json = JSON.parse(text); } catch { throw new Error(`relay non-JSON response (status=${res.status}): ${text.slice(0, 200)}`); }
     if (!json.success) throw new Error(json.error || 'Worker relay failed');
     return json.data;
   } catch (e: any) {
-    // 输出详细错误便于诊断
+    const chain = extractErrorChain(e);
     console.error('[TikTok Ads] relay failed:', {
       url: relayUrl,
-      code: e?.code || e?.cause?.code,
-      message: e?.message,
-      cause: e?.cause?.message,
-      stack: e?.stack?.slice(0, 500),
+      token_prefix: relayToken.slice(0, 12) + '...',
+      chain,
+      // 关键：把最后一层（根因）也单独抽出来
+      root: chain[chain.length - 1],
+      // 原始 stack 头部 300 字（不截断 cause.message）
+      stack_head: e?.stack?.slice(0, 300),
+      // 直接序列化前 2 层，避免被终端 truncate
+      full_e: { message: e?.message, code: e?.code, name: e?.name, cause: e?.cause ? { message: e.cause.message, code: e.cause.code, name: e.cause.name } : null },
     });
-    throw e;
+    // 重新抛一个带根因 message 的新 Error，方便上层日志和前端错误浮层看清楚
+    const rootCause = chain[chain.length - 1];
+    const rootMsg = rootCause?.message || e?.message || 'relay fetch failed';
+    const wrapped = new Error(`relay fetch failed → ${rootMsg} (code=${rootCause?.code || '-'})`);
+    (wrapped as any).cause = e;
+    (wrapped as any).chain = chain;
+    throw wrapped;
   }
 }
 
@@ -255,6 +286,71 @@ router.get('/token-status', authMiddleware, (_req: Request, res: Response) => {
     res.json(getTokenStatus());
   } catch (e: any) {
     res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/tiktok-ads/test-relay — 诊断 Worker 可达性 + 鉴权是否通过
+// 返回：worker_url、http_status、response_body（前 500 字）、耗时、错误链（如有）
+router.get('/test-relay', authMiddleware, async (_req: Request, res: Response) => {
+  const relayUrl = process.env.TT_ADS_RELAY_URL;
+  const relayToken = process.env.TT_ADS_RELAY_TOKEN || 'change-me';
+  if (!relayUrl) return res.status(400).json({ success: false, error: '未配置 TT_ADS_RELAY_URL' });
+
+  const directAgent = new Agent({
+    connect: { timeout: 10_000 },
+    bodyTimeout: 15_000,
+    headersTimeout: 10_000,
+  });
+  const t0 = Date.now();
+  try {
+    // 故意发一个空 auth_code，Worker 会返回 400 + missing 错误，但能验证鉴权+网络是否通
+    const r = await undiciFetch(relayUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${relayToken}`,
+      },
+      body: JSON.stringify({
+        action: 'exchange_code',
+        app_id: APP_ID,
+        secret: APP_SECRET,
+        auth_code: '__test__', // 占位
+      }),
+      dispatcher: directAgent,
+    });
+    const text = await r.text();
+    return res.json({
+      success: r.status >= 200 && r.status < 500, // 200~499 都算"网络通"，只有 5xx 才算失败
+      relay_url: relayUrl,
+      http_status: r.status,
+      latency_ms: Date.now() - t0,
+      body_preview: text.slice(0, 500),
+      hint: r.status === 200
+        ? 'Worker 可达且鉴权通过'
+        : r.status === 401
+          ? 'Worker 鉴权失败 — 检查 TT_ADS_RELAY_TOKEN 是否等于 Worker env TIKTOK_RELAY_TOKEN'
+          : r.status === 400
+            ? 'Worker 可达+鉴权通过，仅参数错误（正常，测试用）'
+            : `HTTP ${r.status}`,
+    });
+  } catch (e: any) {
+    const chain = extractErrorChain(e);
+    return res.status(503).json({
+      success: false,
+      relay_url: relayUrl,
+      latency_ms: Date.now() - t0,
+      error_chain: chain,
+      root_cause: chain[chain.length - 1],
+      hint: (() => {
+        const root = chain[chain.length - 1];
+        const code = root?.code || '';
+        if (code === 'ENOTFOUND' || /ENOTFOUND/.test(root?.message || '')) return 'DNS 解析失败 — 容器内 ping 不到 Cloudflare，检查 /etc/resolv.conf';
+        if (code === 'ECONNREFUSED' || /ECONNREFUSED/.test(root?.message || '')) return '连接被拒 — 端口 443 出站被防火墙挡了';
+        if (code === 'ETIMEDOUT' || /timeout/i.test(root?.message || '')) return '连接超时 — 可能是代理 127.0.0.1:7890 拦下了 workers.dev 域名';
+        if (/fetch failed/i.test(e?.message || '')) return '底层 fetch 失败（无具体 code）— 多半是 HTTPS_PROXY 把请求路由到 7890 但代理不认 workers.dev；已经显式用 undici 直连 Agent，理论上不走代理。请检查容器内 `curl -v https://kyrie.yangyue0505.workers.dev`';
+        return '未知网络错误 — 查看 chain 详情';
+      })(),
+    });
   }
 });
 
