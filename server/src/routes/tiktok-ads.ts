@@ -31,7 +31,33 @@ async function exchangeAuthCode(authCode: string) {
     grant_type: 'authorization_code',
   };
 
+  // 优先直连
   return tiktokAdsPost('/open_api/v1.3/oauth2/access_token/', body);
+}
+
+/** 通过 Cloudflare Worker 中继换 token（解决国内 ECS 无法访问 TikTok 的问题） */
+async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
+  const relayUrl = process.env.TT_ADS_RELAY_URL;
+  const relayToken = process.env.TT_ADS_RELAY_TOKEN || 'change-me';
+  if (!relayUrl) throw new Error('未配置 TT_ADS_RELAY_URL');
+
+  const res = await fetch(relayUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${relayToken}`,
+    },
+    body: JSON.stringify({
+      action: 'exchange_code',
+      app_id: APP_ID,
+      secret: APP_SECRET,
+      auth_code: authCode,
+    }),
+  });
+  const json = await res.json() as any;
+  if (!json.success) throw new Error(json.error || 'Worker relay failed');
+  // Worker 返回 { success: true, data: TikTok API response }
+  return json.data;
 }
 
 async function saveAccountsCache(idsArray: string[]) {
@@ -75,7 +101,20 @@ async function saveAccountsCache(idsArray: string[]) {
 }
 
 async function handleAuthCodeAndSave(authCode: string) {
-  const result = await exchangeAuthCode(authCode);
+  let result: any;
+  // 1. 尝试直连 TikTok
+  try {
+    result = await exchangeAuthCode(authCode);
+  } catch (directErr: any) {
+    console.warn('[TikTok Ads] direct exchange failed:', directErr.message);
+    // 2. 回退到 Cloudflare Worker 中继
+    if (process.env.TT_ADS_RELAY_URL) {
+      console.log('[TikTok Ads] falling back to Cloudflare Worker relay:', process.env.TT_ADS_RELAY_URL);
+      result = await exchangeAuthCodeViaRelay(authCode);
+    } else {
+      throw directErr; // 没有配置 relay，直接报错
+    }
+  }
   if (result.code !== 0) throw new Error(result.message || '换取 token 失败');
 
   const data = result.data || {};
