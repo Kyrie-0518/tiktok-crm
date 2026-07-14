@@ -90,16 +90,27 @@ function isTransientError(e: any): boolean {
 async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 async function fetchWithProxy(url: string, options: any) {
-  const proxies = getProxyCandidates();
+  // 配置开关
+  const SKIP_PROXY = process.env.TT_ADS_SKIP_PROXY === '1';
+  const DIRECT_TIMEOUT_MS = Number(process.env.TT_ADS_DIRECT_TIMEOUT_MS) || 30000;
+  const PROXY_TIMEOUT_MS = Number(process.env.TT_ADS_PROXY_TIMEOUT_MS) || 15000;
+
+  // 给 undici 设置超时（headersTimeout / bodyTimeout 用 AbortController 模拟）
+  const optionsWithTimeout = (timeoutMs: number) => ({
+    ...options,
+    headersTimeout: timeoutMs,
+    bodyTimeout: timeoutMs,
+  });
+
+  const proxies = SKIP_PROXY ? [] : getProxyCandidates();
   const maxRetries = 2; // 每个通道重试 2 次，节省总耗时
   let lastError: any;
   // 1. 顺序尝试每个代理
   for (const proxyUrl of proxies) {
-    // 2. 每个代理内部重试 2 次（避免在不可达代理上浪费太多时间）
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const dispatcher = new ProxyAgent(proxyUrl);
-        const res = await fetch(url, { ...options, dispatcher } as any);
+        const res = await fetch(url, { ...optionsWithTimeout(PROXY_TIMEOUT_MS), dispatcher } as any);
         if (attempt > 1) console.log(`[TikTok Ads] retry success on attempt ${attempt} via ${proxyUrl}`);
         return res;
       } catch (e: any) {
@@ -113,12 +124,16 @@ async function fetchWithProxy(url: string, options: any) {
     }
   }
   // 3. 兜底：所有代理都不可达 → 尝试直连（TikTok API 国内可访问，只是慢）
-  console.warn('[TikTok Ads] all proxies unreachable, trying direct connection (no proxy)');
+  if (SKIP_PROXY) {
+    console.log('[TikTok Ads] TT_ADS_SKIP_PROXY=1 set, attempting direct connection only');
+  } else {
+    console.warn('[TikTok Ads] all proxies unreachable, trying direct connection (no proxy)');
+  }
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const res = await fetch(url, options as any);
+      const res = await fetch(url, optionsWithTimeout(DIRECT_TIMEOUT_MS) as any);
       if (attempt > 1) console.log(`[TikTok Ads] direct retry success on attempt ${attempt}`);
-      console.log('[TikTok Ads] direct connection works — consider disabling proxies in production');
+      console.log('[TikTok Ads] direct connection works — set TT_ADS_SKIP_PROXY=1 to make this permanent');
       return res;
     } catch (e: any) {
       lastError = e;
