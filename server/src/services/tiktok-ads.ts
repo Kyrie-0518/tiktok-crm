@@ -368,9 +368,10 @@ export async function getReport(params: {
 }) {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
-  // TikTok v1.3 必传 report_type 字段（v1.2 改名 level，v1.3 叫 report_type）
-  // 常见值：REPORT_TYPE_ADVERTISER / _CAMPAIGN / _ADGROUP / _AD / _CATEGORY / _BC
-  const reportType = params.report_type || 'REPORT_TYPE_CAMPAIGN';
+  // TikTok v1.3 integrated/get 接口的 report_type 实际可选值只有 6 个：
+  //   AUDIENCE / BASIC / TT_SHOP / CATALOG / BC / PLAYABLE_MATERIAL
+  // 没有 _CAMPAIGN / _ADVERTISER / _ADGROUP 这种。campaign 数据走 BASIC + dimensions=campaign_id
+  const reportType = params.report_type || 'BASIC';
   return tiktokAdsGet('/open_api/v1.3/report/integrated/get/', token, {
     advertiser_id: params.advertiser_id,
     report_type: reportType,

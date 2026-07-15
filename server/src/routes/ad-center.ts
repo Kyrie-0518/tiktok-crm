@@ -24,8 +24,8 @@ const router = Router();
 
 function handleApiError(e: any, res: Response) {
   const msg = e?.message || String(e);
-  // TikTok 401 / token 过期错误码
-  if (/HTTP 401|code 10102|code 40001|code 40002|Expired credentials|invalid_token/i.test(msg)) {
+  // TikTok 401 / token 过期错误码（只有 10102 和 40001 是 token 相关的，40002 是字段错误不归这里）
+  if (/HTTP 401|code 10102|code 40001|Expired credentials|invalid_token/i.test(msg)) {
     console.warn('[ad-center] 检测到 token 过期:', msg.slice(0, 200));
     return res.json({
       success: false,
@@ -35,7 +35,7 @@ function handleApiError(e: any, res: Response) {
     });
   }
   // TikTok 账户欠费
-  if (/in debt|AccessDenied|insufficient_balance|code 40011|code 40100/i.test(msg)) {
+  if (/in debt|AccessDenied|insufficient_balance|code 40100/i.test(msg)) {
     console.warn('[ad-center] 检测到账户欠费:', msg.slice(0, 200));
     return res.json({
       success: false,
