@@ -4,7 +4,7 @@
  * 提供 22 个 API 类的方法封装，统一 callback → Promise 转换
  */
 
-import { fetch, ProxyAgent } from 'undici';
+import { fetch, fetch as undiciFetch, ProxyAgent, Agent } from 'undici';
 import getDb from '../db';
 
 // SDK 使用 ES Module，我们用动态 import
@@ -95,54 +95,84 @@ async function fetchWithProxy(url: string, options: any) {
   const DIRECT_TIMEOUT_MS = Number(process.env.TT_ADS_DIRECT_TIMEOUT_MS) || 30000;
   const PROXY_TIMEOUT_MS = Number(process.env.TT_ADS_PROXY_TIMEOUT_MS) || 15000;
 
-  // 给 undici 设置超时（headersTimeout / bodyTimeout 用 AbortController 模拟）
+  // 给 undici 设置超时
   const optionsWithTimeout = (timeoutMs: number) => ({
     ...options,
     headersTimeout: timeoutMs,
     bodyTimeout: timeoutMs,
   });
 
-  const proxies = SKIP_PROXY ? [] : getProxyCandidates();
-  const maxRetries = 2; // 每个通道重试 2 次，节省总耗时
+  // 0. 【最快通道】FC Relay（国内 ECS 唯一稳定出口）——先试，失败再走代理
+  const relayUrl = process.env.TT_ADS_RELAY_URL;
+  const relayToken = process.env.TT_ADS_RELAY_TOKEN;
+  if (relayUrl && relayToken) {
+    try {
+      const parsedUrl = new URL(url);
+      const relayPath = parsedUrl.pathname + parsedUrl.search;
+      const fetchHeaders = (options?.headers || {}) as Record<string, string>;
+      const relayRes = await undiciFetch(relayUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${relayToken}`,
+          'Date': new Date().toUTCString(),
+        },
+        body: JSON.stringify({
+          action: 'relay',
+          path: relayPath,
+          method: options.method || 'GET',
+          payload: fetchHeaders,
+        }),
+        dispatcher: new Agent({ connect: { timeout: 5_000 }, bodyTimeout: 30_000 }),
+      });
+      const relayText = await relayRes.text();
+      const relayJson = JSON.parse(relayText);
+      if (relayJson.success && relayJson.data !== undefined) {
+        console.log('[TikTok Ads] FC relay success');
+        return {
+          ok: String(relayJson.status || 200).startsWith('2'),
+          status: relayJson.status || 200,
+          text: async () => JSON.stringify(relayJson.data),
+          json: async () => relayJson.data,
+          headers: new Map([['content-type', 'application/json']]),
+        } as any;
+      }
+      console.warn('[TikTok Ads] FC relay returned error:', relayText.slice(0, 200));
+    } catch (e: any) {
+      console.warn('[TikTok Ads] FC relay failed:', e.message);
+    }
+  }
+
+  // 1-3. 原始 fallback：代理 → 直连（境外服务器或不配 relay 时用）
   let lastError: any;
-  // 1. 顺序尝试每个代理
+  const proxies = SKIP_PROXY ? [] : getProxyCandidates();
+  const maxRetries = 2;
+
   for (const proxyUrl of proxies) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const dispatcher = new ProxyAgent(proxyUrl);
         const res = await fetch(url, { ...optionsWithTimeout(PROXY_TIMEOUT_MS), dispatcher } as any);
-        if (attempt > 1) console.log(`[TikTok Ads] retry success on attempt ${attempt} via ${proxyUrl}`);
         return res;
       } catch (e: any) {
         lastError = e;
-        const transient = isTransientError(e);
-        const code = e?.code || e?.cause?.code || '-';
-        console.error(`[TikTok Ads] proxy ${proxyUrl} attempt ${attempt}/${maxRetries} failed: code=${code} msg=${e?.message || e}`);
-        if (!transient || attempt === maxRetries) break;
+        if (!isTransientError(e) || attempt === maxRetries) break;
         await sleep(500 * Math.pow(2, attempt - 1));
       }
     }
   }
-  // 3. 兜底：所有代理都不可达 → 尝试直连（TikTok API 国内可访问，只是慢）
-  if (SKIP_PROXY) {
-    console.log('[TikTok Ads] TT_ADS_SKIP_PROXY=1 set, attempting direct connection only');
-  } else {
-    console.warn('[TikTok Ads] all proxies unreachable, trying direct connection (no proxy)');
-  }
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(url, optionsWithTimeout(DIRECT_TIMEOUT_MS) as any);
-      if (attempt > 1) console.log(`[TikTok Ads] direct retry success on attempt ${attempt}`);
-      console.log('[TikTok Ads] direct connection works — set TT_ADS_SKIP_PROXY=1 to make this permanent');
       return res;
     } catch (e: any) {
       lastError = e;
-      const code = e?.code || e?.cause?.code || '-';
-      console.error(`[TikTok Ads] direct attempt ${attempt}/${maxRetries} failed: code=${code} msg=${e?.message || e}`);
       if (attempt === maxRetries) break;
       await sleep(500 * Math.pow(2, attempt - 1));
     }
   }
+
   throw lastError;
 }
 
