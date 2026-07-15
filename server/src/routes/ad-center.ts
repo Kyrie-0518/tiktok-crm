@@ -486,6 +486,41 @@ router.get('/creatives', authMiddleware, async (req: Request, res: Response) => 
 });
 
 // ══════════════════════════════════════
+//  GMV Max 推广系列
+// ══════════════════════════════════════
+
+// GET /api/ad-center/gmv-max/campaigns — GMV Max 计划列表
+router.get('/gmv-max/campaigns', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const advertiserId = req.query.advertiser_id as string || '';
+    const gmvType = req.query.gmv_type as string || 'product'; // product | live
+    const forceRefresh = req.query.force_refresh === '1';
+    const cacheKey = `tt_ads_gmvmax_${advertiserId}_${gmvType}`;
+    const result = await getCachedOrFetch(cacheKey, () => Ads.getGmvMaxCampaigns({
+      advertiser_id: advertiserId,
+      gmv_max_promotion_types: gmvType === 'live' ? ['LIVE_GMV_MAX'] : ['PRODUCT_GMV_MAX'],
+      page: Number(req.query.page) || 1,
+      page_size: Number(req.query.page_size) || 50,
+      primary_status: req.query.status as string || undefined,
+    }), { forceRefresh });
+    res.json({ success: true, data: result.data, cached: result.cached });
+  } catch (e: any) {
+    return handleApiError(e, res);
+  }
+});
+
+// GET /api/ad-center/gmv-max/campaigns/:id — 单个 GMV Max 计划详情
+router.get('/gmv-max/campaigns/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const advertiserId = req.query.advertiser_id as string || '';
+    const result = await Ads.getGmvMaxCampaignInfo(advertiserId, req.params.id);
+    res.json({ success: true, data: result?.data || result });
+  } catch (e: any) {
+    return handleApiError(e, res);
+  }
+});
+
+// ══════════════════════════════════════
 //  MCP 通道（给欧文 AI 智能体用）
 // ══════════════════════════════════════
 

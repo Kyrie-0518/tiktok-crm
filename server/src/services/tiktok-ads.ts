@@ -576,3 +576,50 @@ export async function getMyAdvertisers() {
   console.log('[TikTok Ads] oauth2AdvertiserGet response:', JSON.stringify(res));
   return res;
 }
+
+// ── GMV Max ──
+
+/** 获取 GMV Max 推广系列列表 */
+export async function getGmvMaxCampaigns(params: {
+  advertiser_id: string;
+  gmv_max_promotion_types?: string[]; // ['PRODUCT_GMV_MAX'] | ['LIVE_GMV_MAX']
+  store_ids?: string[];
+  campaign_ids?: string[];
+  campaign_name?: string;
+  primary_status?: string;
+  creation_filter_start_time?: string;
+  creation_filter_end_time?: string;
+  page?: number;
+  page_size?: number;
+  fields?: string[];
+}) {
+  const token = getAccessToken();
+  if (!token) throw new Error('TikTok Ads 未授权');
+  const filtering: any = {
+    gmv_max_promotion_types: params.gmv_max_promotion_types || ['PRODUCT_GMV_MAX'],
+  };
+  if (params.store_ids?.length) filtering.store_ids = params.store_ids;
+  if (params.campaign_ids?.length) filtering.campaign_ids = params.campaign_ids;
+  if (params.campaign_name) filtering.campaign_name = params.campaign_name;
+  if (params.primary_status) filtering.primary_status = params.primary_status;
+  if (params.creation_filter_start_time) filtering.creation_filter_start_time = params.creation_filter_start_time;
+  if (params.creation_filter_end_time) filtering.creation_filter_end_time = params.creation_filter_end_time;
+
+  return tiktokAdsGet('/open_api/v1.3/gmv_max/campaign/get/', token, {
+    advertiser_id: params.advertiser_id,
+    filtering: JSON.stringify(filtering),
+    page: String(params.page || 1),
+    page_size: String(params.page_size || 50),
+    fields: params.fields ? JSON.stringify(params.fields) : undefined,
+  });
+}
+
+/** 获取单个 GMV Max 推广系列详情 */
+export async function getGmvMaxCampaignInfo(advertiserId: string, campaignId: string) {
+  const token = getAccessToken();
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsGet('/open_api/v1.3/campaign/gmv_max/info/', token, {
+    advertiser_id: advertiserId,
+    campaign_id: campaignId,
+  });
+}
