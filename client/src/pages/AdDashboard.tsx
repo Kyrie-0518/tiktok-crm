@@ -22,18 +22,7 @@ const AdDashboard: React.FC = () => {
   });
   const [selectedAccount, setSelectedAccount] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs().subtract(7, 'day'), dayjs()]);
-  const [reportData, setReportData] = useState<any>(() => {
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith('ad_report_')) {
-          const v = localStorage.getItem(key);
-          if (v) return JSON.parse(v);
-        }
-      }
-    } catch {}
-    return null;
-  });
+  const [reportData, setReportData] = useState<any>(null); // 不再从 localStorage 拿（避免不同账户数据串号）
   const [chartTab, setChartTab] = useState('cost');
   // 趋势图可见指标（仿 Adrate：每个 KPI 卡有 checkbox 控制图例）
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
@@ -72,7 +61,8 @@ const AdDashboard: React.FC = () => {
           dimensions: 'campaign_id',
           metrics: 'spend,impressions,clicks,conversions,ctr,cpc,cpm',
           level: 'AUCTION_CAMPAIGN',
-          force_refresh: '0',
+          // 显式查询时强制刷新缓存，静默后台同步走 5min 缓存
+          force_refresh: silent ? '0' : '1',
         },
       });
       if (res.data?.success && res.data.data) {
