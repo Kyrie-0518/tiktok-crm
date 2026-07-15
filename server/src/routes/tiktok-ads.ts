@@ -140,12 +140,16 @@ async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
 
 /** 解析 Worker 返回，提取 data 字段 */
 function parseRelayResponse(status: number, text: string): any {
-  console.log(`[TikTok Ads] relay response status=${status} body=${text.slice(0, 500)}`);
+  console.log(`[TikTok Ads] relay response status=${status} body=${text.slice(0, 800)}`);
   let json: any;
   try { json = JSON.parse(text); } catch {
     throw new Error(`relay non-JSON response (status=${status}): ${text.slice(0, 200)}`);
   }
-  if (!json.success) throw new Error(json.error || 'Worker relay failed');
+  if (!json.success) {
+    // 把 FC 的真实错误信息全部打出来
+    console.error('[TikTok Ads] relay returned failure:', JSON.stringify(json).slice(0, 500));
+    throw new Error(json.error || json.message || `Worker relay failed (status=${status})`);
+  }
   return json.data;
 }
 
