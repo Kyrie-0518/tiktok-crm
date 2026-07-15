@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Space, Typography, message, DatePicker, Spin, Tabs } from 'antd';
-import { BarChartOutlined, SearchOutlined, ReloadOutlined, DollarOutlined, ShoppingOutlined, RiseOutlined, WalletOutlined, TrophyOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Space, Typography, message, DatePicker, Tabs } from 'antd';
+import { BarChartOutlined, SearchOutlined, ReloadOutlined, DollarOutlined, ShoppingOutlined, RiseOutlined, WalletOutlined, TrophyOutlined, SyncOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import ReactECharts from 'echarts-for-react';
 import api from '../api';
@@ -10,20 +10,35 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 const PRIMARY = '#2563eb';
 
-const CACHE_KEY = 'ad_reports_cache_v1';
+const ACCOUNTS_KEY = 'ad_reports_accounts_v2';
+const reportKey = (advId: string, start: string, end: string) => `ad_report_${advId}_${start}_${end}`;
 
 interface AdAccount { advertiser_id: string; advertiser_name: string; status: string; }
 interface ReportRow { shop_name?: string; cost?: number; net_cost?: number; orders?: number; cpo?: number; revenue?: number; roi?: number; }
 
 const AdDashboard: React.FC = () => {
-  const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<AdAccount[]>(() => {
-    try { const c = localStorage.getItem(CACHE_KEY); return c ? JSON.parse(c) : []; } catch { return []; }
+    try { const c = localStorage.getItem(ACCOUNTS_KEY); return c ? JSON.parse(c) : []; } catch { return []; }
   });
   const [selectedAccount, setSelectedAccount] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs().subtract(7, 'day'), dayjs()]);
-  const [reportData, setReportData] = useState<any>(null);
+  // 关键：初始值从 localStorage 读，秒出
+  const [reportData, setReportData] = useState<any>(() => {
+    try {
+      const k = reportKey('', dayjs().subtract(7, 'day').format('YYYY-MM-DD'), dayjs().format('YYYY-MM-DD'));
+      // 尝试用任何缓存的 key（兼容首次加载）
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('ad_report_')) {
+          const v = localStorage.getItem(key);
+          if (v) return JSON.parse(v);
+        }
+      }
+    } catch {}
+    return null;
+  });
   const [chartTab, setChartTab] = useState('cost');
+  const [syncing, setSyncing] = useState(false); // 静默同步标识（小图标，不阻塞渲染）
 
   // 静默加载账户
   const syncAccounts = useCallback(async () => {
@@ -31,35 +46,41 @@ const AdDashboard: React.FC = () => {
       const res = await api.get('/ad-center/advertisers');
       if (res.data?.success && res.data.data?.length) {
         setAccounts(res.data.data);
-        localStorage.setItem(CACHE_KEY, JSON.stringify(res.data.data));
+        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(res.data.data));
         if (!selectedAccount) setSelectedAccount(res.data.data[0].advertiser_id);
       }
     } catch {}
   }, [selectedAccount]);
   useEffect(() => { syncAccounts(); }, [syncAccounts]);
 
-  // 查报表
-  const fetchReport = useCallback(async () => {
+  // 查报表 — 静默后台同步，不显示大转圈
+  const fetchReport = useCallback(async (silent = true) => {
     if (!selectedAccount) return;
-    setLoading(true);
+    if (!silent) setSyncing(true);
     try {
+      const startStr = dateRange[0].format('YYYY-MM-DD');
+      const endStr = dateRange[1].format('YYYY-MM-DD');
       const res = await api.get('/ad-center/reports', {
         params: {
           advertiser_id: selectedAccount,
-          start_date: dateRange[0].format('YYYY-MM-DD'),
-          end_date: dateRange[1].format('YYYY-MM-DD'),
+          start_date: startStr,
+          end_date: endStr,
           dimensions: 'advertiser_id',
           metrics: 'spend,impressions,clicks,conversions,ctr,cpc,cpm',
           level: 'AUCTION_CAMPAIGN',
           force_refresh: '0',
         },
       });
-      if (res.data?.success) setReportData(res.data.data);
+      if (res.data?.success && res.data.data) {
+        setReportData(res.data.data);
+        localStorage.setItem(reportKey(selectedAccount, startStr, endStr), JSON.stringify(res.data.data));
+      }
     } catch { message.error('报表加载失败'); }
-    finally { setLoading(false); }
+    finally { setSyncing(false); }
   }, [selectedAccount, dateRange]);
 
-  useEffect(() => { if (selectedAccount) fetchReport(); }, [selectedAccount]);
+  // 账户选择后 → 静默同步
+  useEffect(() => { if (selectedAccount) fetchReport(true); }, [selectedAccount, fetchReport]);
 
   // KPI
   const list: any[] = reportData?.list || [];
@@ -142,14 +163,13 @@ const AdDashboard: React.FC = () => {
             style={{ borderRadius: 8 }}
             allowClear={false}
           />
-          <Button type="primary" icon={<SearchOutlined />} onClick={fetchReport} loading={loading} style={{ borderRadius: 8 }}>
+          <Button type="primary" icon={<SearchOutlined />} onClick={() => fetchReport(false)} loading={syncing} style={{ borderRadius: 8 }}>
             查询
           </Button>
         </div>
       </Card>
 
-      <Spin spinning={loading && !reportData}>
-        {/* KPI 卡片 */}
+      {/* KPI 卡片 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
           {kpiCards.map((k, i) => (
             <Card key={i} style={{ borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', textAlign: 'center' }} bodyStyle={{ padding: '16px 12px' }}>
@@ -166,6 +186,7 @@ const AdDashboard: React.FC = () => {
         <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
             <Text strong style={{ fontSize: 14, color: '#1e293b' }}>趋势</Text>
+            {syncing && <Text type="secondary" style={{ fontSize: 12 }}><SyncOutlined spin /> 同步中…</Text>}
             <Tabs
               activeKey={chartTab}
               onChange={setChartTab}
@@ -197,7 +218,6 @@ const AdDashboard: React.FC = () => {
             locale={{ emptyText: '暂无报表数据' }}
           />
         </Card>
-      </Spin>
     </div>
   );
 };
