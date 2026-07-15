@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Tag, Button, Space, Select, Input, Typography, message, Spin, Modal, Switch } from 'antd';
-import { AppstoreOutlined, ReloadOutlined, SearchOutlined, PlayCircleOutlined, PauseCircleOutlined, CaretRightOutlined, PauseOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, ReloadOutlined, SearchOutlined, PlayCircleOutlined, PauseCircleOutlined, CaretRightOutlined, PauseOutlined, SyncOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
 
@@ -29,9 +29,13 @@ const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode }> = {
   DELETED: { color: '#94a3b8', icon: null },
 };
 
+const CACHE_CAMP_KEY = 'ad_campaigns_cache_v1';
+
 const AdCampaigns: React.FC = () => {
-  const [loading, setLoading] = useState(true);
-  const [advertisers, setAdvertisers] = useState<AdvertiserInfo[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [advertisers, setAdvertisers] = useState<AdvertiserInfo[]>(() => {
+    try { const c = localStorage.getItem(CACHE_CAMP_KEY); return c ? JSON.parse(c) : []; } catch { return []; }
+  });
   const [selectedAdv, setSelectedAdv] = useState<string>('');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [keyword, setKeyword] = useState('');
@@ -43,17 +47,15 @@ const AdCampaigns: React.FC = () => {
       if (res.data?.success) {
         const list = res.data.data || [];
         setAdvertisers(list);
+        localStorage.setItem(CACHE_CAMP_KEY, JSON.stringify(list));
         if (list.length && !selectedAdv) setSelectedAdv(list[0].advertiser_id);
       }
-    } catch { /* ignore */ }
+    } catch {}
   }, [selectedAdv]);
 
-  const loadCampaigns = useCallback(async () => {
-    if (!selectedAdv) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const loadCampaigns = useCallback(async (silent = true) => {
+    if (!selectedAdv) return;
+    if (silent) setSyncing(true);
     try {
       const res = await api.get('/ad-center/campaigns', {
         params: { advertiser_id: selectedAdv, page_size: 100, status: statusFilter || undefined },
@@ -69,18 +71,16 @@ const AdCampaigns: React.FC = () => {
           create_time: c.create_time || '-',
         }));
         setCampaigns(list);
-      } else {
-        message.error(res.data?.error);
       }
     } catch (e: any) {
       message.error('加载失败: ' + (e.response?.data?.error || e.message));
     } finally {
-      setLoading(false);
+      setSyncing(false);
     }
   }, [selectedAdv, statusFilter]);
 
   useEffect(() => { loadAdvertisers(); }, [loadAdvertisers]);
-  useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
+  useEffect(() => { if (selectedAdv) loadCampaigns(true); }, [selectedAdv, loadCampaigns]);
 
   const toggleStatus = async (record: Campaign) => {
     const newStatus = record.status === 'ENABLE' ? 'DISABLE' : 'ENABLE';
@@ -135,7 +135,8 @@ const AdCampaigns: React.FC = () => {
           </div>
           <Text type="secondary">TikTok 广告系列列表、启停、预算修改</Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={loadCampaigns} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
+        <Button icon={<ReloadOutlined />} onClick={() => loadCampaigns(false)} loading={syncing} style={{ borderRadius: 8 }}>
+          {syncing ? <><SyncOutlined spin /> 同步中</> : '刷新'}</Button>
       </div>
 
       <Card style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: 16 }}>
@@ -157,10 +158,8 @@ const AdCampaigns: React.FC = () => {
       </Card>
 
       <Card style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        {loading ? <Spin style={{ display: 'block', margin: '40px auto' }} /> : (
-          <Table columns={columns} dataSource={filtered} rowKey="campaign_id" size="middle" scroll={{ x: 1100 }}
-            pagination={{ pageSize: 20, showSizeChanger: false }} />
-        )}
+        <Table columns={columns} dataSource={filtered} rowKey="campaign_id" size="middle" scroll={{ x: 1100 }}
+          pagination={{ pageSize: 20, showSizeChanger: false }} />
       </Card>
     </div>
   );

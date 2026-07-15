@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Tag, Button, Space, Select, Typography, message, Spin, Row, Col, Image, Tabs } from 'antd';
-import { PictureOutlined, ReloadOutlined, LikeOutlined, EyeOutlined } from '@ant-design/icons';
+import { PictureOutlined, ReloadOutlined, LikeOutlined, EyeOutlined, SyncOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
 
@@ -28,7 +28,7 @@ interface AdvertiserInfo {
 }
 
 const AdCreatives: React.FC = () => {
-  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [advertisers, setAdvertisers] = useState<AdvertiserInfo[]>([]);
   const [selectedAdv, setSelectedAdv] = useState('');
   const [creatives, setCreatives] = useState<Creative[]>([]);
@@ -42,44 +42,31 @@ const AdCreatives: React.FC = () => {
         setAdvertisers(list);
         if (list.length && !selectedAdv) setSelectedAdv(list[0].advertiser_id);
       }
-    } catch { /* ignore */ }
+    } catch {}
   }, [selectedAdv]);
 
-  const loadCreatives = useCallback(async () => {
-    if (!selectedAdv) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const loadCreatives = useCallback(async (silent = true) => {
+    if (!selectedAdv) return;
+    if (silent) setSyncing(true);
     try {
       const res = await api.get('/ad-center/creatives', { params: { advertiser_id: selectedAdv, page_size: 100 } });
       if (res.data?.success) {
         const list = (res.data.data?.list || []).map((c: any) => ({
-          creative_id: c.creative_id || c.id,
-          creative_name: c.creative_name || c.name || '-',
-          creative_type: c.creative_type || c.type || 'IMAGE',
-          thumbnail_url: c.thumbnail_url || c.image_url || c.preview_url,
-          ctr: Number(c.ctr) || 0,
-          cvr: Number(c.cvr) || 0,
-          spend: Number(c.spend) || 0,
-          impressions: Number(c.impressions) || 0,
-          clicks: Number(c.clicks) || 0,
-          conversions: Number(c.conversions) || 0,
+          creative_id: c.creative_id || c.id, creative_name: c.creative_name || c.name || '-',
+          creative_type: c.creative_type || c.type || 'IMAGE', thumbnail_url: c.thumbnail_url || c.image_url || c.preview_url,
+          ctr: Number(c.ctr) || 0, cvr: Number(c.cvr) || 0, spend: Number(c.spend) || 0,
+          impressions: Number(c.impressions) || 0, clicks: Number(c.clicks) || 0, conversions: Number(c.conversions) || 0,
           status: c.status || 'ACTIVE',
         }));
         setCreatives(list);
-      } else {
-        message.error(res.data?.error);
       }
     } catch (e: any) {
       message.error('加载失败: ' + (e.response?.data?.error || e.message));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setSyncing(false); }
   }, [selectedAdv]);
 
   useEffect(() => { loadAdvertisers(); }, [loadAdvertisers]);
-  useEffect(() => { loadCreatives(); }, [loadCreatives]);
+  useEffect(() => { if (selectedAdv) loadCreatives(true); }, [selectedAdv, loadCreatives]);
 
   const filtered = tab === 'all' ? creatives :
     tab === 'image' ? creatives.filter(c => c.creative_type === 'IMAGE') :
@@ -117,12 +104,12 @@ const AdCreatives: React.FC = () => {
           </div>
           <Text type="secondary">广告素材表现数据，按 CTR/CVR/消耗 维度分析</Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={loadCreatives} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
+        <Button icon={<ReloadOutlined />} onClick={() => loadCreatives(false)} loading={syncing} style={{ borderRadius: 8 }}>
+          {syncing ? <><SyncOutlined spin /> 同步中</> : '刷新'}</Button>
       </div>
 
-      {loading ? <Spin size="large" style={{ display: 'block', margin: '40px auto' }} /> : (
-        <>
-          {/* Top 素材卡片 */}
+      <>
+        {/* Top 素材卡片 */}
           <div style={{ marginBottom: 20 }}>
             <Text strong style={{ fontSize: 14, marginBottom: 12, display: 'block' }}>🏆 Top 6 高 CTR 素材</Text>
             <Row gutter={[12, 12]}>
@@ -176,8 +163,7 @@ const AdCreatives: React.FC = () => {
             <Table columns={columns} dataSource={filtered} rowKey="creative_id" size="middle"
               scroll={{ x: 900 }} pagination={{ pageSize: 20 }} />
           </Card>
-        </>
-      )}
+      </>
     </div>
   );
 };

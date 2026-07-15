@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Tag, Button, Space, Select, Typography, message, Spin, Timeline, Input } from 'antd';
-import { FileTextOutlined, ReloadOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { FileTextOutlined, ReloadOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
 
@@ -24,7 +24,7 @@ interface AdvertiserInfo {
 }
 
 const AdLogs: React.FC = () => {
-  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [advertisers, setAdvertisers] = useState<AdvertiserInfo[]>([]);
   const [selectedAdv, setSelectedAdv] = useState('');
   const [rules, setRules] = useState<{ rule_id: string; rule_name: string }[]>([]);
@@ -40,7 +40,7 @@ const AdLogs: React.FC = () => {
         setAdvertisers(list);
         if (list.length && !selectedAdv) setSelectedAdv(list[0].advertiser_id);
       }
-    } catch { /* ignore */ }
+    } catch {}
   }, [selectedAdv]);
 
   const loadRules = useCallback(async () => {
@@ -48,49 +48,35 @@ const AdLogs: React.FC = () => {
     try {
       const res = await api.get('/ad-center/rules', { params: { advertiser_id: selectedAdv } });
       if (res.data?.success) {
-        const list = (res.data.data?.list || []).map((r: any) => ({
-          rule_id: r.rule_id || r.id,
-          rule_name: r.rule_name || r.name,
-        }));
+        const list = (res.data.data?.list || []).map((r: any) => ({ rule_id: r.rule_id || r.id, rule_name: r.rule_name || r.name }));
         setRules(list);
         if (list.length && !selectedRule) setSelectedRule(list[0].rule_id);
       }
-    } catch { /* ignore */ }
+    } catch {}
   }, [selectedAdv, selectedRule]);
 
-  const loadLogs = useCallback(async () => {
-    if (!selectedRule) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const loadLogs = useCallback(async (silent = true) => {
+    if (!selectedRule) return;
+    if (silent) setSyncing(true);
     try {
-      const res = await api.get(`/ad-center/rules/${selectedRule}/logs`, {
-        params: { advertiser_id: selectedAdv },
-      });
+      const res = await api.get(`/ad-center/rules/${selectedRule}/logs`, { params: { advertiser_id: selectedAdv } });
       if (res.data?.success) {
         const list = (res.data.data?.list || []).map((l: any) => ({
           rule_log_id: l.rule_log_id || l.id || Math.random().toString(),
-          rule_id: l.rule_id || selectedRule,
-          action: l.action || l.event_type || '-',
-          status: l.status || l.result,
-          message: l.message || l.description || JSON.stringify(l),
-          create_time: l.create_time || l.time || '-',
-          before_value: l.before_value,
-          after_value: l.after_value,
+          rule_id: l.rule_id || selectedRule, action: l.action || l.event_type || '-',
+          status: l.status || l.result, message: l.message || l.description || JSON.stringify(l),
+          create_time: l.create_time || l.time || '-', before_value: l.before_value, after_value: l.after_value,
         }));
         setLogs(list);
       }
     } catch (e: any) {
       message.error('加载失败: ' + (e.response?.data?.error || e.message));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setSyncing(false); }
   }, [selectedAdv, selectedRule]);
 
   useEffect(() => { loadAdvertisers(); }, [loadAdvertisers]);
   useEffect(() => { loadRules(); }, [loadRules]);
-  useEffect(() => { loadLogs(); }, [loadLogs]);
+  useEffect(() => { if (selectedRule) loadLogs(true); }, [selectedAdv, selectedRule, loadLogs]);
 
   const filtered = logs.filter(l => keyword
     ? l.message.toLowerCase().includes(keyword.toLowerCase()) || l.action.toLowerCase().includes(keyword.toLowerCase())
@@ -129,7 +115,8 @@ const AdLogs: React.FC = () => {
           </div>
           <Text type="secondary">自动化规则执行记录与变更历史</Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={loadLogs} loading={loading} style={{ borderRadius: 8 }}>刷新</Button>
+        <Button icon={<ReloadOutlined />} onClick={() => loadLogs(false)} loading={syncing} style={{ borderRadius: 8 }}>
+          {syncing ? <><SyncOutlined spin /> 同步中</> : '刷新'}</Button>
       </div>
 
       <Card style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: 16 }}>
@@ -149,10 +136,8 @@ const AdLogs: React.FC = () => {
       </Card>
 
       <Card style={{ borderRadius: 12, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        {loading ? <Spin style={{ display: 'block', margin: '40px auto' }} /> : (
-          <Table columns={columns} dataSource={filtered} rowKey="rule_log_id" size="middle"
-            scroll={{ x: 1000 }} pagination={{ pageSize: 30, showSizeChanger: false }} />
-        )}
+        <Table columns={columns} dataSource={filtered} rowKey="rule_log_id" size="middle"
+          scroll={{ x: 1000 }} pagination={{ pageSize: 30, showSizeChanger: false }} />
       </Card>
     </div>
   );
