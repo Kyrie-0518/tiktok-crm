@@ -109,7 +109,15 @@ async function fetchWithProxy(url: string, options: any) {
     try {
       const parsedUrl = new URL(url);
       const relayPath = parsedUrl.pathname + parsedUrl.search;
+      // 关键：FC 函数读 payload.access_token（小写下划线），但 tiktokAdsGet 传的是 'Access-Token'（大写带横线）
+      // 这里归一化字段名，让 FC 能正确读到 token
       const fetchHeaders = (options?.headers || {}) as Record<string, string>;
+      const normalizedPayload: Record<string, string> = {};
+      for (const [k, v] of Object.entries(fetchHeaders)) {
+        if (k.toLowerCase() === 'access-token') normalizedPayload['access_token'] = v;
+        else if (k.toLowerCase() === 'content-type') normalizedPayload['content_type'] = v;
+        else normalizedPayload[k] = v;
+      }
       const relayRes = await undiciFetch(relayUrl, {
         method: 'POST',
         headers: {
@@ -121,7 +129,7 @@ async function fetchWithProxy(url: string, options: any) {
           action: 'relay',
           path: relayPath,
           method: options.method || 'GET',
-          payload: fetchHeaders,
+          payload: normalizedPayload,
         }),
         dispatcher: new Agent({ connect: { timeout: 5_000 }, bodyTimeout: 30_000 }),
       });
