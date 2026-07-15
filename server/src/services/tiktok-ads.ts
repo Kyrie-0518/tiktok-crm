@@ -364,11 +364,16 @@ export async function getReport(params: {
   page_size?: number;
   filters?: Record<string, any>;
   level?: string;
+  report_type?: string;
 }) {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
+  // TikTok v1.3 必传 report_type 字段（v1.2 改名 level，v1.3 叫 report_type）
+  // 常见值：REPORT_TYPE_ADVERTISER / _CAMPAIGN / _ADGROUP / _AD / _CATEGORY / _BC
+  const reportType = params.report_type || 'REPORT_TYPE_CAMPAIGN';
   return tiktokAdsGet('/open_api/v1.3/report/integrated/get/', token, {
     advertiser_id: params.advertiser_id,
+    report_type: reportType,
     dimensions: JSON.stringify(params.dimensions || ['campaign_id']),
     metrics: JSON.stringify(params.metrics || ['spend', 'impressions', 'clicks', 'conversions', 'ctr', 'cpc', 'cpm']),
     start_date: params.start_date,
