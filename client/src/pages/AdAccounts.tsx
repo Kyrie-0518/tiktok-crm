@@ -20,15 +20,57 @@ interface AuthStatus {
   advertiserIds: string[];
 }
 
+const ACCOUNTS_CACHE_KEY = 'ad_accounts_cache_v1';
+const AUTH_STATUS_CACHE_KEY = 'tiktok_auth_status_v1';
+
 const AdAccounts: React.FC = () => {
-  const [loading, setLoading] = useState(true);
+  // 初始值：直接从 localStorage 读（秒开，无 loading 转圈）
+  const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
-  const [accounts, setAccounts] = useState<AdAccount[]>([]);
-  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [accounts, setAccounts] = useState<AdAccount[]>(() => {
+    try {
+      const cached = localStorage.getItem(ACCOUNTS_CACHE_KEY);
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(() => {
+    try {
+      const cached = localStorage.getItem(AUTH_STATUS_CACHE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
   // 手动换 token 模式（客户端/服务器代理都失败时启用）
   const [manualAuth, setManualAuth] = useState<{ authCode: string; appId: string; appSecret: string; errorMsg: string } | null>(null);
   const [manualResponse, setManualResponse] = useState('');
   const [manualSaving, setManualSaving] = useState(false);
+
+  // 持久化到 localStorage（任何时候 accounts 变都同步）
+  React.useEffect(() => {
+    try { localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(accounts)); } catch {}
+  }, [accounts]);
+  React.useEffect(() => {
+    try { if (authStatus) localStorage.setItem(AUTH_STATUS_CACHE_KEY, JSON.stringify(authStatus)); } catch {}
+  }, [authStatus]);
+
+  // 静默后台同步（不显示转圈，不阻塞渲染）
+  const silentSync = useCallback(async () => {
+    try {
+      const [sRes, aRes] = await Promise.all([
+        api.get('/tiktok-ads/token-status'),
+        api.get('/ad-center/advertisers'),
+      ]);
+      if (sRes.data) {
+        setAuthStatus(sRes.data);
+        localStorage.setItem(AUTH_STATUS_CACHE_KEY, JSON.stringify(sRes.data));
+      }
+      if (aRes.data?.success) {
+        setAccounts(aRes.data.data || []);
+        localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(aRes.data.data || []));
+      }
+    } catch (e: any) {
+      console.warn('[AdAccounts] silent sync failed:', e?.message);
+    }
+  }, []);
 
   const loadAuthStatus = useCallback(async () => {
     try {
@@ -58,12 +100,14 @@ const AdAccounts: React.FC = () => {
     }
   }, []);
 
+  // 显式刷新：强制从 TikTok 拉最新
   const refreshAccounts = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get('/ad-center/advertisers', { params: { refresh: '1' } });
       if (res.data?.success) {
         setAccounts(res.data.data || []);
+        localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(res.data.data || []));
         if (res.data.refreshed) message.success('已从 TikTok 刷新最新数据');
       }
     } catch (e: any) {
@@ -73,7 +117,10 @@ const AdAccounts: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { loadAuthStatus(); loadAccounts(); }, [loadAuthStatus, loadAccounts]);
+  // 进入页面：直接渲染（localStorage），后台静默同步一次
+  useEffect(() => {
+    silentSync();
+  }, [silentSync]);
 
   // OAuth 回调：从 URL 中读取 auth_code 并自动换 token
   useEffect(() => {
