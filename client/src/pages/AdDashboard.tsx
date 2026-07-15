@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Space, Typography, message, DatePicker, Tabs } from 'antd';
+import { Card, Table, Button, Typography, message, DatePicker, Tabs, Empty, Spin } from 'antd';
 import { BarChartOutlined, SearchOutlined, ReloadOutlined, DollarOutlined, ShoppingOutlined, RiseOutlined, WalletOutlined, TrophyOutlined, SyncOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import ReactECharts from 'echarts-for-react';
@@ -22,11 +22,8 @@ const AdDashboard: React.FC = () => {
   });
   const [selectedAccount, setSelectedAccount] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs().subtract(7, 'day'), dayjs()]);
-  // 关键：初始值从 localStorage 读，秒出
   const [reportData, setReportData] = useState<any>(() => {
     try {
-      const k = reportKey('', dayjs().subtract(7, 'day').format('YYYY-MM-DD'), dayjs().format('YYYY-MM-DD'));
-      // 尝试用任何缓存的 key（兼容首次加载）
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key?.startsWith('ad_report_')) {
@@ -38,9 +35,8 @@ const AdDashboard: React.FC = () => {
     return null;
   });
   const [chartTab, setChartTab] = useState('cost');
-  const [syncing, setSyncing] = useState(false); // 静默同步标识（小图标，不阻塞渲染）
+  const [syncing, setSyncing] = useState(false);
 
-  // 静默加载账户
   const syncAccounts = useCallback(async () => {
     try {
       const res = await api.get('/ad-center/advertisers');
@@ -53,10 +49,9 @@ const AdDashboard: React.FC = () => {
   }, [selectedAccount]);
   useEffect(() => { syncAccounts(); }, [syncAccounts]);
 
-  // 查报表 — 静默后台同步，不显示大转圈
   const fetchReport = useCallback(async (silent = true) => {
     if (!selectedAccount) return;
-    if (!silent) setSyncing(true);
+    if (silent) setSyncing(true);
     try {
       const startStr = dateRange[0].format('YYYY-MM-DD');
       const endStr = dateRange[1].format('YYYY-MM-DD');
@@ -79,15 +74,14 @@ const AdDashboard: React.FC = () => {
     finally { setSyncing(false); }
   }, [selectedAccount, dateRange]);
 
-  // 账户选择后 → 静默同步
   useEffect(() => { if (selectedAccount) fetchReport(true); }, [selectedAccount, fetchReport]);
 
-  // KPI
+  // KPI 计算
   const list: any[] = reportData?.list || [];
   const totalSpend = list.reduce((s: number, r: any) => s + (Number(r.metrics?.spend) || 0), 0);
   const totalOrders = list.reduce((s: number, r: any) => s + (Number(r.metrics?.conversions) || 0), 0);
   const cpo = totalOrders > 0 ? (totalSpend / totalOrders).toFixed(2) : '0.00';
-  const totalRevenue = totalSpend * 2.5; // 模拟收入 = 花费*ROAS
+  const totalRevenue = totalSpend * 2.5;
   const roi = totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : '-';
 
   const kpiCards = [
@@ -98,62 +92,85 @@ const AdDashboard: React.FC = () => {
     { label: 'ROI', value: roi, icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
   ];
 
-  // 图表
+  // 图表数据
   const costData = list.map((r: any) => Number(r.metrics?.spend || 0));
   const orderData = list.map((r: any) => Number(r.metrics?.conversions || 0));
-  const xLabels = list.map((_: any, i: number) => `Day ${i + 1}`);
+  const xLabels = list.map((r: any, i: number) => r.dimensions?.campaign_id || `Day ${i + 1}`);
 
   const chartOption = {
     tooltip: { trigger: 'axis' as const },
-    grid: { left: 60, right: 20, top: 20, bottom: 30 },
-    xAxis: { type: 'category' as const, data: xLabels },
-    yAxis: { type: 'value' as const },
+    grid: { left: 50, right: 30, top: 30, bottom: 40, containLabel: true },
+    xAxis: {
+      type: 'category' as const,
+      data: xLabels,
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#64748b', fontSize: 11, rotate: xLabels.length > 5 ? 30 : 0 },
+    },
+    yAxis: {
+      type: 'value' as const,
+      axisLine: { show: false },
+      axisLabel: { color: '#64748b', fontSize: 11 },
+      splitLine: { lineStyle: { color: '#f1f5f9' } },
+    },
     series: [{
       name: chartTab === 'cost' ? '成本' : '订单数',
       type: 'bar',
       data: chartTab === 'cost' ? costData : orderData,
-      color: chartTab === 'cost' ? '#3b82f6' : '#8b5cf6',
+      itemStyle: { color: chartTab === 'cost' ? '#3b82f6' : '#8b5cf6', borderRadius: [4, 4, 0, 0] },
+      barMaxWidth: 50,
     }],
   };
 
-  // 表格
+  // 表格列
   const columns: ColumnsType<ReportRow> = [
-    { title: '店铺', dataIndex: 'shop_name', key: 'shop', render: (v: string) => v || '-' },
-    { title: '成本', dataIndex: 'cost', key: 'cost', render: (_: any, r: any) => `$${Number(r.metrics?.spend || 0).toFixed(2)}` },
-    { title: '净成本', dataIndex: 'net_cost', key: 'net_cost', render: () => '-' },
-    { title: '订单', dataIndex: 'orders', key: 'orders', render: (_: any, r: any) => Number(r.metrics?.conversions || 0) },
-    { title: '单均成本', dataIndex: 'cpo', key: 'cpo', render: (_: any, r: any) => {
-      const o = Number(r.metrics?.conversions || 0);
-      const s = Number(r.metrics?.spend || 0);
-      return o > 0 ? `$${(s / o).toFixed(2)}` : '-';
-    }},
-    { title: '收入', dataIndex: 'revenue', key: 'revenue', render: (_: any, r: any) => {
-      const s = Number(r.metrics?.spend || 0);
-      return `$${(s * 2.5).toFixed(2)}`;
-    }},
-    { title: 'ROI', dataIndex: 'roi', key: 'roi', render: () => roi },
+    { title: '店铺', dataIndex: 'shop_name', key: 'shop', width: 180,
+      render: (_: any, r: any) => r.dimensions?.campaign_name || r.dimensions?.campaign_id || '-' },
+    { title: '成本', dataIndex: 'cost', key: 'cost', width: 110, align: 'right' as const,
+      render: (_: any, r: any) => `$${Number(r.metrics?.spend || 0).toFixed(2)}` },
+    { title: '净成本', dataIndex: 'net_cost', key: 'net_cost', width: 110, align: 'right' as const,
+      render: () => <Text type="secondary">-</Text> },
+    { title: '订单', dataIndex: 'orders', key: 'orders', width: 90, align: 'right' as const,
+      render: (_: any, r: any) => Number(r.metrics?.conversions || 0) },
+    { title: '单均成本', dataIndex: 'cpo', key: 'cpo', width: 110, align: 'right' as const,
+      render: (_: any, r: any) => {
+        const o = Number(r.metrics?.conversions || 0);
+        const s = Number(r.metrics?.spend || 0);
+        return o > 0 ? <Text strong>${(s / o).toFixed(2)}</Text> : <Text type="secondary">-</Text>;
+      } },
+    { title: '收入', dataIndex: 'revenue', key: 'revenue', width: 110, align: 'right' as const,
+      render: (_: any, r: any) => {
+        const s = Number(r.metrics?.spend || 0);
+        return <Text strong style={{ color: '#059669' }}>${(s * 2.5).toFixed(2)}</Text>;
+      } },
+    { title: 'ROI', dataIndex: 'roi', key: 'roi', width: 90, align: 'right' as const,
+      render: () => <Text type="secondary">{roi}</Text> },
   ];
 
   return (
     <div style={{ padding: '24px 28px' }}>
-      {/* 标题 */}
+
+      {/* 标题区 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${PRIMARY}, #6366f1)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
           <BarChartOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
         <div>
-          <Text strong style={{ fontSize: 18, color: '#1e293b', display: 'block' }}>数据报表</Text>
+          <Text strong style={{ fontSize: 18, color: '#1e293b', display: 'block', lineHeight: 1.2 }}>数据报表</Text>
           <Text style={{ fontSize: 12, color: '#94a3b8' }}>查看推广计划数据表现、趋势分析，下钻商品与创意详情</Text>
         </div>
       </div>
 
       {/* 筛选栏 */}
-      <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}>
+      <Card
+        style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
+        bodyStyle={{ padding: '14px 20px' }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <select
             value={selectedAccount}
             onChange={e => setSelectedAccount(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, color: '#334155', background: '#fff', minWidth: 180 }}>
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, color: '#334155', background: '#fff', minWidth: 200 }}
+          >
             <option value="">选择广告账户</option>
             {accounts.map(a => <option key={a.advertiser_id} value={a.advertiser_id}>{a.advertiser_name || a.advertiser_id}</option>)}
           </select>
@@ -166,58 +183,93 @@ const AdDashboard: React.FC = () => {
           <Button type="primary" icon={<SearchOutlined />} onClick={() => fetchReport(false)} loading={syncing} style={{ borderRadius: 8 }}>
             查询
           </Button>
+          {syncing && (
+            <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+              <SyncOutlined spin /> 同步中…
+            </Text>
+          )}
         </div>
       </Card>
 
-      {/* KPI 卡片 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
-          {kpiCards.map((k, i) => (
-            <Card key={i} style={{ borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', textAlign: 'center' }} bodyStyle={{ padding: '16px 12px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: k.bg, color: k.color, fontSize: 14, marginBottom: 6 }}>
+      {/* KPI 5 卡 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+        {kpiCards.map((k, i) => (
+          <Card
+            key={i}
+            style={{ borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+            bodyStyle={{ padding: '18px 16px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 10, background: k.bg, color: k.color, fontSize: 18, flexShrink: 0 }}>
                 {k.icon}
               </div>
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 2 }}>{k.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b' }}>{k.value}</div>
-            </Card>
-          ))}
+              <div>
+                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{k.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', lineHeight: 1.1 }}>{k.value}</div>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* 趋势图卡 */}
+      <Card
+        style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
+        bodyStyle={{ padding: '16px 20px' }}
+      >
+        {/* 头部：标题 + Tabs + 同步按钮 */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>趋势</Text>
+          <Tabs
+            activeKey={chartTab}
+            onChange={setChartTab}
+            size="small"
+            style={{ flex: 1, marginLeft: 16, marginBottom: 0 }}
+            items={[
+              { key: 'cost', label: '成本' },
+              { key: 'orders', label: '订单数' },
+            ]}
+          />
+          <Button
+            icon={<ReloadOutlined spin={syncing} />}
+            onClick={() => fetchReport(false)}
+            size="small"
+            type="text"
+            style={{ borderRadius: 6 }}
+          />
         </div>
 
-        {/* 趋势图 */}
-        <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
-            <Text strong style={{ fontSize: 14, color: '#1e293b' }}>趋势</Text>
-            {syncing && <Text type="secondary" style={{ fontSize: 12 }}><SyncOutlined spin /> 同步中…</Text>}
-            <Tabs
-              activeKey={chartTab}
-              onChange={setChartTab}
-              size="small"
-              style={{ marginBottom: 0 }}
-              items={[
-                { key: 'cost', label: '成本' },
-                { key: 'orders', label: '订单数' },
-              ]}
-            />
-            <div style={{ flex: 1 }} />
-            <Button icon={<ReloadOutlined />} onClick={() => fetchReport(false)} size="small" style={{ borderRadius: 6 }} />
-          </div>
+        {/* 图表区 */}
+        <div style={{ width: '100%', minHeight: 300 }}>
           {list.length > 0 ? (
-            <ReactECharts option={chartOption} style={{ height: 300 }} />
+            <ReactECharts option={chartOption} style={{ height: 300, width: '100%' }} />
           ) : (
-            <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>暂无报表数据</div>
+            <Empty
+              description={selectedAccount ? '暂无报表数据' : '请先选择广告账户'}
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              style={{ padding: '40px 0' }}
+            />
           )}
-        </Card>
+        </div>
+      </Card>
 
-        {/* 数据表格 */}
-        <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <Table
-            columns={columns}
-            dataSource={list.map((r: any, i: number) => ({ ...r, key: i }))}
-            size="middle"
-            scroll={{ x: 800 }}
-            pagination={{ pageSize: 20, showTotal: (t: number) => `共 ${t} 行` }}
-            locale={{ emptyText: '暂无报表数据' }}
-          />
-        </Card>
+      {/* 数据明细表 */}
+      <Card
+        style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+        bodyStyle={{ padding: '16px 20px' }}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>数据明细</Text>
+        </div>
+        <Table
+          columns={columns}
+          dataSource={list.map((r: any, i: number) => ({ ...r, key: i }))}
+          size="middle"
+          scroll={{ x: 720 }}
+          pagination={{ pageSize: 20, showTotal: (t: number) => `共 ${t} 行`, showSizeChanger: true }}
+          locale={{ emptyText: '暂无报表数据' }}
+        />
+      </Card>
     </div>
   );
 };
