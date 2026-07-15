@@ -81,10 +81,13 @@ const AdCampaigns: React.FC = () => {
     if (!selectedAdv) return;
     if (silent) setSyncing(true);
     try {
-      // 1. 拉 GMV Max 计划列表
+      // 1. 拉 GMV Max 计划列表（首次加载强制刷新，避开之前可能缓存的空 list）
       const campRes = await api.get('/ad-center/gmv-max/campaigns', {
-        params: { advertiser_id: selectedAdv, gmv_type: gmvType, page_size: 100 },
+        params: { advertiser_id: selectedAdv, gmv_type: gmvType, page_size: 100, force_refresh: silent ? '0' : '1' },
       });
+      const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
+      console.log('[AdCampaigns] gmv-max 列表长度:', list.length,
+        list[0] ? `首条 keys: ${Object.keys(list[0]).join(',')}` : '(空)');
       const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
       // 2. 拉性能数据并合并（用 stat_time_day + campaign_id 双维度，按天分组，按 campaign 聚合）
       const end = new Date();
@@ -102,7 +105,8 @@ const AdCampaigns: React.FC = () => {
         },
       });
       const reportList: any[] = repRes.data?.data?.list || [];
-      console.log('[AdCampaigns] reports API 返回 list 长度:', reportList.length, '首条:', JSON.stringify(reportList[0]).slice(0, 300));
+      console.log('[AdCampaigns] reports API 返回 list 长度:', reportList.length,
+        reportList[0] ? `首条: ${JSON.stringify(reportList[0]).slice(0, 300)}` : '首条: (空)');
       const reportMap: Record<string, { spend: number; conversions: number; impressions: number; clicks: number }> = {};
       reportList.forEach((r: any) => {
         const id = r.dimensions?.campaign_id;

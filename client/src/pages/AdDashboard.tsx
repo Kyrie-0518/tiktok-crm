@@ -67,7 +67,9 @@ const AdDashboard: React.FC = () => {
         },
       });
       if (res.data?.success && res.data.data) {
-        console.log('[AdDashboard] reports list length:', res.data.data.list?.length, '首条:', JSON.stringify(res.data.data.list?.[0]).slice(0, 300));
+        const rList = res.data.data.list || [];
+        console.log('[AdDashboard] reports list length:', rList.length,
+          rList[0] ? `首条: ${JSON.stringify(rList[0]).slice(0, 300)}` : '首条: (空)');
         setReportData(res.data.data);
         localStorage.setItem(reportKey(selectedAccount, startStr, endStr), JSON.stringify(res.data.data));
       }

@@ -496,6 +496,7 @@ router.get('/gmv-max/campaigns', authMiddleware, async (req: Request, res: Respo
     const gmvType = req.query.gmv_type as string || 'product'; // product | live
     const forceRefresh = req.query.force_refresh === '1';
     const cacheKey = `tt_ads_gmvmax_${advertiserId}_${gmvType}`;
+    console.log(`[ad-center] gmv-max campaigns: advertiser=${advertiserId} type=${gmvType} forceRefresh=${forceRefresh}`);
     const result = await getCachedOrFetch(cacheKey, () => Ads.getGmvMaxCampaigns({
       advertiser_id: advertiserId,
       gmv_max_promotion_types: gmvType === 'live' ? ['LIVE_GMV_MAX'] : ['PRODUCT_GMV_MAX'],
@@ -503,8 +504,12 @@ router.get('/gmv-max/campaigns', authMiddleware, async (req: Request, res: Respo
       page_size: Number(req.query.page_size) || 50,
       primary_status: req.query.status as string || undefined,
     }), { forceRefresh });
+    const listLen = (result.data as any)?.list?.length || 0;
+    console.log(`[ad-center] gmv-max campaigns 返回 ${listLen} 个 (cached=${result.cached})`);
+    if (listLen > 0) console.log(`[ad-center] gmv-max 首条 keys:`, Object.keys((result.data as any).list[0]));
     res.json({ success: true, data: result.data, cached: result.cached });
   } catch (e: any) {
+    console.error('[ad-center] gmv-max campaigns failed:', e.message);
     return handleApiError(e, res);
   }
 });
