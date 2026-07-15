@@ -78,9 +78,13 @@ async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
     secret: APP_SECRET,
     auth_code: authCode,
   };
-  const headers = {
+  // 关键：FC 网关（*.fcapp.run）强制要求 Date 头，否则返回 MissingRequiredHeader
+  // 每次请求生成新的 GMT 时间（HTTP/1.1 标准 RFC 1123 格式）
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${relayToken}`,
+    'Date': new Date().toUTCString(),
+    'User-Agent': 'bozone-server/1.0',
   };
 
   // 通道 A：直连
