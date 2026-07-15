@@ -154,10 +154,10 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
     }
     console.log(`[ad-center] refreshing ${advertiserIds.length} advertisers`);
 
-    const infoMap: Record<string, { country?: string }> = {};
+    const infoMap: Record<string, { country?: string; currency?: string; timezone?: string; balance?: number; name?: string }> = {};
     const balanceMap: Record<string, any> = {};
 
-    // 4. 批量调 advertiserInfo 拉详情（name/currency/timezone/country）
+    // 4. 批量调 advertiserInfo 拉详情（name/currency/timezone/country/balance）
     try {
       const infoRes = await Ads.getAdvertisersInfo(advertiserIds);
       const list = (infoRes?.data?.list || []) as any[];
@@ -167,7 +167,14 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
         // TikTok v1.3 标准字段：name（中文名）。v1.2 是 advertiser_name
         const name = item.name || item.advertiser_name;
         if (name) baseNameMap[id] = name;
-        infoMap[id] = { country: item.country || '' };
+        // 全部从 info 拉：currency / timezone / country / balance（如果返回了）
+        infoMap[id] = {
+          name: name || undefined,
+          country: item.country || '',
+          currency: item.currency || '',
+          timezone: item.timezone || item.display_timezone || '',
+          balance: typeof item.balance === 'number' ? item.balance : undefined,
+        };
       });
     } catch (e: any) { console.error('[ad-center] getAdvertisersInfo failed:', e.message); }
 
@@ -178,13 +185,21 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
     } catch (e: any) { console.error('[ad-center] getAdvertiserBalance failed:', e.message); }
 
-    const list = advertiserIds.map((id: string) => ({
-      advertiser_id: id,
-      advertiser_name: baseNameMap[id] || id,
-      status: 'ACTIVE',
-      country: infoMap[id]?.country || undefined,
-      balance_info: balanceMap[id] || null,
-    }));
+    const list = advertiserIds.map((id: string) => {
+      const balanceItem = balanceMap[id] || {};
+      // 优先用 balanceMap（专用接口拉的），回退到 infoMap（info 接口返回的）
+      const balance = balanceItem.balance ?? infoMap[id]?.balance ?? 0;
+      const currency = balanceItem.currency || infoMap[id]?.currency || '';
+      return {
+        advertiser_id: id,
+        advertiser_name: baseNameMap[id] || id,
+        status: 'ACTIVE',
+        country: infoMap[id]?.country || undefined,
+        currency: currency || undefined,
+        timezone: infoMap[id]?.timezone || undefined,
+        balance_info: { balance, currency: currency || undefined },
+      };
+    });
     console.log('[ad-center] refreshed advertisers list:', JSON.stringify(list));
     db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(list));
