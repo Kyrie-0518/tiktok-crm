@@ -178,13 +178,12 @@ const AdAccounts: React.FC = () => {
     { title: '币种', dataIndex: 'currency', key: 'currency', width: 80,
       render: (_: any, r: any) => r.balance_info?.currency || r.currency || '-' },
     { title: '余额', dataIndex: 'balance_info', key: 'balance', width: 120,
-      render: (b: any) => <Text strong style={{ color: (b?.balance || 0) > 0 ? '#059669' : '#64748b' }}>
-        {(b?.balance || 0) > 0 ? `$${Number(b?.balance).toFixed(2)}` : '-'}
-      </Text> },
+      render: (b: any) => {
+        const bal = Number(b?.balance ?? 0);
+        return <Text strong style={{ color: bal > 0 ? '#059669' : '#64748b' }}>${bal.toFixed(2)}</Text>;
+      } },
     { title: '时区', dataIndex: 'timezone', key: 'timezone', width: 100,
       render: (v: string) => v || '-' },
-    { title: '标签', dataIndex: 'label', key: 'label', width: 100,
-      render: (v: string) => v ? <Tag>{v}</Tag> : <Text type="secondary">-</Text> },
     { title: '账户 ID', dataIndex: 'advertiser_id', key: 'id', width: 200,
       render: (id: string) => <Text strong>{id}</Text> },
     { title: '操作', key: 'action', width: 80, fixed: 'right',
