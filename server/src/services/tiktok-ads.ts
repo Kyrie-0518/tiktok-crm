@@ -243,84 +243,80 @@ export async function getAdvertisersInfo(advertiserIds: string[]) {
   return res;
 }
 
+// ── Campaigns 广告系列（改用 undici 直连 + relay，绕开 superagent）──
+
 export async function getCampaigns(params: { advertiser_id: string; page?: number; page_size?: number; campaign_ids?: string[]; status?: string; objective_type?: string }) {
-  const sdk = await getSDK();
-  const api = new sdk.CampaignCreationApi();
   const token = getAccessToken();
-  return promisify(cb => api.campaignGet(token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsGet('/open_api/v1.3/campaign/get/', token, {
     advertiser_id: params.advertiser_id,
     page: params.page || 1,
     page_size: params.page_size || 50,
-    campaign_ids: params.campaign_ids || undefined,
-    status: params.status || undefined,
-    objective_type: params.objective_type || undefined,
-  }, cb));
+    campaign_ids: params.campaign_ids,
+    status: params.status,
+    objective_type: params.objective_type,
+  });
 }
 
 export async function updateCampaign(advertiserId: string, campaignId: string, updates: Record<string, any>) {
-  const sdk = await getSDK();
-  const api = new sdk.CampaignCreationApi();
   const token = getAccessToken();
-  return promisify(cb => api.campaignUpdate(token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsPost('/open_api/v1.3/campaign/update/', {
     advertiser_id: advertiserId,
     campaign_id: campaignId,
-    body: updates,
-  }, cb));
+    ...updates,
+  }, token);
 }
 
 export async function updateCampaignStatus(advertiserId: string, campaignId: string, status: string) {
-  const sdk = await getSDK();
-  const api = new sdk.CampaignCreationApi();
   const token = getAccessToken();
-  return promisify(cb => api.campaignStatusUpdate(token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsPost('/open_api/v1.3/campaign/status/update/', {
     advertiser_id: advertiserId,
     campaign_id: campaignId,
-    body: { status },
-  }, cb));
+    status,
+  }, token);
 }
 
 // ── Adgroup 广告组 ──
 
 export async function getAdgroups(params: { advertiser_id: string; campaign_id?: string; page?: number; page_size?: number; adgroup_ids?: string[]; status?: string }) {
-  const sdk = await getSDK();
-  const api = new sdk.AdgroupApi();
   const token = getAccessToken();
-  return promisify(cb => api.adgroupGet(token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsGet('/open_api/v1.3/adgroup/get/', token, {
     advertiser_id: params.advertiser_id,
-    campaign_id: params.campaign_id || undefined,
+    campaign_id: params.campaign_id,
     page: params.page || 1,
     page_size: params.page_size || 50,
-    adgroup_ids: params.adgroup_ids || undefined,
-    status: params.status || undefined,
-  }, cb));
+    adgroup_ids: params.adgroup_ids,
+    status: params.status,
+  });
 }
 
 // ── Ad 广告 ──
 
 export async function getAds(params: { advertiser_id: string; adgroup_id?: string; campaign_id?: string; page?: number; page_size?: number; ad_ids?: string[]; status?: string }) {
-  const sdk = await getSDK();
-  const api = new sdk.AdApi();
   const token = getAccessToken();
-  return promisify(cb => api.adGet(token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsGet('/open_api/v1.3/ad/get/', token, {
     advertiser_id: params.advertiser_id,
-    adgroup_id: params.adgroup_id || undefined,
-    campaign_id: params.campaign_id || undefined,
+    adgroup_id: params.adgroup_id,
+    campaign_id: params.campaign_id,
     page: params.page || 1,
     page_size: params.page_size || 50,
-    ad_ids: params.ad_ids || undefined,
-    status: params.status || undefined,
-  }, cb));
+    ad_ids: params.ad_ids,
+    status: params.status,
+  });
 }
 
 export async function updateAdStatus(advertiserId: string, adId: string, status: string) {
-  const sdk = await getSDK();
-  const api = new sdk.AdApi();
   const token = getAccessToken();
-  return promisify(cb => api.adStatusUpdate(token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsPost('/open_api/v1.3/ad/status/update/', {
     advertiser_id: advertiserId,
     ad_id: adId,
-    body: { status },
-  }, cb));
+    status,
+  }, token);
 }
 
 // ── 报表 ──
@@ -336,10 +332,9 @@ export async function getReport(params: {
   filters?: Record<string, any>;
   level?: string;
 }) {
-  const sdk = await getSDK();
-  const api = new sdk.ReportingApi();
   const token = getAccessToken();
-  return promisify(cb => api.reportIntegratedGet(token, {
+  if (!token) throw new Error('TikTok Ads 未授权');
+  return tiktokAdsGet('/open_api/v1.3/report/integrated/get/', token, {
     advertiser_id: params.advertiser_id,
     dimensions: JSON.stringify(params.dimensions || ['campaign_id']),
     metrics: JSON.stringify(params.metrics || ['spend', 'impressions', 'clicks', 'conversions', 'ctr', 'cpc', 'cpm']),
@@ -349,7 +344,7 @@ export async function getReport(params: {
     page_size: params.page_size || 100,
     level: params.level || 'AUCTION_CAMPAIGN',
     filters: params.filters ? JSON.stringify(params.filters) : undefined,
-  }, cb));
+  });
 }
 
 // ── 自动规则（统一走 undici 代理，不依赖 SDK 的 superagent） ──
