@@ -234,12 +234,18 @@ export async function getAdvertisersInfo(advertiserIds: string[]) {
   const token = getAccessToken();
   if (!token) throw new Error('TikTok Ads 未授权');
   if (!advertiserIds.length) return { data: { list: [] } };
+  // 显式指定要返回的字段（v1.3 必须指定 name 才能拿到中文名）
+  const FIELDS = ['advertiser_id', 'name', 'currency', 'timezone', 'country', 'status', 'balance', 'contacter', 'cellphone_number', 'email'];
   const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
     advertiser_ids: advertiserIds,
+    fields: FIELDS,
   });
+  // v1.2 / v1.3 / 不同账号数，list 的位置可能不同，统一处理
   if (res.data && !res.data.list && res.data.advertiser_info_list) {
     res.data.list = res.data.advertiser_info_list;
   }
+  console.log('[TikTok Ads] getAdvertisersInfo response keys:', Object.keys(res?.data || {}),
+    '| first item keys:', Object.keys(res?.data?.list?.[0] || {}));
   return res;
 }
 

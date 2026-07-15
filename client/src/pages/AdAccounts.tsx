@@ -227,10 +227,6 @@ const AdAccounts: React.FC = () => {
         </Button>
       </div>
 
-      <Text style={{ display: 'block', fontSize: 12, color: '#94a3b8', marginBottom: 20 }}>
-        虾掌柜 ERP 仅用于管理您的广告投放，不会收集或存储您的个人数据。
-      </Text>
-
       {/* ── 账户列表 ── */}
       <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}>
         {/* 表格头部 */}

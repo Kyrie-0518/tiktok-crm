@@ -116,34 +116,52 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
     let advertiserIds: string[] = [];
     let baseNameMap: Record<string, string> = {};
 
+    // 1. 优先用 settings 表里保存的 advertiser_ids（OAuth 时存的，最可靠）
+    const savedIdsRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_advertiser_ids'").get() as any;
+    if (savedIdsRow?.value) {
+      try { advertiserIds = JSON.parse(savedIdsRow.value); } catch {}
+    }
+    // 2. 备用方案：调 /oauth2/advertiser/get/ 拿最新列表
     try {
       const authResult = await Ads.getMyAdvertisers();
       const authList = authResult?.data?.list || [];
-      advertiserIds = authList.map((a: any) => a.advertiser_id).filter(Boolean);
-      authList.forEach((a: any) => { if (a.advertiser_name) baseNameMap[a.advertiser_id] = a.advertiser_name; });
-      // 更新数据库中的 advertiser_ids
-      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(advertiserIds));
+      const freshIds = authList.map((a: any) => a.advertiser_id).filter(Boolean);
+      if (freshIds.length > 0) {
+        advertiserIds = freshIds;
+        authList.forEach((a: any) => {
+          if (a.advertiser_name || a.name) baseNameMap[a.advertiser_id] = a.advertiser_name || a.name;
+        });
+        // 更新保存的 ID 列表
+        db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(advertiserIds));
+      }
     } catch (e: any) { console.error('[ad-center] getMyAdvertisers failed:', e.message); }
 
-    if (advertiserIds.length === 0) return res.json({ success: true, data: [] });
+    // 3. 兜底：如果两者都没有，放弃
+    if (advertiserIds.length === 0) {
+      console.warn('[ad-center] no advertiser_ids available, returning empty');
+      return res.json({ success: true, data: [], error: 'no_advertiser_ids' });
+    }
+    console.log(`[ad-center] refreshing ${advertiserIds.length} advertisers`);
 
     const infoMap: Record<string, { country?: string }> = {};
     const balanceMap: Record<string, any> = {};
 
-    // 批量调 advertiserInfo 拉 promotion_area
+    // 4. 批量调 advertiserInfo 拉详情（name/currency/timezone/country）
     try {
       const infoRes = await Ads.getAdvertisersInfo(advertiserIds);
-      (infoRes?.data?.list || []).forEach((item: any) => {
-        console.log(`[ad-center] advertiser ${item.advertiser_id} balance=${item.balance} currency=${item.currency}`);
-      });
-      (infoRes?.data?.list || []).forEach((item: any) => {
+      const list = (infoRes?.data?.list || []) as any[];
+      console.log(`[ad-center] advertiserInfo 返回 ${list.length} 条，首条 keys:`, Object.keys(list[0] || {}));
+      list.forEach((item: any) => {
         const id = item.advertiser_id;
-        if (item.advertiser_name || item.name) baseNameMap[id] = item.advertiser_name || item.name;
+        // TikTok v1.3 标准字段：name（中文名）。v1.2 是 advertiser_name
+        const name = item.name || item.advertiser_name;
+        if (name) baseNameMap[id] = name;
         infoMap[id] = { country: item.country || '' };
       });
     } catch (e: any) { console.error('[ad-center] getAdvertisersInfo failed:', e.message); }
-    // 批量调 getAdvertiserBalance 拉余额
+
+    // 5. 批量调 getAdvertiserBalance 拉余额
     try {
       const balance = await Ads.getAdvertiserBalance(advertiserIds);
       console.log('[ad-center] advertiserBalance raw:', JSON.stringify(balance?.data?.list));
