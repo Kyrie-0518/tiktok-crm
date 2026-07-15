@@ -258,11 +258,13 @@ router.post('/ad/:id/status', authMiddleware, async (req: Request, res: Response
   }
 });
 
-// GET /api/ad-center/reports — 广告报表
+// GET /api/ad-center/reports — 广告报表（5min 缓存）
 router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { advertiser_id, start_date, end_date, dimensions, metrics, level, page, page_size } = req.query;
-    const result = await Ads.getReport({
+    const forceRefresh = req.query.force_refresh === '1';
+    const cacheKey = `tt_ads_reports_${advertiser_id}_${start_date}_${end_date}_${level || 'default'}`;
+    const result = await getCachedOrFetch(cacheKey, () => Ads.getReport({
       advertiser_id: advertiser_id as string || '',
       start_date: start_date as string || '',
       end_date: end_date as string || '',
@@ -271,8 +273,8 @@ router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
       level: level as string || undefined,
       page: Number(page) || 1,
       page_size: Number(page_size) || 100,
-    });
-    res.json({ success: true, data: result?.data || result });
+    }), { forceRefresh });
+    res.json({ success: true, data: result.data, cached: result.cached });
   } catch (e: any) {
     return handleApiError(e, res);
   }
