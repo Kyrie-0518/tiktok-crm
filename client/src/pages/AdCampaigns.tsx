@@ -59,6 +59,8 @@ const AdCampaigns: React.FC = () => {
   const [gmvType, setGmvType] = useState<'product' | 'live'>('product');
   const [campaigns, setCampaigns] = useState<GmvMaxCampaign[]>([]);
   const [keyword, setKeyword] = useState('');
+  // 诊断信息：服务器返回的原始 list + 错误，方便排查"暂无数据"问题
+  const [debugInfo, setDebugInfo] = useState<{ listLen: number; cached: boolean; rawSample: string; error?: string } | null>(null);
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
     cost: true, orders: true, cpo: false,
   });
@@ -88,6 +90,11 @@ const AdCampaigns: React.FC = () => {
       const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
       console.log('[AdCampaigns] gmv-max 列表长度:', list.length,
         list[0] ? `首条 keys: ${Object.keys(list[0]).join(',')}` : '(空)');
+      setDebugInfo({
+        listLen: list.length,
+        cached: !!campRes.data?.cached,
+        rawSample: list[0] ? JSON.stringify(list[0]).slice(0, 200) : '(无数据)',
+      });
       const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
       // 2. 拉性能数据并合并（用 stat_time_day + campaign_id 双维度，按天分组，按 campaign 聚合）
       const end = new Date();
@@ -137,10 +144,21 @@ const AdCampaigns: React.FC = () => {
       }));
     } catch (e: any) {
       message.error('加载失败: ' + (e.response?.data?.error || e.message));
+      setDebugInfo({ listLen: 0, cached: false, rawSample: '', error: e.response?.data?.error || e.message });
     } finally { setSyncing(false); }
   }, [selectedAdv, gmvType]);
 
   useEffect(() => { if (selectedAdv) loadData(true); }, [selectedAdv, loadData]);
+
+  // 首次挂载：无论是否已选账户，先强制刷新一次 gmv-max 缓存（避开之前可能的空缓存）
+  useEffect(() => {
+    if (advertisers.length > 0 && !sessionStorage.getItem('gmv_max_cache_busted')) {
+      sessionStorage.setItem('gmv_max_cache_busted', '1');
+      console.log('[AdCampaigns] 首次挂载，强制刷新 gmv-max 缓存');
+      // 延迟一点等 selectedAdv 设置
+      setTimeout(() => loadData(false), 200);
+    }
+  }, [advertisers.length]);
 
   // KPI（基于已合并的 campaigns 数据）
   const totalCost = campaigns.reduce((s, c) => s + (c.cost || 0), 0);
@@ -325,6 +343,19 @@ const AdCampaigns: React.FC = () => {
           loading={syncing && campaigns.length === 0}
           scroll={{ x: 1300 }} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 个` }}
           locale={{ emptyText: '暂无 GMV Max 计划' }} />
+        {/* Debug 诊断信息：方便排查"暂无数据"问题 */}
+        {debugInfo && debugInfo.listLen === 0 && (
+          <div style={{ marginTop: 12, padding: 12, background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#78350f' }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>📊 诊断信息（开发者参考）</div>
+            <div>服务器返回 list 长度: <strong>{debugInfo.listLen}</strong></div>
+            <div>是否走缓存: <strong>{debugInfo.cached ? '是' : '否'}</strong></div>
+            {debugInfo.error && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.error}</strong></div>}
+            {debugInfo.rawSample && <div>首条: {debugInfo.rawSample}</div>}
+            <div style={{ marginTop: 4, color: '#92400e' }}>
+              💡 提示：点击右上角「刷新」按钮可强制刷新服务器缓存（绕过 5min 缓存）
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
