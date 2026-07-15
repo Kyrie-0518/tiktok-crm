@@ -169,15 +169,7 @@ const AdAccounts: React.FC = () => {
         );
       } },
     { title: '广告账户名称', dataIndex: 'advertiser_name', key: 'name', width: 200,
-      render: (name: string, r) => (
-        <Text style={{
-          fontWeight: 600,
-          background: 'linear-gradient(135deg, #2563eb, #6366f1)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-        }}>{name || r.advertiser_id}</Text>
-      ) },
+      render: (name: string, r) => <Text strong>{name || r.advertiser_id}</Text> },
     { title: '账户状态', dataIndex: 'status', key: 'acc_status', width: 100,
       render: (s: string) => {
         const isActive = s === 'ACTIVE' || s === 'APPROVED';
@@ -194,17 +186,7 @@ const AdAccounts: React.FC = () => {
     { title: '标签', dataIndex: 'label', key: 'label', width: 100,
       render: (v: string) => v ? <Tag>{v}</Tag> : <Text type="secondary">-</Text> },
     { title: '账户 ID', dataIndex: 'advertiser_id', key: 'id', width: 200,
-      render: (id: string) => (
-        <Text style={{
-          fontWeight: 600,
-          background: 'linear-gradient(135deg, #2563eb, #6366f1)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          fontFamily: 'monospace',
-          fontSize: 12,
-        }}>{id}</Text>
-      ) },
+      render: (id: string) => <Text strong>{id}</Text> },
     { title: '操作', key: 'action', width: 80, fixed: 'right',
       render: () => <Button type="link" size="small" style={{ color: PRIMARY }}>详情</Button> },
   ];

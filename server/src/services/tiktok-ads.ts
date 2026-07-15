@@ -244,8 +244,10 @@ export async function getAdvertisersInfo(advertiserIds: string[]) {
   if (res.data && !res.data.list && res.data.advertiser_info_list) {
     res.data.list = res.data.advertiser_info_list;
   }
-  console.log('[TikTok Ads] getAdvertisersInfo response keys:', Object.keys(res?.data || {}),
-    '| first item keys:', Object.keys(res?.data?.list?.[0] || {}));
+  const sample = res?.data?.list?.[0] || {};
+  console.log('[TikTok Ads] getAdvertisersInfo 返回', res?.data?.list?.length || 0, '条');
+  console.log('[TikTok Ads]  首条 name=', sample.name, 'advertiser_name=', sample.advertiser_name,
+    'all keys:', Object.keys(sample));
   return res;
 }
 
