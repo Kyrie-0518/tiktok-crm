@@ -223,7 +223,8 @@ async function handleAuthCodeAndSave(authCode: string) {
   db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(idsArray));
 
-  await saveAccountsCache(idsArray);
+  // 异步存账户缓存（不阻塞响应，否则国内 ECS 连不上 TikTok 会超时）
+  saveAccountsCache(idsArray).catch(e => console.warn('[TikTok Ads] async cache update failed:', e.message));
   return { accessToken, advertiserIds: idsArray };
 }
 
