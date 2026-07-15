@@ -35,6 +35,15 @@ const AdDashboard: React.FC = () => {
     return null;
   });
   const [chartTab, setChartTab] = useState('cost');
+  // 趋势图可见指标（仿 Adrate：每个 KPI 卡有 checkbox 控制图例）
+  const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
+    cost: true,
+    orders: true,
+    cpo: false,
+    revenue: false,
+    roi: false,
+  });
+  // 暂留 chartTab 兼容旧代码（实际未使用，已用 visibleMetrics 替代）
   const [syncing, setSyncing] = useState(false);
 
   const syncAccounts = useCallback(async () => {
@@ -84,22 +93,33 @@ const AdDashboard: React.FC = () => {
   const totalRevenue = totalSpend * 2.5;
   const roi = totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : '-';
 
-  const kpiCards = [
-    { label: '花费', value: `$${totalSpend.toFixed(2)}`, icon: <DollarOutlined />, color: '#3b82f6', bg: '#eff6ff' },
-    { label: '订单', value: totalOrders, icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff' },
-    { label: 'CPO', value: `$${cpo}`, icon: <RiseOutlined />, color: '#f59e0b', bg: '#fffbeb' },
-    { label: '总收入', value: `$${totalRevenue.toFixed(2)}`, icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5' },
-    { label: 'ROI', value: roi, icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
+  const kpiCards: { key: 'cost' | 'orders' | 'cpo' | 'revenue' | 'roi'; label: string; value: string; icon: React.ReactNode; color: string; bg: string }[] = [
+    { key: 'cost', label: '花费', value: `$${totalSpend.toFixed(2)}`, icon: <DollarOutlined />, color: '#3b82f6', bg: '#eff6ff' },
+    { key: 'orders', label: '订单', value: totalOrders.toString(), icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff' },
+    { key: 'cpo', label: 'CPO', value: `$${cpo}`, icon: <RiseOutlined />, color: '#f59e0b', bg: '#fffbeb' },
+    { key: 'revenue', label: '总收入', value: `$${totalRevenue.toFixed(2)}`, icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5' },
+    { key: 'roi', label: 'ROI', value: roi, icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
   ];
 
-  // 图表数据
-  const costData = list.map((r: any) => Number(r.metrics?.spend || 0));
-  const orderData = list.map((r: any) => Number(r.metrics?.conversions || 0));
+  // 图表数据 — 仿 Adrate：根据 visibleMetrics 决定显示哪些 series
   const xLabels = list.map((r: any, i: number) => r.dimensions?.campaign_id || `Day ${i + 1}`);
+  const metricConfig: { key: 'cost' | 'orders' | 'cpo' | 'revenue' | 'roi'; label: string; color: string; extractor: (r: any) => number }[] = [
+    { key: 'cost', label: '花费', color: '#3b82f6', extractor: (r: any) => Number(r.metrics?.spend || 0) },
+    { key: 'orders', label: '订单', color: '#8b5cf6', extractor: (r: any) => Number(r.metrics?.conversions || 0) },
+    { key: 'cpo', label: 'CPO', color: '#f59e0b', extractor: (r: any) => {
+        const o = Number(r.metrics?.conversions || 0);
+        const s = Number(r.metrics?.spend || 0);
+        return o > 0 ? s / o : 0;
+      } },
+    { key: 'revenue', label: '总收入', color: '#059669', extractor: (r: any) => Number(r.metrics?.spend || 0) * 2.5 },
+    { key: 'roi', label: 'ROI', color: '#dc2626', extractor: (r: any) => 2.5 },
+  ];
+  const activeSeries = metricConfig.filter(m => visibleMetrics[m.key]);
 
   const chartOption = {
     tooltip: { trigger: 'axis' as const },
-    grid: { left: 50, right: 30, top: 30, bottom: 40, containLabel: true },
+    legend: { show: true, top: 0, right: 0, textStyle: { color: '#64748b', fontSize: 12 } },
+    grid: { left: 50, right: 30, top: 40, bottom: 40, containLabel: true },
     xAxis: {
       type: 'category' as const,
       data: xLabels,
@@ -112,13 +132,13 @@ const AdDashboard: React.FC = () => {
       axisLabel: { color: '#64748b', fontSize: 11 },
       splitLine: { lineStyle: { color: '#f1f5f9' } },
     },
-    series: [{
-      name: chartTab === 'cost' ? '成本' : '订单数',
+    series: activeSeries.map(m => ({
+      name: m.label,
       type: 'bar',
-      data: chartTab === 'cost' ? costData : orderData,
-      itemStyle: { color: chartTab === 'cost' ? '#3b82f6' : '#8b5cf6', borderRadius: [4, 4, 0, 0] },
+      data: list.map(r => m.extractor(r)),
+      itemStyle: { color: m.color, borderRadius: [4, 4, 0, 0] },
       barMaxWidth: 50,
-    }],
+    })),
   };
 
   // 表格列
@@ -191,22 +211,36 @@ const AdDashboard: React.FC = () => {
         </div>
       </Card>
 
-      {/* KPI 5 卡 */}
+      {/* KPI 5 卡 — 仿 Adrate：每卡右上角 checkbox 控制趋势图图例 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
-        {kpiCards.map((k, i) => (
+        {kpiCards.map((k) => (
           <Card
-            key={i}
-            style={{ borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-            bodyStyle={{ padding: '18px 16px' }}
+            key={k.key}
+            style={{
+              borderRadius: 12,
+              border: '1px solid #e8e5e0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              background: visibleMetrics[k.key] ? '#fff' : '#fafafa',
+              transition: 'all 0.2s',
+            }}
+            bodyStyle={{ padding: '14px 16px' }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 10, background: k.bg, color: k.color, fontSize: 18, flexShrink: 0 }}>
-                {k.icon}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: k.bg, color: k.color, fontSize: 16, flexShrink: 0 }}>
+                  {k.icon}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2, whiteSpace: 'nowrap' }}>{k.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.value}</div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{k.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', lineHeight: 1.1 }}>{k.value}</div>
-              </div>
+              <input
+                type="checkbox"
+                checked={visibleMetrics[k.key]}
+                onChange={e => setVisibleMetrics({ ...visibleMetrics, [k.key]: e.target.checked })}
+                style={{ width: 14, height: 14, cursor: 'pointer', accentColor: PRIMARY, marginTop: 2, flexShrink: 0 }}
+              />
             </div>
           </Card>
         ))}
@@ -217,19 +251,21 @@ const AdDashboard: React.FC = () => {
         style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
         bodyStyle={{ padding: '16px 20px' }}
       >
-        {/* 头部：标题 + Tabs + 同步按钮 */}
+        {/* 头部：标题 + 激活指标的 legend + 同步按钮 */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
           <Text strong style={{ fontSize: 15, color: '#1e293b' }}>趋势</Text>
-          <Tabs
-            activeKey={chartTab}
-            onChange={setChartTab}
-            size="small"
-            style={{ flex: 1, marginLeft: 16, marginBottom: 0 }}
-            items={[
-              { key: 'cost', label: '成本' },
-              { key: 'orders', label: '订单数' },
-            ]}
-          />
+          <div style={{ flex: 1, marginLeft: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+            {activeSeries.length === 0 ? (
+              <Text type="secondary" style={{ fontSize: 12 }}>请勾选上方卡片以显示指标</Text>
+            ) : (
+              activeSeries.map(m => (
+                <span key={m.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#64748b' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: m.color }} />
+                  {m.label}
+                </span>
+              ))
+            )}
+          </div>
           <Button
             icon={<ReloadOutlined spin={syncing} />}
             onClick={() => fetchReport(false)}
