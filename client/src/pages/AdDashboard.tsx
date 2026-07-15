@@ -69,7 +69,7 @@ const AdDashboard: React.FC = () => {
           advertiser_id: selectedAccount,
           start_date: startStr,
           end_date: endStr,
-          dimensions: 'advertiser_id',
+          dimensions: 'campaign_id',
           metrics: 'spend,impressions,clicks,conversions,ctr,cpc,cpm',
           level: 'AUCTION_CAMPAIGN',
           force_refresh: '0',
