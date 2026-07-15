@@ -34,6 +34,16 @@ function handleApiError(e: any, res: Response) {
       details: msg,
     });
   }
+  // TikTok 账户欠费
+  if (/in debt|AccessDenied|insufficient_balance|code 40011|code 40100/i.test(msg)) {
+    console.warn('[ad-center] 检测到账户欠费:', msg.slice(0, 200));
+    return res.json({
+      success: false,
+      error: 'account_in_debt',
+      message: 'TikTok Ads 账户欠费（API 返回：Current user is in debt）\n请前往 https://ads.tiktok.com 充值或还款后重试',
+      details: msg,
+    });
+  }
   return res.json({ success: false, error: msg });
 }
 
@@ -181,7 +191,7 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
 
     res.json({ success: true, data: list, refreshed: true });
   } catch (e: any) {
-    res.json({ success: true, data: [], error: e.message });
+    return handleApiError(e, res);
   }
 });
 

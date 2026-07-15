@@ -130,8 +130,15 @@ const AdAccounts: React.FC = () => {
       if (res.data?.success) {
         setAccounts(res.data.data || []);
         message.success('已从 TikTok 同步最新数据');
+      } else {
+        // 后端返回的错误（含 token 过期 / 账户欠费 等业务码）
+        const errMsg = res.data?.message || res.data?.details || res.data?.error || '同步失败';
+        message.error({ content: errMsg, duration: 6 });
       }
-    } catch { message.error('同步失败'); }
+    } catch (e: any) {
+      const errMsg = e.response?.data?.message || e.response?.data?.details || e.message || '同步失败';
+      message.error({ content: errMsg, duration: 6 });
+    }
     finally { setLoading(false); }
   };
 
