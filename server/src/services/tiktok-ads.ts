@@ -243,20 +243,37 @@ export async function getAdvertisersInfo(advertiserIds: string[]) {
   if (!token) throw new Error('TikTok Ads 未授权');
   if (!advertiserIds.length) return { data: { list: [] } };
   // 显式指定要返回的字段（v1.3 必须指定 name 才能拿到中文名）
-  const FIELDS = ['advertiser_id', 'name', 'currency', 'timezone', 'country', 'status', 'balance', 'contacter', 'cellphone_number', 'email'];
-  const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
-    advertiser_ids: advertiserIds,
-    fields: FIELDS,
-  });
-  // v1.2 / v1.3 / 不同账号数，list 的位置可能不同，统一处理
-  if (res.data && !res.data.list && res.data.advertiser_info_list) {
-    res.data.list = res.data.advertiser_info_list;
+  const FIELDS = ['advertiser_id', 'name', 'currency', 'timezone', 'country', 'status', 'balance', 'contacter', 'cellphone_number', 'email', 'owner_bc_id', 'language', 'industry'];
+  // TikTok API 单次最多支持 100 个 ID，但实践中大批量会被截断——分批 10 个
+  const BATCH_SIZE = 10;
+  const allList: any[] = [];
+  for (let i = 0; i < advertiserIds.length; i += BATCH_SIZE) {
+    const batch = advertiserIds.slice(i, i + BATCH_SIZE);
+    try {
+      const res = await tiktokAdsGet('/open_api/v1.3/advertiser/info/', token, {
+        advertiser_ids: batch,
+        fields: FIELDS,
+      });
+      if (res.data && !res.data.list && res.data.advertiser_info_list) {
+        res.data.list = res.data.advertiser_info_list;
+      }
+      const batchList = (res?.data?.list || []) as any[];
+      console.log(`[TikTok Ads] advertiserInfo 批次 ${i / BATCH_SIZE + 1}：请求 ${batch.length} 返回 ${batchList.length} 条`);
+      allList.push(...batchList);
+    } catch (e: any) {
+      console.error(`[TikTok Ads] advertiserInfo 批次 ${i / BATCH_SIZE + 1} 失败:`, e.message);
+    }
   }
-  const sample = res?.data?.list?.[0] || {};
-  console.log('[TikTok Ads] getAdvertisersInfo 返回', res?.data?.list?.length || 0, '条');
-  console.log('[TikTok Ads]  首条 name=', sample.name, 'advertiser_name=', sample.advertiser_name,
-    'all keys:', Object.keys(sample));
-  return res;
+  console.log('[TikTok Ads] getAdvertisersInfo 累计返回', allList.length, '条 / 应有', advertiserIds.length);
+  if (allList[0]) {
+    console.log('[TikTok Ads]  首条 name=', allList[0].name, 'currency=', allList[0].currency,
+      'timezone=', allList[0].timezone, 'balance=', allList[0].balance);
+  }
+  // 找出没拿到数据的账户
+  const gotIds = new Set(allList.map((x: any) => x.advertiser_id));
+  const missing = advertiserIds.filter(id => !gotIds.has(id));
+  if (missing.length) console.warn('[TikTok Ads] 这些 ID 没拿到详情:', missing);
+  return { data: { list: allList } };
 }
 
 // ── Campaigns 广告系列（改用 undici 直连 + relay，绕开 superagent）──
