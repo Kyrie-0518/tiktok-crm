@@ -74,8 +74,8 @@ const MENU_GROUPS = [
     label: '流量引擎',
     icon: <RiseOutlined />,
     items: [
+      { key: '/ad-accounts', icon: <SafetyOutlined />, label: '账户授权管理' },
       { key: '/ad-dashboard', icon: <FundOutlined />, label: '广告仪表盘' },
-      { key: '/ad-accounts', icon: <SafetyOutlined />, label: '账户授权' },
       { key: '/ad-campaigns', icon: <AppstoreOutlined />, label: '系列管理' },
       { key: '/ad-rules', icon: <ControlOutlined />, label: '智能规则' },
       { key: '/ad-logs', icon: <FileTextOutlined />, label: '执行日志' },
