@@ -381,7 +381,9 @@ export async function getReport(params: {
     end_date: params.end_date,
     page: params.page || 1,
     page_size: params.page_size || 100,
-    level: params.level || 'AUCTION_CAMPAIGN',
+    // v1.3 拆成 report_type + data_level 两个字段
+    // AUCTION_CAMPAIGN → data_level=AUCTION_CAMPAIGN
+    data_level: params.level || 'AUCTION_CAMPAIGN',
     filters: params.filters ? JSON.stringify(params.filters) : undefined,
   });
 }
