@@ -198,7 +198,7 @@ const AdDashboard: React.FC = () => {
               ]}
             />
             <div style={{ flex: 1 }} />
-            <Button icon={<ReloadOutlined />} onClick={fetchReport} size="small" style={{ borderRadius: 6 }} />
+            <Button icon={<ReloadOutlined />} onClick={() => fetchReport(false)} size="small" style={{ borderRadius: 6 }} />
           </div>
           {list.length > 0 ? (
             <ReactECharts option={chartOption} style={{ height: 300 }} />
