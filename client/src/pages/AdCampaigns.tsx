@@ -60,7 +60,7 @@ const AdCampaigns: React.FC = () => {
   const [campaigns, setCampaigns] = useState<GmvMaxCampaign[]>([]);
   const [keyword, setKeyword] = useState('');
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
-    cost: true, orders: true, cpo: false, revenue: false, roi: false,
+    cost: true, orders: true, cpo: false,
   });
 
   const loadAdvertisers = useCallback(async () => {
@@ -86,7 +86,7 @@ const AdCampaigns: React.FC = () => {
         params: { advertiser_id: selectedAdv, gmv_type: gmvType, page_size: 100 },
       });
       const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
-      // 2. 拉性能数据并合并
+      // 2. 拉性能数据并合并（用 stat_time_day + campaign_id 双维度，按天分组，按 campaign 聚合）
       const end = new Date();
       const start = new Date(); start.setDate(end.getDate() - 6);
       const repRes = await api.get('/ad-center/reports', {
@@ -94,31 +94,43 @@ const AdCampaigns: React.FC = () => {
           advertiser_id: selectedAdv,
           start_date: start.toISOString().slice(0, 10),
           end_date: end.toISOString().slice(0, 10),
-          dimensions: 'campaign_id',
+          dimensions: 'stat_time_day,campaign_id',
           metrics: 'spend,impressions,clicks,conversions,ctr,cpc,cpm',
           level: 'AUCTION_CAMPAIGN',
           report_type: 'BASIC',
-          data_level: 'AUCTION_CAMPAIGN',
           force_refresh: silent ? '0' : '1',
         },
       });
-      const reportMap: Record<string, any> = {};
-      (repRes.data?.data?.list || []).forEach((r: any) => {
+      const reportList: any[] = repRes.data?.data?.list || [];
+      console.log('[AdCampaigns] reports API 返回 list 长度:', reportList.length, '首条:', JSON.stringify(reportList[0]).slice(0, 300));
+      const reportMap: Record<string, { spend: number; conversions: number; impressions: number; clicks: number }> = {};
+      reportList.forEach((r: any) => {
         const id = r.dimensions?.campaign_id;
-        if (id) reportMap[id] = r.metrics || {};
+        if (!id) return;
+        const m = r.metrics || {};
+        if (!reportMap[id]) reportMap[id] = { spend: 0, conversions: 0, impressions: 0, clicks: 0 };
+        // 累加求和：spend / conversions / impressions / clicks
+        reportMap[id].spend += Number(m.spend) || 0;
+        reportMap[id].conversions += Number(m.conversions) || 0;
+        reportMap[id].impressions += Number(m.impressions) || 0;
+        reportMap[id].clicks += Number(m.clicks) || 0;
       });
-      // 合并
-      setCampaigns(list.map(c => ({
-        ...c,
-        cost: Number(reportMap[c.campaign_id]?.spend) || 0,
-        orders: Number(reportMap[c.campaign_id]?.conversions) || 0,
-        net_cost: Number(reportMap[c.campaign_id]?.spend) || 0,
-        cpo: Number(reportMap[c.campaign_id]?.conversions) > 0
-          ? Number(reportMap[c.campaign_id]?.spend) / Number(reportMap[c.campaign_id]?.conversions)
-          : 0,
-        revenue: Number(reportMap[c.campaign_id]?.spend || 0) * 2.5,
-        roi: 2.5,
-      })));
+      console.log('[AdCampaigns] reportMap keys:', Object.keys(reportMap));
+      // 合并：cpo 按 spend/conversions 计算，revenue 暂不显示（GMV Max 没有可靠收入字段）
+      setCampaigns(list.map(c => {
+        const m = reportMap[c.campaign_id];
+        const cost = m?.spend || 0;
+        const orders = m?.conversions || 0;
+        return {
+          ...c,
+          cost,
+          orders,
+          net_cost: cost, // GMV Max 没有净成本概念
+          cpo: orders > 0 ? cost / orders : 0,
+          revenue: 0, // 收入需独立接口或订单接口，目前没接
+          roi: 0,
+        };
+      }));
     } catch (e: any) {
       message.error('加载失败: ' + (e.response?.data?.error || e.message));
     } finally { setSyncing(false); }
@@ -126,26 +138,23 @@ const AdCampaigns: React.FC = () => {
 
   useEffect(() => { if (selectedAdv) loadData(true); }, [selectedAdv, loadData]);
 
-  // KPI
+  // KPI（基于已合并的 campaigns 数据）
   const totalCost = campaigns.reduce((s, c) => s + (c.cost || 0), 0);
   const totalNetCost = campaigns.reduce((s, c) => s + (c.net_cost || 0), 0);
   const totalOrders = campaigns.reduce((s, c) => s + (c.orders || 0), 0);
   const cpo = totalOrders > 0 ? (totalCost / totalOrders).toFixed(2) : '0.00';
-  const totalRevenue = campaigns.reduce((s, c) => s + (c.revenue || 0), 0);
 
   const kpiCards = [
     { key: 'cost' as const, label: '成本', value: `$${totalCost.toFixed(2)}`, icon: <DollarOutlined />, color: '#3b82f6', bg: '#eff6ff' },
     { key: 'net_cost' as const, label: '净成本', value: `$${totalNetCost.toFixed(2)}`, icon: <RiseOutlined />, color: '#f59e0b', bg: '#fffbeb' },
     { key: 'orders' as const, label: '订单数', value: totalOrders.toString(), icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff' },
-    { key: 'cpo' as const, label: 'CPO', value: `$${cpo}`, icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
+    { key: 'cpo' as const, label: 'CPO', value: totalOrders > 0 ? `$${cpo}` : '-', icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
   ];
 
   const activeSeries = [
     { key: 'cost' as const, label: '成本', color: '#3b82f6', extractor: (c: GmvMaxCampaign) => c.cost || 0 },
     { key: 'orders' as const, label: '订单数', color: '#8b5cf6', extractor: (c: GmvMaxCampaign) => c.orders || 0 },
     { key: 'cpo' as const, label: 'CPO', color: '#f59e0b', extractor: (c: GmvMaxCampaign) => c.cpo || 0 },
-    { key: 'revenue' as const, label: '收入', color: '#059669', extractor: (c: GmvMaxCampaign) => c.revenue || 0 },
-    { key: 'roi' as const, label: 'ROI', color: '#dc2626', extractor: (c: GmvMaxCampaign) => c.roi || 0 },
   ].filter(m => visibleMetrics[m.key]);
 
   const xLabels = campaigns.map(c => c.campaign_name?.slice(0, 12) || c.campaign_id);
@@ -197,12 +206,16 @@ const AdCampaigns: React.FC = () => {
       render: (v: number) => v || 0 },
     { title: '单均成本', dataIndex: 'cpo', key: 'cpo', width: 110, align: 'right' as const,
       render: (v: number) => v > 0 ? `$${v.toFixed(2)}` : '-' },
-    { title: '收入', dataIndex: 'revenue', key: 'revenue', width: 110, align: 'right' as const,
-      render: (v: number) => <Text strong style={{ color: '#059669' }}>${Number(v || 0).toFixed(2)}</Text> },
-    { title: 'ROI', dataIndex: 'roi', key: 'roi', width: 90, align: 'right' as const,
-      render: (v: number) => Number(v || 0).toFixed(2) },
     { title: '创建时间', dataIndex: 'create_time', key: 'create_time', width: 140,
-      render: (v: string) => <Text type="secondary">{v || '-'}</Text> },
+      render: (v: string) => {
+        // TikTok create_time 是秒级时间戳，需要 × 1000
+        if (!v) return '-';
+        const ts = /^\d+$/.test(v) ? Number(v) * 1000 : Date.parse(v);
+        if (!ts || isNaN(ts)) return v;
+        const d = new Date(ts);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return <Text type="secondary">{`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`}</Text>;
+      } },
     { title: '操作', key: 'action', width: 100, fixed: 'right' as const,
       render: () => <Button type="link" size="small" style={{ color: PRIMARY }}>详情</Button> },
   ];

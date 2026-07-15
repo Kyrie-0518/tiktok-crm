@@ -372,20 +372,34 @@ export async function getReport(params: {
   //   AUDIENCE / BASIC / TT_SHOP / CATALOG / BC / PLAYABLE_MATERIAL
   // 没有 _CAMPAIGN / _ADVERTISER / _ADGROUP 这种。campaign 数据走 BASIC + dimensions=campaign_id
   const reportType = params.report_type || 'BASIC';
-  return tiktokAdsGet('/open_api/v1.3/report/integrated/get/', token, {
+  const dataLevel = params.level || 'AUCTION_CAMPAIGN';
+  // dimensions 同时包含 stat_time_day + campaign_id（多行时按天和 campaign 同时分组，合并时聚合）
+  const dimensions = params.dimensions || ['stat_time_day', 'campaign_id'];
+  const metrics = params.metrics || ['spend', 'impressions', 'clicks', 'conversions', 'ctr', 'cpc', 'cpm'];
+  console.log(`[TikTok Ads] getReport: advertiser=${params.advertiser_id} ${params.start_date}~${params.end_date} dataLevel=${dataLevel} dimensions=${JSON.stringify(dimensions)}`);
+  const result = await tiktokAdsGet('/open_api/v1.3/report/integrated/get/', token, {
     advertiser_id: params.advertiser_id,
     report_type: reportType,
-    dimensions: JSON.stringify(params.dimensions || ['campaign_id']),
-    metrics: JSON.stringify(params.metrics || ['spend', 'impressions', 'clicks', 'conversions', 'ctr', 'cpc', 'cpm']),
+    dimensions: JSON.stringify(dimensions),
+    metrics: JSON.stringify(metrics),
     start_date: params.start_date,
     end_date: params.end_date,
     page: params.page || 1,
     page_size: params.page_size || 100,
     // v1.3 拆成 report_type + data_level 两个字段
     // AUCTION_CAMPAIGN → data_level=AUCTION_CAMPAIGN
-    data_level: params.level || 'AUCTION_CAMPAIGN',
+    data_level: dataLevel,
     filters: params.filters ? JSON.stringify(params.filters) : undefined,
   });
+  // 详细日志：输出原始响应用于诊断
+  const dataList = (result as any)?.data?.list || [];
+  console.log(`[TikTok Ads] getReport response: code=${(result as any).code} list.length=${dataList.length}`);
+  if (dataList.length > 0) {
+    console.log(`[TikTok Ads] getReport 首条:`, JSON.stringify(dataList[0]).slice(0, 500));
+    if (dataList[0].dimensions) console.log(`[TikTok Ads] dimensions 字段:`, Object.keys(dataList[0].dimensions));
+    if (dataList[0].metrics) console.log(`[TikTok Ads] metrics 字段:`, Object.keys(dataList[0].metrics));
+  }
+  return result;
 }
 
 // ── 自动规则（统一走 undici 代理，不依赖 SDK 的 superagent） ──

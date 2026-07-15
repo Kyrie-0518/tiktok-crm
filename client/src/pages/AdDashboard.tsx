@@ -29,8 +29,8 @@ const AdDashboard: React.FC = () => {
     cost: true,
     orders: true,
     cpo: false,
-    revenue: false,
-    roi: false,
+    impressions: false,
+    clicks: false,
   });
   // 暂留 chartTab 兼容旧代码（实际未使用，已用 visibleMetrics 替代）
   const [syncing, setSyncing] = useState(false);
@@ -58,7 +58,8 @@ const AdDashboard: React.FC = () => {
           advertiser_id: selectedAccount,
           start_date: startStr,
           end_date: endStr,
-          dimensions: 'campaign_id',
+          // 用 stat_time_day 维度，按天展示数据
+          dimensions: 'stat_time_day',
           metrics: 'spend,impressions,clicks,conversions,ctr,cpc,cpm',
           level: 'AUCTION_CAMPAIGN',
           // 显式查询时强制刷新缓存，静默后台同步走 5min 缓存
@@ -66,6 +67,7 @@ const AdDashboard: React.FC = () => {
         },
       });
       if (res.data?.success && res.data.data) {
+        console.log('[AdDashboard] reports list length:', res.data.data.list?.length, '首条:', JSON.stringify(res.data.data.list?.[0]).slice(0, 300));
         setReportData(res.data.data);
         localStorage.setItem(reportKey(selectedAccount, startStr, endStr), JSON.stringify(res.data.data));
       }
@@ -75,25 +77,29 @@ const AdDashboard: React.FC = () => {
 
   useEffect(() => { if (selectedAccount) fetchReport(true); }, [selectedAccount, fetchReport]);
 
-  // KPI 计算
+  // KPI 计算（基于 reports 列表聚合）
   const list: any[] = reportData?.list || [];
   const totalSpend = list.reduce((s: number, r: any) => s + (Number(r.metrics?.spend) || 0), 0);
   const totalOrders = list.reduce((s: number, r: any) => s + (Number(r.metrics?.conversions) || 0), 0);
-  const cpo = totalOrders > 0 ? (totalSpend / totalOrders).toFixed(2) : '0.00';
-  const totalRevenue = totalSpend * 2.5;
-  const roi = totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : '-';
+  const cpo = totalOrders > 0 ? (totalSpend / totalOrders).toFixed(2) : '-';
+  const totalImpressions = list.reduce((s: number, r: any) => s + (Number(r.metrics?.impressions) || 0), 0);
+  const totalClicks = list.reduce((s: number, r: any) => s + (Number(r.metrics?.clicks) || 0), 0);
 
-  const kpiCards: { key: 'cost' | 'orders' | 'cpo' | 'revenue' | 'roi'; label: string; value: string; icon: React.ReactNode; color: string; bg: string }[] = [
+  const kpiCards: { key: 'cost' | 'orders' | 'cpo' | 'impressions' | 'clicks'; label: string; value: string; icon: React.ReactNode; color: string; bg: string }[] = [
     { key: 'cost', label: '花费', value: `$${totalSpend.toFixed(2)}`, icon: <DollarOutlined />, color: '#3b82f6', bg: '#eff6ff' },
     { key: 'orders', label: '订单', value: totalOrders.toString(), icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff' },
-    { key: 'cpo', label: 'CPO', value: `$${cpo}`, icon: <RiseOutlined />, color: '#f59e0b', bg: '#fffbeb' },
-    { key: 'revenue', label: '总收入', value: `$${totalRevenue.toFixed(2)}`, icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5' },
-    { key: 'roi', label: 'ROI', value: roi, icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
+    { key: 'cpo', label: 'CPO', value: cpo === '-' ? '-' : `$${cpo}`, icon: <RiseOutlined />, color: '#f59e0b', bg: '#fffbeb' },
+    { key: 'impressions', label: '展现量', value: totalImpressions.toLocaleString(), icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5' },
+    { key: 'clicks', label: '点击量', value: totalClicks.toLocaleString(), icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
   ];
 
-  // 图表数据 — 仿 Adrate：根据 visibleMetrics 决定显示哪些 series
-  const xLabels = list.map((r: any, i: number) => r.dimensions?.campaign_id || `Day ${i + 1}`);
-  const metricConfig: { key: 'cost' | 'orders' | 'cpo' | 'revenue' | 'roi'; label: string; color: string; extractor: (r: any) => number }[] = [
+  // 图表数据：xLabels 用 stat_time_day（如 2026-07-15），无日期则退回到 campaign_id
+  const xLabels = list.map((r: any, i: number) => {
+    const day = r.dimensions?.stat_time_day;
+    if (day) return day.slice(5); // 07-15 格式
+    return r.dimensions?.campaign_id || `Day ${i + 1}`;
+  });
+  const metricConfig: { key: 'cost' | 'orders' | 'cpo' | 'impressions' | 'clicks'; label: string; color: string; extractor: (r: any) => number }[] = [
     { key: 'cost', label: '花费', color: '#3b82f6', extractor: (r: any) => Number(r.metrics?.spend || 0) },
     { key: 'orders', label: '订单', color: '#8b5cf6', extractor: (r: any) => Number(r.metrics?.conversions || 0) },
     { key: 'cpo', label: 'CPO', color: '#f59e0b', extractor: (r: any) => {
@@ -101,8 +107,8 @@ const AdDashboard: React.FC = () => {
         const s = Number(r.metrics?.spend || 0);
         return o > 0 ? s / o : 0;
       } },
-    { key: 'revenue', label: '总收入', color: '#059669', extractor: (r: any) => Number(r.metrics?.spend || 0) * 2.5 },
-    { key: 'roi', label: 'ROI', color: '#dc2626', extractor: (r: any) => 2.5 },
+    { key: 'impressions', label: '展现量', color: '#059669', extractor: (r: any) => Number(r.metrics?.impressions || 0) },
+    { key: 'clicks', label: '点击量', color: '#dc2626', extractor: (r: any) => Number(r.metrics?.clicks || 0) },
   ];
   const activeSeries = metricConfig.filter(m => visibleMetrics[m.key]);
 
@@ -133,12 +139,18 @@ const AdDashboard: React.FC = () => {
 
   // 表格列
   const columns: ColumnsType<ReportRow> = [
-    { title: '店铺', dataIndex: 'shop_name', key: 'shop', width: 180,
-      render: (_: any, r: any) => r.dimensions?.campaign_name || r.dimensions?.campaign_id || '-' },
+    { title: '日期/计划', dataIndex: 'shop_name', key: 'shop', width: 180,
+      render: (_: any, r: any) => {
+        const day = r.dimensions?.stat_time_day;
+        const campId = r.dimensions?.campaign_id;
+        return day || campId || '-';
+      } },
+    { title: '展现量', dataIndex: 'impressions', key: 'impressions', width: 110, align: 'right' as const,
+      render: (_: any, r: any) => Number(r.metrics?.impressions || 0).toLocaleString() },
+    { title: '点击量', dataIndex: 'clicks', key: 'clicks', width: 100, align: 'right' as const,
+      render: (_: any, r: any) => Number(r.metrics?.clicks || 0).toLocaleString() },
     { title: '成本', dataIndex: 'cost', key: 'cost', width: 110, align: 'right' as const,
       render: (_: any, r: any) => `$${Number(r.metrics?.spend || 0).toFixed(2)}` },
-    { title: '净成本', dataIndex: 'net_cost', key: 'net_cost', width: 110, align: 'right' as const,
-      render: () => <Text type="secondary">-</Text> },
     { title: '订单', dataIndex: 'orders', key: 'orders', width: 90, align: 'right' as const,
       render: (_: any, r: any) => Number(r.metrics?.conversions || 0) },
     { title: '单均成本', dataIndex: 'cpo', key: 'cpo', width: 110, align: 'right' as const,
@@ -147,13 +159,11 @@ const AdDashboard: React.FC = () => {
         const s = Number(r.metrics?.spend || 0);
         return o > 0 ? <Text strong>${(s / o).toFixed(2)}</Text> : <Text type="secondary">-</Text>;
       } },
-    { title: '收入', dataIndex: 'revenue', key: 'revenue', width: 110, align: 'right' as const,
+    { title: '点击率', dataIndex: 'ctr', key: 'ctr', width: 100, align: 'right' as const,
       render: (_: any, r: any) => {
-        const s = Number(r.metrics?.spend || 0);
-        return <Text strong style={{ color: '#059669' }}>${(s * 2.5).toFixed(2)}</Text>;
+        const ctr = Number(r.metrics?.ctr || 0);
+        return ctr > 0 ? `${(ctr * 100).toFixed(2)}%` : '-';
       } },
-    { title: 'ROI', dataIndex: 'roi', key: 'roi', width: 90, align: 'right' as const,
-      render: () => <Text type="secondary">{roi}</Text> },
   ];
 
   return (
