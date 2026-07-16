@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, Table, Tag, Button, Typography, message, Empty, Switch, Input } from 'antd';
 import {
   AppstoreOutlined, ReloadOutlined, SearchOutlined, SyncOutlined,
@@ -259,103 +259,105 @@ const AdCampaigns: React.FC = () => {
   const costArr = dailyData.map(d => d.cost);
   const ordersArr = dailyData.map(d => d.orders);
   const revenueArr = dailyData.map(d => d.gross_revenue);
-  // 趋势图 series 根据 visibleMetrics 过滤
-  const allSeries: any[] = [
-    visibleMetrics.cost && {
-      name: '成本',
-      type: 'line',
-      yAxisIndex: 0,
-      data: costArr,
-      smooth: 0.4,
-      symbol: 'circle',
-      symbolSize: 4,
-      showSymbol: false,
-      lineStyle: { color: '#3b82f6', width: 2 },
-      itemStyle: { color: '#3b82f6' },
-      areaStyle: {
-        color: {
-          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(59, 130, 246, 0.18)' },
-            { offset: 1, color: 'rgba(59, 130, 246, 0)' },
-          ],
+  // 趋势图 series 根据 visibleMetrics 过滤（用 useMemo 确保 visibleMetrics 变化时 option 引用改变）
+  const chartOption: any = useMemo(() => {
+    const allSeries: any[] = [
+      visibleMetrics.cost && {
+        name: '成本',
+        type: 'line',
+        yAxisIndex: 0,
+        data: costArr,
+        smooth: 0.4,
+        symbol: 'circle',
+        symbolSize: 4,
+        showSymbol: false,
+        lineStyle: { color: '#3b82f6', width: 2 },
+        itemStyle: { color: '#3b82f6' },
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(59, 130, 246, 0.18)' },
+              { offset: 1, color: 'rgba(59, 130, 246, 0)' },
+            ],
+          },
         },
       },
-    },
-    visibleMetrics.orders && {
-      name: '订单数',
-      type: 'line',
-      yAxisIndex: 1,
-      data: ordersArr,
-      smooth: 0.4,
-      symbol: 'circle',
-      symbolSize: 4,
-      showSymbol: false,
-      lineStyle: { color: '#8b5cf6', width: 2 },
-      itemStyle: { color: '#8b5cf6' },
-      areaStyle: {
-        color: {
-          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(139, 92, 246, 0.18)' },
-            { offset: 1, color: 'rgba(139, 92, 246, 0)' },
-          ],
+      visibleMetrics.orders && {
+        name: '订单数',
+        type: 'line',
+        yAxisIndex: 1,
+        data: ordersArr,
+        smooth: 0.4,
+        symbol: 'circle',
+        symbolSize: 4,
+        showSymbol: false,
+        lineStyle: { color: '#8b5cf6', width: 2 },
+        itemStyle: { color: '#8b5cf6' },
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(139, 92, 246, 0.18)' },
+              { offset: 1, color: 'rgba(139, 92, 246, 0)' },
+            ],
+          },
         },
       },
-    },
-    visibleMetrics.revenue && {
-      name: '收入',
-      type: 'line',
-      yAxisIndex: 0,
-      data: revenueArr,
-      smooth: 0.4,
-      symbol: 'circle',
-      symbolSize: 4,
-      showSymbol: false,
-      lineStyle: { color: '#059669', width: 2, type: 'dashed' },
-      itemStyle: { color: '#059669' },
-    },
-  ].filter(Boolean) as any[];
-  const chartOption: any = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'cross' },
-      formatter: (params: any[]) => {
-        let html = `<div style="font-weight:600">${params[0]?.axisValue || ''}</div>`;
-        params.forEach(p => {
-          html += `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:2px"><span>${p.marker} ${p.seriesName}</span><span style="font-weight:600">${typeof p.value === 'number' ? p.value.toFixed(2) : p.value}</span></div>`;
-        });
-        return html;
+      visibleMetrics.revenue && {
+        name: '收入',
+        type: 'line',
+        yAxisIndex: 0,
+        data: revenueArr,
+        smooth: 0.4,
+        symbol: 'circle',
+        symbolSize: 4,
+        showSymbol: false,
+        lineStyle: { color: '#059669', width: 2, type: 'dashed' },
+        itemStyle: { color: '#059669' },
       },
-    },
-    // 关掉 ECharts 自带 legend（用我们自己的 trendLegendItems 显示，避免和右边 Y 轴冲突）
-    legend: { show: false },
-    grid: { left: 50, right: 50, top: 20, bottom: 30, containLabel: true },
-    xAxis: {
-      type: 'category' as const,
-      data: xLabels,
-      axisLine: { lineStyle: { color: '#e2e8f0' } },
-      axisLabel: { color: '#64748b', fontSize: 11 },
-    },
-    // 双 Y 轴：左 = 成本/收入（美元），右 = 订单数
-    yAxis: [
-      {
-        type: 'value' as const,
-        position: 'left' as const,
-        axisLine: { show: false },
-        axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: number) => `$${v}` },
-        splitLine: { lineStyle: { color: '#f1f5f9' } },
+    ].filter(Boolean) as any[];
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        formatter: (params: any[]) => {
+          let html = `<div style="font-weight:600">${params[0]?.axisValue || ''}</div>`;
+          params.forEach(p => {
+            html += `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:2px"><span>${p.marker} ${p.seriesName}</span><span style="font-weight:600">${typeof p.value === 'number' ? p.value.toFixed(2) : p.value}</span></div>`;
+          });
+          return html;
+        },
       },
-      {
-        type: 'value' as const,
-        position: 'right' as const,
-        axisLine: { show: false },
+      legend: { show: false },
+      grid: { left: 50, right: 50, top: 20, bottom: 30, containLabel: true },
+      xAxis: {
+        type: 'category' as const,
+        data: xLabels,
+        axisLine: { lineStyle: { color: '#e2e8f0' } },
         axisLabel: { color: '#64748b', fontSize: 11 },
-        splitLine: { show: false },
       },
-    ],
-    series: allSeries,
-  };
+      yAxis: [
+        {
+          type: 'value' as const,
+          position: 'left' as const,
+          axisLine: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: number) => `$${v}` },
+          splitLine: { lineStyle: { color: '#f1f5f9' } },
+        },
+        {
+          type: 'value' as const,
+          position: 'right' as const,
+          axisLine: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11 },
+          splitLine: { show: false },
+        },
+      ],
+      series: allSeries,
+    };
+  // 依赖 visibleMetrics.cost/orders/revenue + xLabels（costArr/ordersArr/revenueArr 是 dailyData 派生的，dailyData 变时 xLabels 也会变）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleMetrics.cost, visibleMetrics.orders, visibleMetrics.revenue, xLabels.join(','), costArr.join(','), ordersArr.join(','), revenueArr.join(',')]);
 
   const filtered = campaigns.filter(c => {
     const matchSearch = !keyword || c.campaign_name?.toLowerCase().includes(keyword.toLowerCase()) || c.campaign_id.includes(keyword);
@@ -487,7 +489,7 @@ const AdCampaigns: React.FC = () => {
         </div>
         <div style={{ width: '100%', minHeight: 280 }}>
           {campaigns.length > 0 ? (
-            <ReactECharts option={chartOption} style={{ height: 280, width: '100%' }} />
+            <ReactECharts key={`chart-${visibleMetrics.cost}-${visibleMetrics.orders}-${visibleMetrics.revenue}`} option={chartOption} notMerge={true} lazyUpdate={true} style={{ height: 280, width: '100%' }} />
           ) : (
             <Empty description={selectedAdv ? '暂无计划数据' : '请先选择广告账户'} image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }} />
           )}
