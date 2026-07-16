@@ -638,10 +638,11 @@ router.get('/gmv-max/report', authMiddleware, async (req: Request, res: Response
       start_date: startDate,
       end_date: endDate,
       gmv_max_promotion_types: gmvType === 'live' ? ['LIVE'] : ['PRODUCT'],
-      // 关键：去掉 stat_time_day（避免 30 天限制），只用 campaign_id 维度，范围最大 365 天
-      dimensions: ['campaign_id'],
+      // 用 stat_time_day + campaign_id 双维度（按天+按 plan 聚合，list 返回每天每个 plan 一行）
+      // 文档：含 stat_time_day 时日期范围最大 30 天
+      dimensions: ['stat_time_day', 'campaign_id'],
       metrics: ['cost', 'net_cost', 'orders', 'cost_per_order', 'gross_revenue', 'roi'],
-      page_size: 200,
+      page_size: 1000,
     });
     const listLen = (result as any)?.data?.list?.length || 0;
     console.log(`[ad-center] gmv-max/report 返回 ${listLen} 条`);

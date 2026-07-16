@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Tag, Button, Typography, message, Empty, Switch, Input } from 'antd';
 import {
   AppstoreOutlined, ReloadOutlined, SearchOutlined, SyncOutlined,
-  DollarOutlined, ShoppingOutlined, RiseOutlined, TrophyOutlined,
+  DollarOutlined, ShoppingOutlined, RiseOutlined, TrophyOutlined, WalletOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import ReactECharts from 'echarts-for-react';
@@ -58,6 +58,8 @@ const AdCampaigns: React.FC = () => {
   const [selectedAdv, setSelectedAdv] = useState<string>('');
   const [gmvType, setGmvType] = useState<'product' | 'live'>('product');
   const [campaigns, setCampaigns] = useState<GmvMaxCampaign[]>([]);
+  // 按天聚合的趋势图数据 { '2026-07-01': { cost, orders, gross_revenue }, ... }
+  const [dailyData, setDailyData] = useState<Array<{ date: string; cost: number; orders: number; gross_revenue: number }>>([]);
   const [keyword, setKeyword] = useState('');
   // 诊断信息：服务器返回的原始 list + 错误，方便排查"暂无数据"问题
   const [debugInfo, setDebugInfo] = useState<{
@@ -69,7 +71,7 @@ const AdCampaigns: React.FC = () => {
     firstCampaignFull?: string;
   } | null>(null);
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
-    cost: true, orders: true, cpo: false,
+    cost: true, orders: true, cpo: false, revenue: false,
   });
 
   const loadAdvertisers = useCallback(async () => {
@@ -127,19 +129,44 @@ const AdCampaigns: React.FC = () => {
         'total_metrics:', JSON.stringify(totalMetrics).slice(0, 300));
       if (reportList[0]) console.log('[AdCampaigns] GMV Max reports 首条:', JSON.stringify(reportList[0]).slice(0, 400));
 
-      // 合并：按 campaign_id 累加 cost / orders / net_cost / gross_revenue
+      // 合并：双维度累加
+      // - reportMap: 按 campaign_id 累加（用于表格每个 plan 的成本/订单）
+      // - dailyMap: 按 stat_time_day 累加（用于趋势图按天显示）
       const reportMap: Record<string, { cost: number; net_cost: number; orders: number; gross_revenue: number }> = {};
+      const dailyMap: Record<string, { cost: number; orders: number; gross_revenue: number }> = {};
       reportList.forEach((r: any) => {
-        const id = r.dimensions?.campaign_id;
-        if (!id) return;
         const m = r.metrics || {};
-        if (!reportMap[id]) reportMap[id] = { cost: 0, net_cost: 0, orders: 0, gross_revenue: 0 };
-        reportMap[id].cost += Number(m.cost) || 0;
-        reportMap[id].net_cost += Number(m.net_cost) || 0;
-        reportMap[id].orders += Number(m.orders) || 0;
-        reportMap[id].gross_revenue += Number(m.gross_revenue) || 0;
+        const cost = Number(m.cost) || 0;
+        const netCost = Number(m.net_cost) || 0;
+        const orders = Number(m.orders) || 0;
+        const grossRevenue = Number(m.gross_revenue) || 0;
+        // 按 campaign_id 聚合（表格用）
+        const cid = r.dimensions?.campaign_id;
+        if (cid) {
+          if (!reportMap[cid]) reportMap[cid] = { cost: 0, net_cost: 0, orders: 0, gross_revenue: 0 };
+          reportMap[cid].cost += cost;
+          reportMap[cid].net_cost += netCost;
+          reportMap[cid].orders += orders;
+          reportMap[cid].gross_revenue += grossRevenue;
+        }
+        // 按 stat_time_day 聚合（趋势图用）
+        const day = r.dimensions?.stat_time_day;
+        if (day) {
+          if (!dailyMap[day]) dailyMap[day] = { cost: 0, orders: 0, gross_revenue: 0 };
+          dailyMap[day].cost += cost;
+          dailyMap[day].orders += orders;
+          dailyMap[day].gross_revenue += grossRevenue;
+        }
       });
-      console.log('[AdCampaigns] reportMap keys:', Object.keys(reportMap), 'hits:', Object.keys(reportMap).length);
+      console.log('[AdCampaigns] reportMap keys:', Object.keys(reportMap).length, 'dailyMap keys:', Object.keys(dailyMap).length);
+      const sortedDays = Object.keys(dailyMap).sort();
+      // 把 dailyMap 转成数组（按日期排序）保存到 state，给趋势图用
+      setDailyData(sortedDays.map(d => ({
+        date: d,
+        cost: dailyMap[d].cost,
+        orders: dailyMap[d].orders,
+        gross_revenue: dailyMap[d].gross_revenue,
+      })));
 
       // 兜底：如果 reportMap 没数据，用 total_metrics 当汇总
       const useTotalAsFallback = Object.keys(reportMap).length === 0 && totalMetrics && Object.keys(totalMetrics).length > 0;
@@ -208,6 +235,7 @@ const AdCampaigns: React.FC = () => {
   const totalCost = campaigns.reduce((s, c) => s + (c.cost || 0), 0);
   const totalNetCost = campaigns.reduce((s, c) => s + (c.net_cost || 0), 0);
   const totalOrders = campaigns.reduce((s, c) => s + (c.orders || 0), 0);
+  const totalRevenue = campaigns.reduce((s, c) => s + (c.revenue || 0), 0);
   const cpo = totalOrders > 0 ? (totalCost / totalOrders).toFixed(2) : '0.00';
 
   const kpiCards = [
@@ -215,28 +243,98 @@ const AdCampaigns: React.FC = () => {
     { key: 'net_cost' as const, label: '净成本', value: `$${totalNetCost.toFixed(2)}`, icon: <RiseOutlined />, color: '#f59e0b', bg: '#fffbeb' },
     { key: 'orders' as const, label: '订单数', value: totalOrders.toString(), icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff' },
     { key: 'cpo' as const, label: 'CPO', value: totalOrders > 0 ? `$${cpo}` : '-', icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
+    { key: 'revenue' as const, label: '总收入', value: `$${totalRevenue.toFixed(2)}`, icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5' },
   ];
 
-  const activeSeries = [
-    { key: 'cost' as const, label: '成本', color: '#3b82f6', extractor: (c: GmvMaxCampaign) => c.cost || 0 },
-    { key: 'orders' as const, label: '订单数', color: '#8b5cf6', extractor: (c: GmvMaxCampaign) => c.orders || 0 },
-    { key: 'cpo' as const, label: 'CPO', color: '#f59e0b', extractor: (c: GmvMaxCampaign) => c.cpo || 0 },
+  // 趋势图激活的 series（用于显示 legend 文字）
+  const trendLegendItems = [
+    { key: 'cost', label: '成本', color: '#3b82f6' },
+    { key: 'orders', label: '订单数', color: '#8b5cf6' },
+    { key: 'revenue', label: '收入', color: '#059669' },
   ].filter(m => visibleMetrics[m.key]);
 
-  const xLabels = campaigns.map(c => c.campaign_name?.slice(0, 12) || c.campaign_id);
-  const chartOption = {
-    tooltip: { trigger: 'axis' as const },
+  const xLabels = dailyData.map(d => d.date.slice(5)); // 07-15 格式
+  const costArr = dailyData.map(d => d.cost);
+  const ordersArr = dailyData.map(d => d.orders);
+  const revenueArr = dailyData.map(d => d.gross_revenue);
+  // 趋势图 series 根据 visibleMetrics 过滤
+  const allSeries: any[] = [
+    visibleMetrics.cost && {
+      name: '成本',
+      type: 'line',
+      yAxisIndex: 0,
+      data: costArr,
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { color: '#3b82f6', width: 2 },
+      itemStyle: { color: '#3b82f6' },
+      areaStyle: { color: 'rgba(59, 130, 246, 0.08)' },
+    },
+    visibleMetrics.orders && {
+      name: '订单数',
+      type: 'line',
+      yAxisIndex: 1,
+      data: ordersArr,
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { color: '#8b5cf6', width: 2 },
+      itemStyle: { color: '#8b5cf6' },
+      areaStyle: { color: 'rgba(139, 92, 246, 0.08)' },
+    },
+    visibleMetrics.revenue && {
+      name: '收入',
+      type: 'line',
+      yAxisIndex: 0,
+      data: revenueArr,
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { color: '#059669', width: 2, type: 'dashed' },
+      itemStyle: { color: '#059669' },
+    },
+  ].filter(Boolean) as any[];
+  const chartOption: any = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+      formatter: (params: any[]) => {
+        let html = `<div style="font-weight:600">${params[0]?.axisValue || ''}</div>`;
+        params.forEach(p => {
+          html += `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:2px"><span>${p.marker} ${p.seriesName}</span><span style="font-weight:600">${typeof p.value === 'number' ? p.value.toFixed(2) : p.value}</span></div>`;
+        });
+        return html;
+      },
+    },
     legend: { show: true, top: 0, right: 0, textStyle: { color: '#64748b', fontSize: 12 } },
-    grid: { left: 50, right: 30, top: 40, bottom: 40, containLabel: true },
-    xAxis: { type: 'category' as const, data: xLabels, axisLine: { lineStyle: { color: '#e2e8f0' } },
-      axisLabel: { color: '#64748b', fontSize: 11, rotate: xLabels.length > 5 ? 30 : 0 } },
-    yAxis: { type: 'value' as const, axisLine: { show: false },
-      axisLabel: { color: '#64748b', fontSize: 11 }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
-    series: activeSeries.map(m => ({
-      name: m.label, type: 'bar' as const,
-      data: campaigns.map(c => m.extractor(c)),
-      itemStyle: { color: m.color, borderRadius: [4, 4, 0, 0] }, barMaxWidth: 50,
-    })),
+    grid: { left: 50, right: 60, top: 40, bottom: 40, containLabel: true },
+    xAxis: {
+      type: 'category' as const,
+      data: xLabels,
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#64748b', fontSize: 11 },
+    },
+    // 双 Y 轴：左 = 成本/收入（美元），右 = 订单数
+    yAxis: [
+      {
+        type: 'value' as const,
+        name: '成本($)',
+        position: 'left' as const,
+        axisLine: { show: false },
+        axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: number) => `$${v}` },
+        splitLine: { lineStyle: { color: '#f1f5f9' } },
+      },
+      {
+        type: 'value' as const,
+        name: '订单数',
+        position: 'right' as const,
+        axisLine: { show: false },
+        axisLabel: { color: '#64748b', fontSize: 11 },
+        splitLine: { show: false },
+      },
+    ],
+    series: allSeries,
   };
 
   const filtered = campaigns.filter(c => {
@@ -327,7 +425,7 @@ const AdCampaigns: React.FC = () => {
       </Card>
 
       {/* 4 KPI 卡 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
         {kpiCards.map(k => (
           <Card key={k.key} style={{
             borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
@@ -355,11 +453,11 @@ const AdCampaigns: React.FC = () => {
       <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
         bodyStyle={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>趋势</Text>
+          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>趋势（按天）</Text>
           <div style={{ flex: 1, marginLeft: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-            {activeSeries.length === 0 ? (
+            {trendLegendItems.length === 0 ? (
               <Text type="secondary" style={{ fontSize: 12 }}>请勾选上方卡片以显示指标</Text>
-            ) : activeSeries.map(m => (
+            ) : trendLegendItems.map(m => (
               <span key={m.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#64748b' }}>
                 <span style={{ width: 8, height: 8, borderRadius: 2, background: m.color }} />
                 {m.label}
