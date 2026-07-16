@@ -31,7 +31,6 @@ import AIStudioLayout from './pages/AIStudioLayout';
 import InfluencerLayout from './pages/InfluencerLayout';
 import Kyrie from './pages/Kyrie';
 import MobileKyrie from './pages/MobileKyrie';
-import AdDashboard from './pages/AdDashboard';
 import AdAccounts from './pages/AdAccounts';
 import AdCampaigns from './pages/AdCampaigns';
 import AdRules from './pages/AdRules';
@@ -75,7 +74,6 @@ const MENU_GROUPS = [
     icon: <RiseOutlined />,
     items: [
       { key: '/ad-accounts', icon: <SafetyOutlined />, label: '账户授权管理' },
-      { key: '/ad-dashboard', icon: <FundOutlined />, label: '数据报表' },
       { key: '/ad-campaigns', icon: <AppstoreOutlined />, label: '计划列表' },
       { key: '/ad-rules', icon: <ControlOutlined />, label: '智能规则' },
       { key: '/ad-logs', icon: <FileTextOutlined />, label: '执行日志' },
@@ -802,7 +800,6 @@ function AppLayout() {
             <Route path="/influencers/*" element={<PermRouteGuard permKey="influencers"><InfluencerLayout /></PermRouteGuard>} />
             <Route path="/ad-bills" element={<AdBills />} />
             <Route path="/data-reports" element={<DataReports />} />
-            <Route path="/ad-dashboard" element={<AdDashboard />} />
             <Route path="/ad-accounts" element={<AdAccounts />} />
             <Route path="/ad-campaigns" element={<AdCampaigns />} />
             <Route path="/ad-rules" element={<AdRules />} />
