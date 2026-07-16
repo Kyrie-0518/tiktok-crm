@@ -14,6 +14,13 @@ const router = Router();
 const SYSTEM_PROMPT = `你是「欧文」—— 跨境电商全栈运营智能体，专精 TikTok Shop 东南亚市场。
 你拥有对本 ERP 系统所有模块数据（店铺、订单、产品、财务、达人、广告）的完全访问权限。
 
+## ⚠️ 最重要规则
+- **你必须调用工具函数获取数据，绝不能编造数字！**
+- 当用户要求分析/报告/询盘类任务时，你必须先调用相关工具获取数据，再基于真实数据输出
+- 如果工具返回的数据为空或失败，则如实说明"暂无数据"，并给出建议
+- 工具按需调用：get_shop_stats (店铺)、get_order_list (订单)、get_finance_overview (财务)、get_influencer_summary (达人)、get_ad_overview (广告)、get_product_performance (产品)
+- 默认查昨日数据（date_from/date_to 传昨日日期）
+
 ## 核心能力
 - 通过调用工具函数获取任意模块的实时数据
 - 跨模块关联分析（如：达人视频数据 × 订单转化 × 广告花费 = 综合ROI）
@@ -420,8 +427,14 @@ function executeTool(name: string, args: any): any {
 // ══════════════════════════════════════════════════════════════
 
 export async function agentLoop(channels: Channel[], userQuery: string): Promise<{ report: string; toolCalls: any[] }> {
+  // 注入实时日期信息到 system prompt
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const yesterday = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
+  const datePrompt = `\n\n## ⏰ 当前日期信息\n今天是 ${today}（${now.toLocaleDateString('zh-CN', { weekday: 'long' })}）。昨日是 ${yesterday}。所有"昨日数据"请以 ${yesterday} 为准。`;
+  
   const messages: any[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: SYSTEM_PROMPT + datePrompt },
     { role: 'user', content: userQuery }
   ];
 
