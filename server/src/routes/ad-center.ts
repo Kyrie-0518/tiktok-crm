@@ -525,6 +525,65 @@ router.get('/gmv-max/campaigns/:id', authMiddleware, async (req: Request, res: R
   }
 });
 
+// GET /api/ad-center/gmv-max/report — GMV Max 专属报表（直接用 GMV Max campaign_id 维度）
+router.get('/gmv-max/report', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const advertiserId = req.query.advertiser_id as string;
+    const startDate = req.query.start_date as string;
+    const endDate = req.query.end_date as string;
+    const gmvType = (req.query.gmv_type as string) || 'product';
+    if (!advertiserId || !startDate || !endDate) {
+      return res.status(400).json({ success: false, error: '缺少 advertiser_id / start_date / end_date' });
+    }
+
+    // 从已有 GMV Max campaigns 缓存里取 store_id
+    const db = getDb();
+    let storeId: string | null = null;
+    const cacheRow = db.prepare('SELECT value FROM settings WHERE key = ?').get(`tt_ads_gmvmax_${advertiserId}_${gmvType}`) as any;
+    if (cacheRow?.value) {
+      try {
+        const cached = JSON.parse(cacheRow.value);
+        if (cached?.list?.[0]?.store_id) storeId = cached.list[0].store_id;
+      } catch {}
+    }
+
+    // 缓存没有就实时查一次
+    if (!storeId) {
+      console.log(`[ad-center] gmv-max/report: 无缓存，实时查 campaigns 拿 store_id`);
+      const campRes = await Ads.getGmvMaxCampaigns({
+        advertiser_id: advertiserId,
+        gmv_max_promotion_types: gmvType === 'live' ? ['LIVE_GMV_MAX'] : ['PRODUCT_GMV_MAX'],
+        page: 1, page_size: 1,
+      });
+      const campList = campRes?.data?.list || [];
+      if (campList[0]?.store_id) storeId = campList[0].store_id;
+    }
+    if (!storeId) {
+      return res.json({ success: false, error: 'no_store_id', message: '该账户下无 GMV Max 计划' });
+    }
+    console.log(`[ad-center] gmv-max/report: store_id=${storeId} type=${gmvType} dates=${startDate}~${endDate}`);
+
+    const result = await Ads.getGmvMaxReport({
+      advertiser_id: advertiserId,
+      store_ids: [storeId],
+      start_date: startDate,
+      end_date: endDate,
+      gmv_max_promotion_types: gmvType === 'live' ? ['LIVE'] : ['PRODUCT'],
+      dimensions: ['campaign_id', 'stat_time_day'],
+      metrics: ['cost', 'net_cost', 'orders', 'cost_per_order', 'gross_revenue', 'roi'],
+      page_size: 200,
+    });
+    const listLen = (result as any)?.data?.list?.length || 0;
+    console.log(`[ad-center] gmv-max/report 返回 ${listLen} 条`);
+    if (listLen > 0) {
+      console.log(`[ad-center] gmv-max/report 首条:`, JSON.stringify((result as any).data.list[0]).slice(0, 400));
+    }
+    res.json({ success: true, data: result?.data || result });
+  } catch (e: any) {
+    return handleApiError(e, res);
+  }
+});
+
 // ══════════════════════════════════════
 //  MCP 通道（给欧文 AI 智能体用）
 // ══════════════════════════════════════

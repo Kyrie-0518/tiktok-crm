@@ -637,3 +637,35 @@ export async function getGmvMaxCampaignInfo(advertiserId: string, campaignId: st
     campaign_id: campaignId,
   });
 }
+
+/** GMV Max 专属报表 — /open_api/v1.3/gmv_max/report/get/ */
+export async function getGmvMaxReport(params: {
+  advertiser_id: string;
+  store_ids: string[];
+  start_date: string;
+  end_date: string;
+  gmv_max_promotion_types: string[]; // ['PRODUCT'] | ['LIVE']
+  dimensions?: string[];
+  metrics?: string[];
+  campaign_ids?: string[];
+  page?: number;
+  page_size?: number;
+}) {
+  const token = getAccessToken();
+  if (!token) throw new Error('TikTok Ads 未授权');
+  const filtering: any = {};
+  if (params.gmv_max_promotion_types?.length) filtering.gmv_max_promotion_types = params.gmv_max_promotion_types;
+  if (params.campaign_ids?.length) filtering.campaign_ids = params.campaign_ids;
+  console.log(`[TikTok Ads] getGmvMaxReport: advertiser=${params.advertiser_id} store=${params.store_ids[0]} dates=${params.start_date}~${params.end_date} dims=${JSON.stringify(params.dimensions)}`);
+  return tiktokAdsGet('/open_api/v1.3/gmv_max/report/get/', token, {
+    advertiser_id: params.advertiser_id,
+    store_ids: JSON.stringify(params.store_ids),
+    start_date: params.start_date,
+    end_date: params.end_date,
+    dimensions: JSON.stringify(params.dimensions || ['campaign_id']),
+    metrics: JSON.stringify(params.metrics || ['cost', 'net_cost', 'orders', 'cost_per_order', 'gross_revenue', 'roi']),
+    page: String(params.page || 1),
+    page_size: String(params.page_size || 100),
+    ...(Object.keys(filtering).length ? { filtering: JSON.stringify(filtering) } : {}),
+  });
+}

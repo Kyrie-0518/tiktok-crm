@@ -93,59 +93,56 @@ const AdCampaigns: React.FC = () => {
       const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
       console.log('[AdCampaigns] gmv-max 列表长度:', list.length,
         list[0] ? `首条 keys: ${Object.keys(list[0]).join(',')}` : '(空)');
-      // 2. 拉性能数据并合并（用 stat_time_day + campaign_id 双维度，按天分组，按 campaign 聚合）
+      // 2. 拉 GMV Max 专属报表（/gmv_max/report/get/）— 直接用 GMV Max campaign_id 维度
       const end = new Date();
       const start = new Date(); start.setDate(end.getDate() - 6);
-      const repRes = await api.get('/ad-center/reports', {
+      const repRes = await api.get('/ad-center/gmv-max/report', {
         params: {
           advertiser_id: selectedAdv,
           start_date: start.toISOString().slice(0, 10),
           end_date: end.toISOString().slice(0, 10),
-          dimensions: 'stat_time_day,campaign_id',
-          metrics: 'spend,impressions,clicks,conversions,ctr,cpc,cpm',
-          level: 'AUCTION_CAMPAIGN',
-          report_type: 'BASIC',
-          force_refresh: silent ? '0' : '1',
+          gmv_type: gmvType,
         },
       });
-      const reportList: any[] = repRes.data?.data?.list || [];
-      console.log('[AdCampaigns] reports API 返回 list 长度:', reportList.length,
-        reportList[0] ? `首条: ${JSON.stringify(reportList[0]).slice(0, 300)}` : '首条: (空)');
-      const reportMap: Record<string, { spend: number; conversions: number; impressions: number; clicks: number }> = {};
+      const reportList: any[] = repRes.data?.data?.list || repRes.data?.list || [];
+      console.log('[AdCampaigns] GMV Max reports 返回 list 长度:', reportList.length,
+        reportList[0] ? `首条: ${JSON.stringify(reportList[0]).slice(0, 400)}` : '首条: (空)');
+      // 合并：按 campaign_id 累加 cost / orders / net_cost / gross_revenue
+      const reportMap: Record<string, { cost: number; net_cost: number; orders: number; gross_revenue: number }> = {};
       reportList.forEach((r: any) => {
         const id = r.dimensions?.campaign_id;
         if (!id) return;
         const m = r.metrics || {};
-        if (!reportMap[id]) reportMap[id] = { spend: 0, conversions: 0, impressions: 0, clicks: 0 };
-        // 累加求和：spend / conversions / impressions / clicks
-        reportMap[id].spend += Number(m.spend) || 0;
-        reportMap[id].conversions += Number(m.conversions) || 0;
-        reportMap[id].impressions += Number(m.impressions) || 0;
-        reportMap[id].clicks += Number(m.clicks) || 0;
+        if (!reportMap[id]) reportMap[id] = { cost: 0, net_cost: 0, orders: 0, gross_revenue: 0 };
+        reportMap[id].cost += Number(m.cost) || 0;
+        reportMap[id].net_cost += Number(m.net_cost) || 0;
+        reportMap[id].orders += Number(m.orders) || 0;
+        reportMap[id].gross_revenue += Number(m.gross_revenue) || 0;
       });
-      console.log('[AdCampaigns] reportMap keys:', Object.keys(reportMap), 'sample:', JSON.stringify(Object.values(reportMap).slice(0, 1)));
+      console.log('[AdCampaigns] reportMap keys:', Object.keys(reportMap), 'hits:', Object.keys(reportMap).length);
       setDebugInfo({
         listLen: list.length,
         cached: !!campRes.data?.cached,
         rawSample: list[0] ? JSON.stringify(list[0]).slice(0, 200) : '(无数据)',
         reportListLen: reportList.length,
-        reportSample: reportList[0] ? JSON.stringify(reportList[0]).slice(0, 300) : '(reports 无数据)',
-        reportMapKeys: Object.keys(reportMap).slice(0, 3).join(',') + (Object.keys(reportMap).length > 3 ? '...' : ''),
+        reportSample: reportList[0] ? JSON.stringify(reportList[0]).slice(0, 400) : '(reports 无数据)',
+        reportMapKeys: Object.keys(reportMap).slice(0, 5).join(',') + (Object.keys(reportMap).length > 5 ? '...' : ''),
         gmvCampaignIds: list.slice(0, 3).map(c => c.campaign_id).join(',') + (list.length > 3 ? '...' : ''),
       });
-      // 合并：cpo 按 spend/conversions 计算，revenue 暂不显示（GMV Max 没有可靠收入字段）
+      // 合并到 campaigns：GMV Max report 自带 cost/net_cost/orders/gross_revenue/roi
       setCampaigns(list.map(c => {
         const m = reportMap[c.campaign_id];
-        const cost = m?.spend || 0;
-        const orders = m?.conversions || 0;
+        const cost = m?.cost || 0;
+        const orders = m?.orders || 0;
+        const grossRevenue = m?.gross_revenue || 0;
         return {
           ...c,
           cost,
           orders,
-          net_cost: cost, // GMV Max 没有净成本概念
+          net_cost: m?.net_cost || 0,
           cpo: orders > 0 ? cost / orders : 0,
-          revenue: 0, // 收入需独立接口或订单接口，目前没接
-          roi: 0,
+          revenue: grossRevenue,
+          roi: cost > 0 ? grossRevenue / cost : 0,
         };
       }));
     } catch (e: any) {
