@@ -60,7 +60,10 @@ const AdCampaigns: React.FC = () => {
   const [campaigns, setCampaigns] = useState<GmvMaxCampaign[]>([]);
   const [keyword, setKeyword] = useState('');
   // 诊断信息：服务器返回的原始 list + 错误，方便排查"暂无数据"问题
-  const [debugInfo, setDebugInfo] = useState<{ listLen: number; cached: boolean; rawSample: string; error?: string } | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{
+    listLen: number; cached: boolean; rawSample: string; error?: string;
+    reportListLen?: number; reportSample?: string; reportMapKeys?: string; gmvCampaignIds?: string;
+  } | null>(null);
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
     cost: true, orders: true, cpo: false,
   });
@@ -90,11 +93,6 @@ const AdCampaigns: React.FC = () => {
       const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
       console.log('[AdCampaigns] gmv-max 列表长度:', list.length,
         list[0] ? `首条 keys: ${Object.keys(list[0]).join(',')}` : '(空)');
-      setDebugInfo({
-        listLen: list.length,
-        cached: !!campRes.data?.cached,
-        rawSample: list[0] ? JSON.stringify(list[0]).slice(0, 200) : '(无数据)',
-      });
       // 2. 拉性能数据并合并（用 stat_time_day + campaign_id 双维度，按天分组，按 campaign 聚合）
       const end = new Date();
       const start = new Date(); start.setDate(end.getDate() - 6);
@@ -125,7 +123,16 @@ const AdCampaigns: React.FC = () => {
         reportMap[id].impressions += Number(m.impressions) || 0;
         reportMap[id].clicks += Number(m.clicks) || 0;
       });
-      console.log('[AdCampaigns] reportMap keys:', Object.keys(reportMap));
+      console.log('[AdCampaigns] reportMap keys:', Object.keys(reportMap), 'sample:', JSON.stringify(Object.values(reportMap).slice(0, 1)));
+      setDebugInfo({
+        listLen: list.length,
+        cached: !!campRes.data?.cached,
+        rawSample: list[0] ? JSON.stringify(list[0]).slice(0, 200) : '(无数据)',
+        reportListLen: reportList.length,
+        reportSample: reportList[0] ? JSON.stringify(reportList[0]).slice(0, 300) : '(reports 无数据)',
+        reportMapKeys: Object.keys(reportMap).slice(0, 3).join(',') + (Object.keys(reportMap).length > 3 ? '...' : ''),
+        gmvCampaignIds: list.slice(0, 3).map(c => c.campaign_id).join(',') + (list.length > 3 ? '...' : ''),
+      });
       // 合并：cpo 按 spend/conversions 计算，revenue 暂不显示（GMV Max 没有可靠收入字段）
       setCampaigns(list.map(c => {
         const m = reportMap[c.campaign_id];
@@ -343,13 +350,26 @@ const AdCampaigns: React.FC = () => {
           scroll={{ x: 1300 }} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 个` }}
           locale={{ emptyText: '暂无 GMV Max 计划' }} />
         {/* Debug 诊断信息：方便排查"暂无数据"问题 */}
-        {debugInfo && debugInfo.listLen === 0 && (
+        {debugInfo && (debugInfo.listLen === 0 || (debugInfo.reportListLen !== undefined && debugInfo.reportListLen > 0 && campaigns.length > 0)) && (
           <div style={{ marginTop: 12, padding: 12, background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#78350f' }}>
             <div style={{ fontWeight: 600, marginBottom: 4 }}>📊 诊断信息（开发者参考）</div>
-            <div>服务器返回 list 长度: <strong>{debugInfo.listLen}</strong></div>
-            <div>是否走缓存: <strong>{debugInfo.cached ? '是' : '否'}</strong></div>
-            {debugInfo.error && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.error}</strong></div>}
-            {debugInfo.rawSample && <div>首条: {debugInfo.rawSample}</div>}
+            {debugInfo.listLen === 0 && (
+              <>
+                <div>🚫 <strong>GMV Max 计划列表为空</strong></div>
+                <div>服务器返回 list 长度: <strong>{debugInfo.listLen}</strong> · 走缓存: <strong>{debugInfo.cached ? '是' : '否'}</strong></div>
+                {debugInfo.error && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.error}</strong></div>}
+                {debugInfo.rawSample && <div>首条: {debugInfo.rawSample}</div>}
+              </>
+            )}
+            {debugInfo.listLen > 0 && debugInfo.reportListLen !== undefined && (
+              <>
+                <div>✅ GMV Max 计划数: <strong>{debugInfo.listLen}</strong></div>
+                <div>📊 Reports API 返回 list 数: <strong>{debugInfo.reportListLen}</strong></div>
+                <div>🔑 reportMap 命中 keys: <strong>{debugInfo.reportMapKeys || '(0 个 — campaign_id 不匹配)'}</strong></div>
+                <div>🏷️ GMV 计划 ID 示例: <strong style={{ fontFamily: 'monospace' }}>{debugInfo.gmvCampaignIds}</strong></div>
+                {debugInfo.reportSample && <div>Reports 首条: <span style={{ fontFamily: 'monospace' }}>{debugInfo.reportSample}</span></div>}
+              </>
+            )}
             <div style={{ marginTop: 4, color: '#92400e' }}>
               💡 提示：点击右上角「刷新」按钮可强制刷新服务器缓存（绕过 5min 缓存）
             </div>
