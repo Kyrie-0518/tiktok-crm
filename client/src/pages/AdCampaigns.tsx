@@ -65,6 +65,7 @@ const AdCampaigns: React.FC = () => {
     reportListLen?: number; reportSample?: string; reportMapKeys?: string; gmvCampaignIds?: string;
     totalMetrics?: string; useTotalFallback?: boolean; fullReportRaw?: string;
     reportSuccess?: boolean; reportError?: string; reportErrorMessage?: string;
+    testResult?: string;
   } | null>(null);
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
     cost: true, orders: true, cpo: false,
