@@ -583,9 +583,14 @@ const AdCampaigns: React.FC = () => {
           {campaigns.length > 0 && dailyData.length > 0 ? (
             <ReactECharts key={`chart-${visibleMetrics.cost}-${visibleMetrics.orders}-${visibleMetrics.revenue}-${visibleMetrics.roi}`} option={chartOption} notMerge={true} lazyUpdate={true} style={{ height: 280, width: '100%' }} />
           ) : campaigns.length > 0 ? (
-            <Empty description="所选日期范围内暂无趋势数据" descriptionStyle={{ fontSize: 13, color: '#94a3b8' }} image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>提示：单日范围通常无数据，请选择「近 7 天」或更长时间</Text>
-            </Empty>
+            <Empty
+              description={<>
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>所选日期范围内暂无趋势数据</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>提示：单日范围通常无数据，请选择「近 7 天」或更长时间</div>
+              </>}
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              style={{ padding: '40px 0' }}
+            />
           ) : (
             <Empty description={selectedAdv ? '暂无计划数据' : '请先选择广告账户'} image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }} />
           )}
