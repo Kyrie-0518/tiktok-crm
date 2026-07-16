@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Input, Button, Typography, Space, Tag, message, Tooltip,
-  Empty, Card
+  Empty, Card, Modal
 } from 'antd';
 import {
   SendOutlined, ThunderboltOutlined,
@@ -381,7 +381,7 @@ export default function Kyrie() {
                     {msg.role === 'assistant' && msg.id !== 'welcome' && (
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 12, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
                         <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => copyMessage(msg.content)} style={{ color: '#94a3b8', height: 26, fontSize: 12 }}>复制</Button>
-                        <Button type="text" size="small" icon={<ExportOutlined />} onClick={() => message.info('导出功能开发中')} style={{ color: '#94a3b8', height: 26, fontSize: 12 }}>导出</Button>
+                        <Button type="text" size="small" onClick={() => message.info('导出功能开发中')} style={{ color: '#94a3b8', height: 26, fontSize: 12 }}>导出</Button>
                       </div>
                     )}
                   </div>
@@ -422,6 +422,7 @@ export default function Kyrie() {
           </div>
         </div>
       </div>
+      </div>{/* close right panel */}
 
       {/* ═══ Markdown 样式（独立 style 块） ═══ */}
       <style>{`
