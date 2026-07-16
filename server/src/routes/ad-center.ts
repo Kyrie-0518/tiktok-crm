@@ -113,12 +113,27 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
     if (!forceRefresh) {
       const cacheRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_accounts_cache'").get() as any;
       if (cacheRow?.value) {
-        try { return res.json({ success: true, data: JSON.parse(cacheRow.value) }); } catch { /* ignore */ }
+        try {
+          const accounts = JSON.parse(cacheRow.value);
+          // 注入 enabled 字段（缓存里没有这个字段，每次从 settings 读）
+          let disabledIds: string[] = [];
+          try {
+            const dr = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_disabled_advertisers'").get() as any;
+            if (dr?.value) disabledIds = JSON.parse(dr.value);
+          } catch {}
+          return res.json({ success: true, data: accounts.map((a: any) => ({
+            ...a,
+            enabled: !disabledIds.includes(a.advertiser_id),
+          })) });
+        } catch { /* ignore */ }
       }
       // 无缓存：返回 ID 列表
       const ids = status.advertiserIds || [];
+      let disabledIds: string[] = [];
+      try { const dr = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_disabled_advertisers'").get() as any; if (dr?.value) disabledIds = JSON.parse(dr.value); } catch {}
       return res.json({ success: true, data: ids.map((id: string) => ({
         advertiser_id: id, advertiser_name: id, status: 'ACTIVE', balance_info: null,
+        enabled: !disabledIds.includes(id),
       })) });
     }
 
@@ -185,6 +200,13 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
       (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
     } catch (e: any) { console.error('[ad-center] getAdvertiserBalance failed:', e.message); }
 
+    // 读取禁用列表（用户手动关闭连接的账户）
+    let disabledIds: string[] = [];
+    try {
+      const disabledRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_disabled_advertisers'").get() as any;
+      if (disabledRow?.value) disabledIds = JSON.parse(disabledRow.value);
+    } catch {}
+
     const list = advertiserIds.map((id: string) => {
       const balanceItem = balanceMap[id] || {};
       // 优先用 balanceMap（专用接口拉的），回退到 infoMap（info 接口返回的）
@@ -198,6 +220,7 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
         currency: currency || undefined,
         timezone: infoMap[id]?.timezone || undefined,
         balance_info: { balance, currency: currency || undefined },
+        enabled: !disabledIds.includes(id), // 手动禁用的为 false
       };
     });
     console.log('[ad-center] refreshed advertisers list:', JSON.stringify(list));
@@ -207,6 +230,50 @@ router.get('/advertisers', authMiddleware, async (req: Request, res: Response) =
     res.json({ success: true, data: list, refreshed: true });
   } catch (e: any) {
     return handleApiError(e, res);
+  }
+});
+
+// POST /api/ad-center/advertisers/batch-enable — 批量启用/禁用广告账户
+router.post('/advertisers/batch-enable', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { advertiser_ids, enabled } = req.body;
+    if (!Array.isArray(advertiser_ids) || advertiser_ids.length === 0) {
+      return res.status(400).json({ success: false, error: '缺少 advertiser_ids' });
+    }
+    const db = getDb();
+    let disabledIds: string[] = [];
+    try {
+      const row = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_disabled_advertisers'").get() as any;
+      if (row?.value) disabledIds = JSON.parse(row.value);
+    } catch {}
+    if (enabled) {
+      // 启用：从禁用列表中移除
+      disabledIds = disabledIds.filter((id: string) => !advertiser_ids.includes(id));
+    } else {
+      // 禁用：加进去（去重）
+      advertiser_ids.forEach((id: string) => {
+        if (!disabledIds.includes(id)) disabledIds.push(id);
+      });
+    }
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_disabled_advertisers', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(disabledIds));
+    console.log(`[ad-center] batch-enable: ${enabled ? '启用' : '禁用'} ${advertiser_ids.length} 个账户，当前禁用列表 ${disabledIds.length} 个`);
+    // 同时刷新缓存（让下次 GET /advertisers 拿到最新 enabled）
+    try {
+      const cacheRow = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_accounts_cache'").get() as any;
+      if (cacheRow?.value) {
+        const accounts = JSON.parse(cacheRow.value);
+        const updated = accounts.map((a: any) => ({
+          ...a,
+          enabled: !disabledIds.includes(a.advertiser_id),
+        }));
+        db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(updated));
+      }
+    } catch {}
+    res.json({ success: true, disabledCount: disabledIds.length, disabledIds });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 

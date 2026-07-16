@@ -11,7 +11,7 @@ import api from '../api';
 const { Text } = Typography;
 const PRIMARY = '#2563eb';
 
-const ACCOUNTS_KEY = 'ad_campaigns_accounts_v1';
+const ACCOUNTS_KEY = 'ad_campaigns_accounts_v2';
 
 interface AdAccount { advertiser_id: string; advertiser_name: string; status: string; }
 interface GmvMaxCampaign {
@@ -78,10 +78,12 @@ const AdCampaigns: React.FC = () => {
     try {
       const res = await api.get('/ad-center/advertisers');
       if (res.data?.success) {
-        const list = res.data.data || [];
-        setAdvertisers(list);
-        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
-        if (list.length && !selectedAdv) setSelectedAdv(list[0].advertiser_id);
+        const all = res.data.data || [];
+        // 只显示已启用的账户（enabled !== false）
+        const enabledList = all.filter((a: any) => a.enabled !== false);
+        setAdvertisers(enabledList);
+        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(enabledList));
+        if (enabledList.length && !selectedAdv) setSelectedAdv(enabledList[0].advertiser_id);
       }
     } catch {}
   }, [selectedAdv]);

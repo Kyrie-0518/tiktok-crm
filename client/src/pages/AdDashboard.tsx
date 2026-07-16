@@ -10,7 +10,7 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 const PRIMARY = '#2563eb';
 
-const ACCOUNTS_KEY = 'ad_reports_accounts_v2';
+const ACCOUNTS_KEY = 'ad_reports_accounts_v3';
 const reportKey = (advId: string, start: string, end: string) => `ad_report_${advId}_${start}_${end}`;
 
 interface AdAccount { advertiser_id: string; advertiser_name: string; status: string; }
@@ -39,9 +39,11 @@ const AdDashboard: React.FC = () => {
     try {
       const res = await api.get('/ad-center/advertisers');
       if (res.data?.success && res.data.data?.length) {
-        setAccounts(res.data.data);
-        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(res.data.data));
-        if (!selectedAccount) setSelectedAccount(res.data.data[0].advertiser_id);
+        // 只显示已启用的账户（enabled !== false）
+        const enabledAccounts = res.data.data.filter((a: any) => a.enabled !== false);
+        setAccounts(enabledAccounts);
+        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(enabledAccounts));
+        if (!selectedAccount && enabledAccounts.length > 0) setSelectedAccount(enabledAccounts[0].advertiser_id);
       }
     } catch {}
   }, [selectedAccount]);

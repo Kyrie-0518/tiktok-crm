@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Tag, Button, Space, Typography, message, Input, Badge, Select, Tooltip } from 'antd';
+import { Card, Table, Tag, Button, Space, Typography, message, Input, Badge, Select, Tooltip, Switch } from 'antd';
 import { SafetyOutlined, ReloadOutlined, CheckCircleOutlined, WarningOutlined, LinkOutlined, SyncOutlined, SearchOutlined, FilterOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
@@ -15,7 +15,7 @@ interface AdAccount {
   currency?: string;
   timezone?: string;
   balance_info?: { balance: number; currency?: string };
-  connected?: boolean;
+  enabled?: boolean; // 用户手动启用/禁用（true=启用，false=禁用）
   label?: string;
 }
 
@@ -24,7 +24,7 @@ interface AuthStatus {
   advertiserIds: string[];
 }
 
-const PAGE_CACHE_KEY = 'ad_accounts_cache_v2';
+const PAGE_CACHE_KEY = 'ad_accounts_cache_v3';
 
 const AdAccounts: React.FC = () => {
   // ── 本地缓存秒开 ──
@@ -156,24 +156,64 @@ const AdAccounts: React.FC = () => {
   // ── 统计 ──
   const isAuthorized = authStatus?.hasToken ?? accounts.length > 0;
   const authorizedCount = accounts.length;
-  const connectedCount = accounts.filter(a => a.connected !== false).length;
+  const enabledCount = accounts.filter(a => a.enabled !== false).length;
+
+  // ── 批量操作 ──
+  const handleBatchEnable = async (enabled: boolean) => {
+    if (selectedRowKeys.length === 0) return message.warning('请先勾选账户');
+    try {
+      const res = await api.post('/ad-center/advertisers/batch-enable', {
+        advertiser_ids: selectedRowKeys,
+        enabled,
+      });
+      if (res.data?.success) {
+        const action = enabled ? '启用' : '禁用';
+        const updated = accounts.map(a => ({
+          ...a,
+          enabled: selectedRowKeys.includes(a.advertiser_id) ? enabled : a.enabled,
+        }));
+        setAccounts(updated);
+        setSelectedRowKeys([]);
+        message.success(`已${action} ${selectedRowKeys.length} 个账户`);
+      }
+    } catch (e: any) {
+      message.error('操作失败: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
+  // ── 单行开关 ──
+  const handleToggleSingle = async (id: string, currentEnabled: boolean) => {
+    try {
+      await api.post('/ad-center/advertisers/batch-enable', {
+        advertiser_ids: [id],
+        enabled: !currentEnabled,
+      });
+      const updated = accounts.map(a => ({
+        ...a,
+        enabled: a.advertiser_id === id ? !currentEnabled : a.enabled,
+      }));
+      setAccounts(updated);
+      message.success(currentEnabled ? '已禁用' : '已启用');
+    } catch (e: any) {
+      message.error('操作失败: ' + (e.response?.data?.error || e.message));
+    }
+  };
 
   // ── 表格列 ──
   const columns: ColumnsType<AdAccount> = [
-    { title: '连接状态', dataIndex: 'status', key: 'connected', width: 100,
-      render: (s: string, r) => {
-        const isActive = s === 'ACTIVE' || s === 'APPROVED';
-        return (
-          <Badge status={isActive ? 'success' : 'error'}
-            text={<span style={{ fontSize: 12, color: isActive ? '#059669' : '#dc2626' }}>{isActive ? '已连接' : r.connected === false ? '已断开' : s || '-'}</span>} />
-        );
+    { title: '启用', dataIndex: 'enabled', key: 'enabled', width: 70,
+      render: (_: any, r) => {
+        const isEnabled = r.enabled !== false;
+        return <Switch size="small" checked={isEnabled}
+          onChange={() => handleToggleSingle(r.advertiser_id, isEnabled)}
+          checkedChildren="开" unCheckedChildren="关" />;
       } },
     { title: '广告账户名称', dataIndex: 'advertiser_name', key: 'name', width: 200,
       render: (name: string, r) => <Text strong>{name || r.advertiser_id}</Text> },
-    { title: '账户状态', dataIndex: 'status', key: 'acc_status', width: 100,
+    { title: '状态', dataIndex: 'status', key: 'acc_status', width: 80,
       render: (s: string) => {
         const isActive = s === 'ACTIVE' || s === 'APPROVED';
-        return <Tag icon={isActive ? <CheckCircleOutlined /> : <WarningOutlined />} color={isActive ? 'success' : 'warning'}>{s}</Tag>;
+        return isActive ? <Tag color="success">ACTIVE</Tag> : <Tag color="warning">{s}</Tag>;
       } },
     { title: '币种', dataIndex: 'currency', key: 'currency', width: 80,
       render: (_: any, r: any) => r.balance_info?.currency || r.currency || '-' },
@@ -274,12 +314,13 @@ const AdAccounts: React.FC = () => {
         {/* 批量操作栏 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Space>
-            <Button disabled={selectedRowKeys.length === 0} size="small" style={{ borderRadius: 6 }}>开启连接</Button>
-            <Button disabled={selectedRowKeys.length === 0} size="small" style={{ borderRadius: 6 }}>关闭连接</Button>
-            <Button disabled={selectedRowKeys.length === 0} size="small" style={{ borderRadius: 6 }}>绑定标签</Button>
+            <Button disabled={selectedRowKeys.length === 0} size="small" type="primary"
+              style={{ borderRadius: 6 }} onClick={() => handleBatchEnable(true)}>开启连接</Button>
+            <Button disabled={selectedRowKeys.length === 0} size="small"
+              style={{ borderRadius: 6, color: '#dc2626', borderColor: '#fecaca' }} onClick={() => handleBatchEnable(false)}>关闭连接</Button>
           </Space>
           <Text style={{ fontSize: 12, color: '#94a3b8' }}>
-            已连接的账户数量 <Text strong style={{ color: PRIMARY }}>{connectedCount}</Text>/{authorizedCount}
+            已启用 <Text strong style={{ color: PRIMARY }}>{enabledCount}</Text>/{authorizedCount} · 已禁用 <Text strong style={{ color: '#dc2626' }}>{authorizedCount - enabledCount}</Text>
           </Text>
         </div>
 
