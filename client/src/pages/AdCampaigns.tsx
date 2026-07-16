@@ -66,6 +66,7 @@ const AdCampaigns: React.FC = () => {
     totalMetrics?: string; useTotalFallback?: boolean; fullReportRaw?: string;
     reportSuccess?: boolean; reportError?: string; reportErrorMessage?: string;
     testResult?: string;
+    firstCampaignFull?: string;
   } | null>(null);
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
     cost: true, orders: true, cpo: false,
@@ -96,6 +97,8 @@ const AdCampaigns: React.FC = () => {
       const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
       console.log('[AdCampaigns] gmv-max 列表长度:', list.length,
         list[0] ? `首条 keys: ${Object.keys(list[0]).join(',')}` : '(空)');
+      // 把第一个 plan 的完整 JSON 保存（脱敏后），方便诊断 store_id 等关键字段
+      const firstCampaignFull = list[0] ? JSON.stringify(list[0]) : '(无)';
       // 2. 拉 GMV Max 专属报表（/gmv_max/report/get/）— 直接用 GMV Max campaign_id 维度
       // 时间范围 30 天（避免 stat_time_day 限制，去掉 stat_time_day 维度最大 365 天）
       const end = new Date();
@@ -147,7 +150,7 @@ const AdCampaigns: React.FC = () => {
       setDebugInfo({
         listLen: list.length,
         cached: !!campRes.data?.cached,
-        rawSample: list[0] ? JSON.stringify(list[0]).slice(0, 400) : '(无数据)',
+        rawSample: firstCampaignFull,
         reportListLen: reportList.length,
         reportSample: reportList[0] ? JSON.stringify(reportList[0]).slice(0, 400) : '(reports 无数据)',
         reportMapKeys: Object.keys(reportMap).slice(0, 5).join(',') + (Object.keys(reportMap).length > 5 ? '...' : ''),
@@ -396,6 +399,7 @@ const AdCampaigns: React.FC = () => {
                 {debugInfo.reportError && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.reportError}</strong> {debugInfo.reportErrorMessage && `· ${debugInfo.reportErrorMessage}`}</div>}
                 {debugInfo.totalMetrics && debugInfo.totalMetrics !== '{}' && <div>📈 total_metrics: <span style={{ fontFamily: 'monospace' }}>{debugInfo.totalMetrics}</span></div>}
                 {debugInfo.reportSample && <div>Reports 首条: <span style={{ fontFamily: 'monospace' }}>{debugInfo.reportSample}</span></div>}
+                {debugInfo.firstCampaignFull && <details style={{ marginTop: 4 }}><summary style={{ cursor: 'pointer' }}>📋 第一个 GMV Max 计划完整字段（点开看 store_id 等）</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 300, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.firstCampaignFull}</pre></details>}
                 {debugInfo.testResult && <details style={{ marginTop: 4 }}><summary style={{ cursor: 'pointer' }}>🧪 测试端点 4 种调用对比（点开看）</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 300, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.testResult}</pre></details>}
                 {debugInfo.fullReportRaw && <details><summary style={{ cursor: 'pointer', marginTop: 4 }}>查看完整 server 响应</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 200, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.fullReportRaw}</pre></details>}
               </>
