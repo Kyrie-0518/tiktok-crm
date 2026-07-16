@@ -60,7 +60,7 @@ const AdCampaigns: React.FC = () => {
   const [gmvType, setGmvType] = useState<'product' | 'live'>('product');
   const [campaigns, setCampaigns] = useState<GmvMaxCampaign[]>([]);
   // 按天聚合的趋势图数据 { '2026-07-01': { cost, orders, gross_revenue }, ... }
-  const [dailyData, setDailyData] = useState<Array<{ date: string; cost: number; orders: number; gross_revenue: number }>>([]);
+  const [dailyData, setDailyData] = useState<Array<{ date: string; cost: number; orders: number; gross_revenue: number; roi: number }>>([]);
   const [keyword, setKeyword] = useState('');
   // 日期范围（默认近 7 天）
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>(() => {
@@ -78,7 +78,7 @@ const AdCampaigns: React.FC = () => {
     firstCampaignFull?: string;
   } | null>(null);
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
-    cost: true, orders: true, cpo: false, revenue: false,
+    cost: true, orders: true, revenue: false, roi: false,
   });
 
   const loadAdvertisers = useCallback(async () => {
@@ -175,6 +175,8 @@ const AdCampaigns: React.FC = () => {
         cost: dailyMap[d].cost,
         orders: dailyMap[d].orders,
         gross_revenue: dailyMap[d].gross_revenue,
+        // 每日 ROI = 当日总收入 / 当日成本
+        roi: dailyMap[d].cost > 0 ? dailyMap[d].gross_revenue / dailyMap[d].cost : 0,
       })));
 
       // 兜底：如果 reportMap 没数据，用 total_metrics 当汇总
@@ -247,12 +249,16 @@ const AdCampaigns: React.FC = () => {
   const totalRevenue = campaigns.reduce((s, c) => s + (c.revenue || 0), 0);
   const cpo = totalOrders > 0 ? (totalCost / totalOrders).toFixed(2) : '0.00';
 
+  // 总 ROI = 总收入 / 总成本
+  const totalRoi = totalCost > 0 ? totalRevenue / totalCost : 0;
+  // 趋势图可控的 KPI（cost/orders/revenue/roi 这 4 个），CPO 是派生指标不显示 checkbox
+  const trendControlledKeys = new Set(['cost', 'orders', 'revenue', 'roi']);
   const kpiCards = [
-    { key: 'cost' as const, label: '成本', value: `$${totalCost.toFixed(2)}`, icon: <DollarOutlined />, color: '#3b82f6', bg: '#eff6ff' },
-    { key: 'net_cost' as const, label: '净成本', value: `$${totalNetCost.toFixed(2)}`, icon: <RiseOutlined />, color: '#f59e0b', bg: '#fffbeb' },
-    { key: 'orders' as const, label: '订单数', value: totalOrders.toString(), icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff' },
-    { key: 'cpo' as const, label: 'CPO', value: totalOrders > 0 ? `$${cpo}` : '-', icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2' },
-    { key: 'revenue' as const, label: '总收入', value: `$${totalRevenue.toFixed(2)}`, icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5' },
+    { key: 'cost' as const, label: '成本', value: `$${totalCost.toFixed(2)}`, icon: <DollarOutlined />, color: '#3b82f6', bg: '#eff6ff', controlled: true },
+    { key: 'orders' as const, label: '订单数', value: totalOrders.toString(), icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff', controlled: true },
+    { key: 'cpo' as const, label: 'CPO', value: totalOrders > 0 ? `$${cpo}` : '-', icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2', controlled: false },
+    { key: 'revenue' as const, label: '总收入', value: `$${totalRevenue.toFixed(2)}`, icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5', controlled: true },
+    { key: 'roi' as const, label: 'ROI', value: totalCost > 0 ? totalRoi.toFixed(2) : '-', icon: <RiseOutlined />, color: '#7c3aed', bg: '#faf5ff', controlled: true },
   ];
 
   // 趋势图激活的 series（用于显示 legend 文字）
@@ -260,6 +266,7 @@ const AdCampaigns: React.FC = () => {
     { key: 'cost', label: '成本', color: '#3b82f6' },
     { key: 'orders', label: '订单数', color: '#8b5cf6' },
     { key: 'revenue', label: '收入', color: '#059669' },
+    { key: 'roi', label: 'ROI', color: '#7c3aed' },
   ].filter(m => visibleMetrics[m.key]);
 
   const xLabels = dailyData.map(d => d.date.slice(5)); // 07-15 格式
@@ -325,6 +332,18 @@ const AdCampaigns: React.FC = () => {
         lineStyle: { color: '#059669', width: 2, type: 'dashed' },
         itemStyle: { color: '#059669' },
       },
+      visibleMetrics.roi && {
+        name: 'ROI',
+        type: 'line',
+        yAxisIndex: 0,
+        data: dailyData.map(d => d.roi),
+        smooth: 0.4,
+        symbol: 'circle',
+        symbolSize: 4,
+        showSymbol: false,
+        lineStyle: { color: '#7c3aed', width: 2, type: 'dotted' },
+        itemStyle: { color: '#7c3aed' },
+      },
     ].filter(Boolean) as any[];
     return {
       tooltip: {
@@ -372,7 +391,8 @@ const AdCampaigns: React.FC = () => {
   // 依赖 visibleMetrics.cost/orders/revenue + xLabels（costArr/ordersArr/revenueArr 是 dailyData 派生的，dailyData 变时 xLabels 也会变）
   // eslint-disable-next-line react-hooks/exhaustive-deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleMetrics.cost, visibleMetrics.orders, visibleMetrics.revenue, xLabels.join(','), costArr.join(','), ordersArr.join(','), revenueArr.join(',')]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleMetrics.cost, visibleMetrics.orders, visibleMetrics.revenue, visibleMetrics.roi, xLabels.join(','), costArr.join(','), ordersArr.join(','), revenueArr.join(',')]);
 
   const filtered = campaigns.filter(c => {
     const matchSearch = !keyword || c.campaign_name?.toLowerCase().includes(keyword.toLowerCase()) || c.campaign_id.includes(keyword);
@@ -492,7 +512,7 @@ const AdCampaigns: React.FC = () => {
         {kpiCards.map(k => (
           <Card key={k.key} style={{
             borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            background: visibleMetrics[k.key] ? '#fff' : '#fafafa',
+            background: k.controlled ? (visibleMetrics[k.key] ? '#fff' : '#fafafa') : '#fff',
           }} bodyStyle={{ padding: '14px 16px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
@@ -500,13 +520,20 @@ const AdCampaigns: React.FC = () => {
                   {k.icon}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{k.label}</div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {k.label}
+                    {!k.controlled && <span style={{ fontSize: 10, color: '#cbd5e1' }}>·派生</span>}
+                  </div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.value}</div>
                 </div>
               </div>
-              <input type="checkbox" checked={visibleMetrics[k.key]}
-                onChange={e => setVisibleMetrics({ ...visibleMetrics, [k.key]: e.target.checked })}
-                style={{ width: 14, height: 14, cursor: 'pointer', accentColor: PRIMARY, marginTop: 2, flexShrink: 0 }} />
+              {k.controlled ? (
+                <input type="checkbox" checked={!!visibleMetrics[k.key]}
+                  onChange={e => setVisibleMetrics({ ...visibleMetrics, [k.key]: e.target.checked })}
+                  style={{ width: 14, height: 14, cursor: 'pointer', accentColor: PRIMARY, marginTop: 2, flexShrink: 0 }} />
+              ) : (
+                <span style={{ width: 14, height: 14, marginTop: 2, flexShrink: 0 }} />
+              )}
             </div>
           </Card>
         ))}
@@ -530,7 +557,7 @@ const AdCampaigns: React.FC = () => {
         </div>
         <div style={{ width: '100%', minHeight: 280 }}>
           {campaigns.length > 0 ? (
-            <ReactECharts key={`chart-${visibleMetrics.cost}-${visibleMetrics.orders}-${visibleMetrics.revenue}`} option={chartOption} notMerge={true} lazyUpdate={true} style={{ height: 280, width: '100%' }} />
+            <ReactECharts key={`chart-${visibleMetrics.cost}-${visibleMetrics.orders}-${visibleMetrics.revenue}-${visibleMetrics.roi}`} option={chartOption} notMerge={true} lazyUpdate={true} style={{ height: 280, width: '100%' }} />
           ) : (
             <Empty description={selectedAdv ? '暂无计划数据' : '请先选择广告账户'} image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }} />
           )}
