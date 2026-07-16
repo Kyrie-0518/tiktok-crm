@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, Table, Tag, Button, Typography, message, Empty, Switch, Input, DatePicker, Space } from 'antd';
+import { Card, Table, Tag, Button, Typography, message, Empty, Switch, Input, DatePicker, Space, Checkbox } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import {
   AppstoreOutlined, ReloadOutlined, SearchOutlined, SyncOutlined,
@@ -398,9 +398,11 @@ const AdCampaigns: React.FC = () => {
           name: 'ROI',
           position: 'right' as const,
           offset: 50,
-          nameTextStyle: { color: '#7c3aed', fontSize: 11 },
+          // ROI 量级跟成本/订单完全不同，隐藏 Y 轴刻度标签避免和右边两个 Y 轴挤一起乱
+          nameTextStyle: { show: false },
           axisLine: { show: false },
-          axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: number) => v.toFixed(2) },
+          axisLabel: { show: false },
+          axisTick: { show: false },
           splitLine: { show: false },
         },
       ],
@@ -531,10 +533,19 @@ const AdCampaigns: React.FC = () => {
       {/* 4 KPI 卡 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
         {kpiCards.map(k => (
-          <Card key={k.key} style={{
-            borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            background: k.controlled ? (visibleMetrics[k.key] ? '#fff' : '#fafafa') : '#fff',
-          }} bodyStyle={{ padding: '14px 16px' }}>
+          <Card
+            key={k.key}
+            hoverable={k.controlled}
+            onClick={k.controlled ? () => setVisibleMetrics({ ...visibleMetrics, [k.key]: !visibleMetrics[k.key] }) : undefined}
+            style={{
+              borderRadius: 12, border: k.controlled && visibleMetrics[k.key] ? `1px solid ${k.color}` : '1px solid #e8e5e0',
+              boxShadow: k.controlled && visibleMetrics[k.key] ? `0 2px 8px ${k.color}20` : '0 1px 3px rgba(0,0,0,0.04)',
+              background: k.controlled ? (visibleMetrics[k.key] ? '#fff' : '#fafafa') : '#fff',
+              cursor: k.controlled ? 'pointer' : 'default',
+              transition: 'all 0.2s',
+            }}
+            bodyStyle={{ padding: '14px 16px' }}
+          >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: k.bg, color: k.color, fontSize: 16, flexShrink: 0 }}>
@@ -549,9 +560,12 @@ const AdCampaigns: React.FC = () => {
                 </div>
               </div>
               {k.controlled ? (
-                <input type="checkbox" checked={!!visibleMetrics[k.key]}
+                <Checkbox
+                  checked={!!visibleMetrics[k.key]}
                   onChange={e => setVisibleMetrics({ ...visibleMetrics, [k.key]: e.target.checked })}
-                  style={{ width: 14, height: 14, cursor: 'pointer', accentColor: PRIMARY, marginTop: 2, flexShrink: 0 }} />
+                  onClick={e => e.stopPropagation()}
+                  style={{ marginTop: 2, flexShrink: 0 }}
+                />
               ) : (
                 <span style={{ width: 14, height: 14, marginTop: 2, flexShrink: 0 }} />
               )}
@@ -565,16 +579,7 @@ const AdCampaigns: React.FC = () => {
         bodyStyle={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
           <Text strong style={{ fontSize: 15, color: '#1e293b' }}>趋势（按天）</Text>
-          <div style={{ flex: 1, marginLeft: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-            {trendLegendItems.length === 0 ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>请勾选上方卡片以显示指标</Text>
-            ) : trendLegendItems.map(m => (
-              <span key={m.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#64748b' }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: m.color }} />
-                {m.label}
-              </span>
-            ))}
-          </div>
+          <Text type="secondary" style={{ fontSize: 12, marginLeft: 12 }}>勾选上方卡片切换显示指标</Text>
         </div>
         <div style={{ width: '100%', minHeight: 280 }}>
           {campaigns.length > 0 && dailyData.length > 0 ? (
