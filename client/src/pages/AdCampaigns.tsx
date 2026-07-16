@@ -266,33 +266,52 @@ const AdCampaigns: React.FC = () => {
       type: 'line',
       yAxisIndex: 0,
       data: costArr,
-      smooth: true,
+      smooth: 0.4,
       symbol: 'circle',
-      symbolSize: 6,
+      symbolSize: 4,
+      showSymbol: false,
       lineStyle: { color: '#3b82f6', width: 2 },
       itemStyle: { color: '#3b82f6' },
-      areaStyle: { color: 'rgba(59, 130, 246, 0.08)' },
+      areaStyle: {
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(59, 130, 246, 0.18)' },
+            { offset: 1, color: 'rgba(59, 130, 246, 0)' },
+          ],
+        },
+      },
     },
     visibleMetrics.orders && {
       name: '订单数',
       type: 'line',
       yAxisIndex: 1,
       data: ordersArr,
-      smooth: true,
+      smooth: 0.4,
       symbol: 'circle',
-      symbolSize: 6,
+      symbolSize: 4,
+      showSymbol: false,
       lineStyle: { color: '#8b5cf6', width: 2 },
       itemStyle: { color: '#8b5cf6' },
-      areaStyle: { color: 'rgba(139, 92, 246, 0.08)' },
+      areaStyle: {
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(139, 92, 246, 0.18)' },
+            { offset: 1, color: 'rgba(139, 92, 246, 0)' },
+          ],
+        },
+      },
     },
     visibleMetrics.revenue && {
       name: '收入',
       type: 'line',
       yAxisIndex: 0,
       data: revenueArr,
-      smooth: true,
+      smooth: 0.4,
       symbol: 'circle',
-      symbolSize: 6,
+      symbolSize: 4,
+      showSymbol: false,
       lineStyle: { color: '#059669', width: 2, type: 'dashed' },
       itemStyle: { color: '#059669' },
     },
@@ -309,8 +328,9 @@ const AdCampaigns: React.FC = () => {
         return html;
       },
     },
-    legend: { show: true, top: 0, right: 0, textStyle: { color: '#64748b', fontSize: 12 } },
-    grid: { left: 50, right: 60, top: 40, bottom: 40, containLabel: true },
+    // 关掉 ECharts 自带 legend（用我们自己的 trendLegendItems 显示，避免和右边 Y 轴冲突）
+    legend: { show: false },
+    grid: { left: 50, right: 50, top: 20, bottom: 30, containLabel: true },
     xAxis: {
       type: 'category' as const,
       data: xLabels,
@@ -321,7 +341,6 @@ const AdCampaigns: React.FC = () => {
     yAxis: [
       {
         type: 'value' as const,
-        name: '成本($)',
         position: 'left' as const,
         axisLine: { show: false },
         axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: number) => `$${v}` },
@@ -329,7 +348,6 @@ const AdCampaigns: React.FC = () => {
       },
       {
         type: 'value' as const,
-        name: '订单数',
         position: 'right' as const,
         axisLine: { show: false },
         axisLabel: { color: '#64748b', fontSize: 11 },
