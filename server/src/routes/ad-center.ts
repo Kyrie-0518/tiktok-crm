@@ -608,19 +608,20 @@ router.get('/gmv-max/campaigns-with-details', authMiddleware, async (req: Reques
         page_size: Number(req.query.page_size) || 100,
       });
       const list = (listRes as any)?.data?.list || [];
-      console.log(`[ad-center] gmv-max/campaigns-with-details: list 拿到 ${list.length} 个，开始批量 info`);
-      // 2. 对每个 plan 调 info 接口拿详情字段（串行避免触发 QPS 限制）
-      const enrichedList: any[] = [];
-      for (const c of list) {
-        try {
-          const infoRes = await Ads.getGmvMaxCampaignInfo(advertiserId, c.campaign_id);
-          const info = (infoRes as any)?.data || infoRes || {};
-          enrichedList.push({ ...c, ...info });
-        } catch (e: any) {
-          console.warn(`[ad-center] info 失败 campaign_id=${c.campaign_id}:`, e.message);
-          enrichedList.push(c); // 失败保留原 list 数据
-        }
-      }
+      console.log(`[ad-center] gmv-max/campaigns-with-details: list 拿到 ${list.length} 个，并发调 info`);
+      // 2. 对每个 plan 并发调 info 接口（同时发出，Promise.allSettled 不中断）
+      const results = await Promise.allSettled(
+        list.map(async (c: any) => {
+          try {
+            const infoRes = await Ads.getGmvMaxCampaignInfo(advertiserId, c.campaign_id);
+            const info = (infoRes as any)?.data || infoRes || {};
+            return { ...c, ...info };
+          } catch {
+            return c; // 失败保留原数据
+          }
+        })
+      );
+      const enrichedList = results.map(r => r.status === 'fulfilled' ? r.value : (r as any).reason);
       return { list: enrichedList };
     }, { forceRefresh, ttl: 3 * 60 * 1000 });
     console.log(`[ad-center] gmv-max/campaigns-with-details 返回 ${(result.data as any)?.list?.length || 0} 个 (cached=${result.cached})`);
