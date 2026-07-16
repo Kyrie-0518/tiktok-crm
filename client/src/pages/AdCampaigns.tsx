@@ -438,11 +438,11 @@ const AdCampaigns: React.FC = () => {
         <Switch checked={s === 'ENABLE'} disabled size="small"
           checkedChildren="开" unCheckedChildren="关" />
       ) },
-    { title: '计划名称', dataIndex: 'campaign_name', key: 'campaign_name', width: 200, fixed: 'left' as const,
+    { title: '计划名称', dataIndex: 'campaign_name', key: 'campaign_name', width: 260, fixed: 'left' as const,
       render: (n: string, r) => <Text strong style={{ fontSize: 13 }}>{n || r.campaign_id}</Text> },
     { title: '优化模式', dataIndex: 'optimization_goal', key: 'optimization_goal', width: 100,
       render: (v: string) => v ? <Tag color="blue">{optimizationGoalLabel(v)}</Tag> : '-' },
-    { title: 'GMV 类型', dataIndex: 'shopping_ads_type', key: 'shopping_ads_type', width: 140,
+    { title: 'GMV 类型', dataIndex: 'shopping_ads_type', key: 'shopping_ads_type', width: 130,
       render: (v: string) => <Tag color={v === 'PRODUCT' ? 'cyan' : 'magenta'}>{shoppingLabel(v)}</Tag> },
     { title: '日预算', dataIndex: 'budget', key: 'budget', width: 100, align: 'right' as const,
       render: (v: number) => v ? `$${v.toFixed(2)}` : '-' },
@@ -456,12 +456,12 @@ const AdCampaigns: React.FC = () => {
       render: (v: number) => v || 0 },
     { title: '总收入', dataIndex: 'revenue', key: 'revenue', width: 100, align: 'right' as const,
       render: (v: number) => v > 0 ? <Text strong style={{ color: '#059669' }}>${v.toFixed(2)}</Text> : '-' },
-    { title: '排期', key: 'schedule', width: 200,
+    { title: '排期', key: 'schedule', width: 110,
       render: (_: any, r) => {
         const txt = scheduleLabel(r);
         return <Text type="secondary" style={{ fontSize: 12 }}>{txt}</Text>;
       } },
-    { title: '创建时间', dataIndex: 'create_time', key: 'create_time', width: 160,
+    { title: '创建时间', dataIndex: 'create_time', key: 'create_time', width: 150,
       render: (v: string) => {
         if (!v) return '-';
         const ts = /^\d+$/.test(v) ? Number(v) * 1000 : Date.parse(v);
