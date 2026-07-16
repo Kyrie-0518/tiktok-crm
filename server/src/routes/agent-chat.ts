@@ -440,63 +440,62 @@ async function executeTool(name: string, args: any): Promise<any> {
         })();
         const dateTo = args.date_to || new Date().toISOString().slice(0, 10);
 
-        // 3. 对每个广告主：实时调 GMV Max list + info 拿 store_id，再调 report API
+        // 3. 对每个广告主：**优先读计划列表页面的缓存**（campaigns-with-details 含 store_id）
         for (const acc of enabledAccounts) {
           try {
             const advId = acc.advertiser_id;
             if (!advId) continue;
 
-            // 拿 store_id：先看缓存，没有就实时 list + info 拿
             let storeId: string | null = null;
             let campCount = 0;
-            const campCache = db.prepare("SELECT value FROM settings WHERE key = ?").get(`tt_ads_gmvmax_${advId}_product`) as any;
-            if (campCache?.value) {
+
+            // ① 优先：读计划列表页面的缓存（含 store_id + info 详情）
+            const detailCache = db.prepare("SELECT value FROM settings WHERE key = ?").get(`tt_ads_gmvmax_with_details_${advId}_product`) as any;
+            if (detailCache?.value) {
               try {
-                const campData = JSON.parse(campCache.value);
-                const list = campData.list || [];
+                const detailData = JSON.parse(detailCache.value);
+                const list = detailData.list || [];
                 campCount = list.length;
                 if (list[0]?.store_id) storeId = list[0].store_id;
               } catch {}
             }
-            // 缓存没 store_id → 实时调 list + 第一个 plan 的 info 拿 store_id
+
+            // ② 次选：store_id 专用缓存
+            if (!storeId) {
+              const storeCache = db.prepare("SELECT value FROM settings WHERE key = ?").get(`tt_ads_gmvmax_store_id_${advId}`) as any;
+              if (storeCache?.value) storeId = storeCache.value;
+            }
+
+            // ③ 兜底：实时调 list + info 拿 store_id
             if (!storeId) {
               try {
                 const listRes: any = await Ads.getGmvMaxCampaigns({
                   advertiser_id: advId,
-                  gmv_max_promotion_types: ['PRODUCT'],
+                  gmv_max_promotion_types: ['PRODUCT_GMV_MAX'],
                   page: 1, page_size: 1,
                 });
                 const list = listRes?.data?.list || [];
                 if (list[0]?.campaign_id) {
-                  campCount = list.length || 1;
+                  campCount = campCount || 1;
                   const infoRes: any = await Ads.getGmvMaxCampaignInfo(advId, list[0].campaign_id);
                   const info = (infoRes as any)?.data || infoRes || {};
                   if (info?.store_id) {
                     storeId = info.store_id;
-                    // 顺便把 store_id 存到 settings（下次直接用）
                     try {
-                      db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)
-                        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(
-                        `tt_ads_gmvmax_store_id_${advId}`, storeId
-                      );
+                      db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(`tt_ads_gmvmax_store_id_${advId}`, storeId);
                     } catch {}
                   }
                 }
               } catch (e: any) {
-                console.warn(`[Kyrie] 拿 store_id 失败 advertiser=${advId}:`, e.message);
+                console.warn(`[Kyrie] live fallback for store_id failed adv=${advId}:`, e.message);
               }
-            }
-            // 缓存里有但还没存 store_id 的（兼容老缓存）— 用同样的逻辑尝试补存
-            if (!storeId) {
-              const storedStoreId = db.prepare("SELECT value FROM settings WHERE key = ?").get(`tt_ads_gmvmax_store_id_${advId}`) as any;
-              if (storedStoreId?.value) storeId = storedStoreId.value;
             }
 
             if (!storeId) {
               result.accounts.push({
                 advertiser_id: advId,
                 advertiser_name: acc.advertiser_name || acc.name || '',
-                notice: '无 store_id（GMV Max 计划为空或 API 调用失败）',
+                notice: '无 store_id（请联系技术支持确认该账号已授权 GMV Max 推广系列）',
                 cost: '0.00', orders: 0, revenue: '0.00', roi: '0', campaign_count: campCount,
               });
               continue;
