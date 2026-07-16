@@ -89,7 +89,7 @@ const AdCampaigns: React.FC = () => {
     if (!selectedAdv) return;
     if (silent) setSyncing(true);
     try {
-      // 1. 拉 GMV Max 计划列表（首次加载强制刷新，避开之前可能缓存的空 list）
+      // 1. 拉 GMV Max 计划列表（首次加载强制刷新，避开之前可能缓存的空 list 或没有 store_id 的旧数据）
       const campRes = await api.get('/ad-center/gmv-max/campaigns', {
         params: { advertiser_id: selectedAdv, gmv_type: gmvType, page_size: 100, force_refresh: silent ? '0' : '1' },
       });
@@ -189,11 +189,13 @@ const AdCampaigns: React.FC = () => {
 
   useEffect(() => { if (selectedAdv) loadData(true); }, [selectedAdv, loadData]);
 
-  // 首次挂载：无论是否已选账户，先强制刷新一次 gmv-max 缓存（避开之前可能的空缓存）
+  // 首次挂载：无论是否已选账户，先强制刷新一次 gmv-max 缓存（避开之前可能的空缓存或没有 store_id 的旧数据）
+  // VERSION 标记：每次后端升级字段（fields 参数等）都需更新版本号，强制刷一次
+  const CACHE_BUST_VERSION = 'v3';
   useEffect(() => {
-    if (advertisers.length > 0 && !sessionStorage.getItem('gmv_max_cache_busted')) {
-      sessionStorage.setItem('gmv_max_cache_busted', '1');
-      console.log('[AdCampaigns] 首次挂载，强制刷新 gmv-max 缓存');
+    if (advertisers.length > 0 && sessionStorage.getItem('gmv_max_cache_busted') !== CACHE_BUST_VERSION) {
+      sessionStorage.setItem('gmv_max_cache_busted', CACHE_BUST_VERSION);
+      console.log(`[AdCampaigns] 首次挂载(${CACHE_BUST_VERSION})，强制刷新 gmv-max 缓存`);
       // 延迟一点等 selectedAdv 设置
       setTimeout(() => loadData(false), 200);
     }
