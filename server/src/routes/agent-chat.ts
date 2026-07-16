@@ -193,7 +193,7 @@ const TOOLS = [
 //  Tool 执行器
 // ══════════════════════════════════════════════════════════════
 
-function executeTool(name: string, args: any): any {
+async function executeTool(name: string, args: any): Promise<any> {
   const db = getDb();
 
   // 构建日期筛选条件（orders 用 order_time）
@@ -601,7 +601,7 @@ export async function agentLoop(channels: Channel[], userQuery: string): Promise
         try { toolArgs = JSON.parse(tc.function.arguments || '{}'); } catch { /* keep empty */ }
 
         // 执行工具
-        const toolResult = executeTool(toolName, toolArgs);
+        const toolResult = await executeTool(toolName, toolArgs);
         executedTools.push({ tool: toolName, args: toolArgs, result_length: toolResult.length });
 
         // 将工具结果追加到消息
