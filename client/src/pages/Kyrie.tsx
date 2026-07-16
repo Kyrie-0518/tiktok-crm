@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Input, Button, Typography, Space, Tag, message, Tooltip,
-  Empty, Drawer, Modal
+  Empty, Drawer, Modal, Card
 } from 'antd';
 import {
   SendOutlined, ThunderboltOutlined,
@@ -194,174 +194,155 @@ export default function Kyrie() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', overflow: 'hidden' }}>
 
-      {/* ─── 1. 顶部导航栏（全宽，内容920px居中） ─── */}
-      <div style={{ height: 48, display: 'flex', alignItems: 'center', background: '#fff', borderBottom: '1px solid #e8e5e0', flexShrink: 0 }}>
-        <div style={{ maxWidth: 920, width: '100%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #2563eb, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ThunderboltOutlined style={{ fontSize: 16, color: '#fff' }} />
+      {/* ─── 1. 顶部导航栏 ─── */}
+      <div style={{ height: 52, display: 'flex', alignItems: 'center', background: '#fff', borderBottom: '1px solid #e8e5e0', flexShrink: 0, padding: '0 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #2563eb, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}>
+            <ThunderboltOutlined style={{ fontSize: 18, color: '#fff' }} />
+          </div>
+          <div>
+            <span style={{ fontSize: 17, fontWeight: 700, color: '#1e293b' }}>欧文</span>
+            <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>全栈运营智能体</span>
+          </div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <Space size={4}>
+          <Button type="text" size="small" icon={<PlusOutlined />} onClick={handleNewSession} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>新建会话</Button>
+          <Button type="text" size="small" icon={<HistoryOutlined />} onClick={() => setDrawerOpen(true)} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>会话归档</Button>
+          <Button type="text" size="small" icon={<ClearOutlined />} onClick={handleClear} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>清空</Button>
+        </Space>
+      </div>
+
+      {/* ─── 2. 横向快捷条 ─── */}
+      <div style={{ flexShrink: 0, background: '#faf9f7', borderBottom: '1px solid #f0ede8', padding: '10px 24px' }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'thin' }}>
+          {QUICK_COMMANDS.map(cmd => (
+            <Button key={cmd.label} size="small" icon={cmd.icon} onClick={() => handleQuickCommand(cmd)}
+              style={{ borderRadius: 8, height: 38, flexShrink: 0, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 13, padding: '0 16px' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#2563eb'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            >{cmd.label}</Button>
+          ))}
+          <Button size="small" icon={<PlusOutlined />}
+            style={{ borderRadius: 8, height: 38, flexShrink: 0, border: '1px dashed #d1d5db', background: 'transparent', color: '#94a3b8', fontSize: 13, padding: '0 16px' }}
+            onClick={() => message.info('自定义模板功能即将上线')}>自定义模板</Button>
+        </div>
+      </div>
+
+      {/* ─── 3. 主内容区 ─── */}
+      <div style={{ flex: 1, overflow: 'auto', background: '#faf9f7', padding: '20px 24px' }}>
+
+        {/* AI 开场介绍 */}
+        {isFirstVisit && (
+          <div style={{ maxWidth: 1020, margin: '0 auto' }}>
+            {/* 主标题 */}
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, #2563eb, #6366f1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, boxShadow: '0 8px 24px rgba(37,99,235,0.25)' }}>
+                <ThunderboltOutlined style={{ fontSize: 28, color: '#fff' }} />
+              </div>
+              <Title level={2} style={{ margin: '0 0 4px', fontSize: 24, color: '#1e293b', fontWeight: 700 }}>我是欧文</Title>
+              <Text style={{ fontSize: 15, color: '#64748b' }}>你的跨境电商全栈运营智能体</Text>
             </div>
-            <span style={{ fontSize: 16, fontWeight: 700, color: '#2563eb' }}>欧文</span>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>全栈运营智能体</span>
+            {/* 3 列卡片 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+              {/* 专精领域 */}
+              <Card style={{ borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }} bodyStyle={{ padding: '20px' }}>
+                <Tag color="blue" style={{ borderRadius: 6, fontSize: 12, marginBottom: 12 }}>我的专精领域</Tag>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {MARKETS.map(m => (
+                    <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569' }}>
+                      <GlobalOutlined style={{ color: '#2563eb', fontSize: 13 }} />
+                      <span>{m}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+              {/* 我能帮你做什么 */}
+              <Card style={{ borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }} bodyStyle={{ padding: '20px' }}>
+                <Tag color="blue" style={{ borderRadius: 6, fontSize: 12, marginBottom: 12 }}>我能帮你做什么</Tag>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {SERVICES.map((svc, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#334155' }}>
+                      <span style={{ color: svc.color, fontSize: 15, width: 18, textAlign: 'center' }}>{svc.icon}</span>
+                      <span>{svc.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+              {/* 示例话术 */}
+              <Card style={{ borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', background: '#f8faff' }} bodyStyle={{ padding: '20px' }}>
+                <Tag color="blue" style={{ borderRadius: 6, fontSize: 12, marginBottom: 12 }}>试试这些</Tag>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {EXAMPLE_PROMPTS.map((p, i) => (
+                    <Text key={i} style={{ fontSize: 13, color: '#2563eb', fontWeight: 500, cursor: 'pointer', lineHeight: 1.5 }}
+                      onClick={() => setInputValue(p + '    ')}
+                      onMouseOver={e => e.currentTarget.style.textDecoration = 'underline'}
+                      onMouseOut={e => e.currentTarget.style.textDecoration = 'none'}
+                    >"{p}"</Text>
+                  ))}
+                </div>
+              </Card>
+            </div>
           </div>
-          <Space size={4}>
-            <Button type="text" size="small" icon={<PlusOutlined />} onClick={handleNewSession} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>新建会话</Button>
-            <Tooltip title="查看历史会话"><Button type="text" size="small" icon={<HistoryOutlined />} onClick={() => setDrawerOpen(true)} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>会话归档</Button></Tooltip>
-            <Button type="text" size="small" icon={<ClearOutlined />} onClick={handleClear} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>清空</Button>
-          </Space>
-        </div>
-      </div>
+        )}
 
-      {/* ─── 2. 横向快捷条（920px居中） ─── */}
-      <div style={{ flexShrink: 0, background: '#faf9f7', borderBottom: '1px solid #f0ede8' }}>
-        <div style={{ maxWidth: 920, margin: '0 auto', padding: '10px 0' }}>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'thin' }}>
-            {QUICK_COMMANDS.map(cmd => (
-              <Button key={cmd.label} size="small" icon={cmd.icon} onClick={() => handleQuickCommand(cmd)}
-                style={{ borderRadius: 6, height: 36, flexShrink: 0, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 13, padding: '0 14px' }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#2563eb'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-              >{cmd.label}</Button>
-            ))}
-            <Button size="small" icon={<PlusOutlined />}
-              style={{ borderRadius: 6, height: 36, flexShrink: 0, border: '1px dashed #d1d5db', background: 'transparent', color: '#94a3b8', fontSize: 13, padding: '0 14px' }}
-              onClick={() => message.info('自定义模板功能即将上线')}>自定义模板</Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── 3. 主内容区（920px居中） ─── */}
-      <div style={{ flex: 1, overflow: 'auto', background: '#faf9f7', padding: '24px 0' }}>
-        <div style={{ maxWidth: 920, margin: '0 auto' }}>
-
-          {/* ═══ 居中主容器 ═══ */}
-          <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 6px rgba(0,0,0,0.05)', border: '1px solid #e8e5e0', padding: 0, overflow: 'hidden', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-
-            {/* === AI 开场介绍 === */}
-            {isFirstVisit && (
-              <div style={{ padding: '32px 36px', borderBottom: '1px solid #f1f5f9' }}>
-                {/* 主标题 */}
-                <Title level={2} style={{ margin: '0 0 6px', fontSize: 22, color: '#1e293b', fontWeight: 700 }}>
-                  我是欧文 🎈
-                </Title>
-                <Text style={{ fontSize: 15, color: '#64748b', marginBottom: 24, display: 'block', lineHeight: 1.6 }}>
-                  ——你的跨境电商全栈运营智能体
-                </Text>
-
-                {/* 专精领域 */}
-                <div style={{ marginBottom: 24 }}>
-                  <Tag color="blue" style={{ borderRadius: 6, fontSize: 12, marginBottom: 10 }}>我的专精领域</Tag>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', marginTop: 8 }}>
-                    {MARKETS.map(m => (
-                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
-                        <GlobalOutlined style={{ color: '#2563eb', fontSize: 13 }} />
-                        {m}
+        {/* 对话消息流 */}
+        <div style={{ maxWidth: 1020, margin: '0 auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: messages.length > 1 ? 0 : 0 }}>
+            {messages.map((msg, idx) => {
+              if (isFirstVisit && msg.id === 'welcome') return null;
+              return (
+                <div key={msg.id} ref={el => messageRefs.current[msg.id] = el}
+                  style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    maxWidth: msg.role === 'user' ? '75%' : '100%',
+                    background: msg.role === 'user' ? '#2563eb' : '#f8fafc',
+                    color: msg.role === 'user' ? '#fff' : '#334155',
+                    borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
+                    padding: msg.role === 'user' ? '12px 16px' : '16px 20px',
+                    fontSize: msg.role === 'user' ? 14 : 15, lineHeight: 1.6,
+                    boxShadow: msg.role === 'user' ? '0 2px 8px rgba(37,99,235,0.2)' : '0 1px 3px rgba(0,0,0,0.04)',
+                    border: msg.role === 'user' ? 'none' : '1px solid #e2e8f0',
+                  }}>
+                    {msg.toolCalls && msg.toolCalls.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <Space wrap size={[4, 4]}>
+                          {msg.toolCalls.map((tc: any, i: number) => (
+                            <Tooltip key={i} title={tc.args ? JSON.stringify(tc.args) : ''}>
+                              <Tag color="blue" style={{ fontSize: 11, borderRadius: 6 }}>🔧 {TOOL_LABELS[tc.tool] || tc.tool}</Tag>
+                            </Tooltip>
+                          ))}
+                          {msg.latency && <Tag color="default" style={{ fontSize: 11, borderRadius: 6 }}>⏱ {(msg.latency / 1000).toFixed(1)}s</Tag>}
+                        </Space>
                       </div>
-                    ))}
+                    )}
+                    <div className="wb-markdown"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
+                    {msg.role === 'assistant' && msg.id !== 'welcome' && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 12, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+                        <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => copyMessage(msg.content)} style={{ color: '#94a3b8', height: 26, fontSize: 12 }}>复制</Button>
+                        <Button type="text" size="small" icon={<ExportOutlined />} onClick={() => message.info('导出功能开发中')} style={{ color: '#94a3b8', height: 26, fontSize: 12 }}>导出</Button>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* 我能帮你做什么 */}
-                <div style={{ marginBottom: 24 }}>
-                  <Tag color="blue" style={{ borderRadius: 6, fontSize: 12, marginBottom: 10 }}>我能帮你做什么</Tag>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                    {SERVICES.map((svc, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#334155', lineHeight: 1.5 }}>
-                        <span style={{ color: svc.color, fontSize: 16, width: 20, textAlign: 'center' }}>{svc.icon}</span>
-                        <span>{svc.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 示例话术区 */}
-                <div style={{ background: '#f0f9ff', borderRadius: 8, padding: '18px 24px', border: '1px solid #bfdbfe' }}>
-                  <div style={{ marginBottom: 8 }}>
-                    <Tag color="blue" style={{ borderRadius: 6, fontSize: 12 }}>现在，有什么需要我帮你盘一下的？</Tag>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-                    {EXAMPLE_PROMPTS.map((p, i) => (
-                      <Text key={i} style={{ fontSize: 13, color: '#2563eb', fontWeight: 500, lineHeight: 1.6, cursor: 'pointer' }}
-                        onClick={() => setInputValue(p + '    ')}
-                        onMouseOver={e => e.currentTarget.style.textDecoration = 'underline'}
-                        onMouseOut={e => e.currentTarget.style.textDecoration = 'none'}
-                      >"{p}"</Text>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>直接告诉我就行！</Text>
-                    <Space size={4}>
-                      <Button type="text" size="small" icon={<CopyOutlined />} onClick={copyIntro}
-                        style={{ color: '#94a3b8', fontSize: 12 }}>复制</Button>
-                      <Button type="text" size="small" icon={<ExportOutlined />} onClick={() => message.info('导出功能即将上线')}
-                        style={{ color: '#94a3b8', fontSize: 12 }}>导出</Button>
-                    </Space>
-                  </div>
+              );
+            })}
+            {sending && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{ background: '#f8fafc', borderRadius: '4px 16px 16px 16px', padding: '14px 20px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <LoadingOutlined style={{ color: '#2563eb' }} /><Text type="secondary" style={{ fontSize: 14 }}>{progressText}</Text>
                 </div>
               </div>
             )}
-
-            {/* === 对话消息流 === */}
-            <div style={{ flex: 1, padding: messages.length > 1 || !isFirstVisit ? '24px 36px' : '20px 36px 0' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                {messages.map((msg, idx) => {
-                  // 首次访问时隐藏欢迎气泡
-                  if (isFirstVisit && msg.id === 'welcome') return null;
-                  return (
-                    <div key={msg.id} ref={el => messageRefs.current[msg.id] = el}
-                      style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{
-                        maxWidth: msg.role === 'user' ? '80%' : '100%',
-                        background: msg.role === 'user' ? '#2563eb' : '#f8fafc',
-                        color: msg.role === 'user' ? '#fff' : '#334155',
-                        borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
-                        padding: msg.role === 'user' ? '12px 16px' : '16px 20px',
-                        fontSize: msg.role === 'user' ? 14 : 15, lineHeight: 1.6,
-                        boxShadow: msg.role === 'user' ? '0 2px 8px rgba(37,99,235,0.2)' : '0 1px 3px rgba(0,0,0,0.04)',
-                        border: msg.role === 'user' ? 'none' : '1px solid #e2e8f0',
-                      }}>
-                        {msg.toolCalls && msg.toolCalls.length > 0 && (
-                          <div style={{ marginBottom: 10 }}>
-                            <Space wrap size={[4, 4]}>
-                              {msg.toolCalls.map((tc: any, i: number) => (
-                                <Tooltip key={i} title={tc.args ? JSON.stringify(tc.args) : ''}>
-                                  <Tag color="blue" style={{ fontSize: 11, borderRadius: 6 }}>🔧 {TOOL_LABELS[tc.tool] || tc.tool}</Tag>
-                                </Tooltip>
-                              ))}
-                              {msg.latency && <Tag color="default" style={{ fontSize: 11, borderRadius: 6 }}>⏱ {(msg.latency / 1000).toFixed(1)}s</Tag>}
-                            </Space>
-                          </div>
-                        )}
-                        <div className="wb-markdown"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
-                        {msg.role === 'assistant' && msg.id !== 'welcome' && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 12, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
-                            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => copyMessage(msg.content)} style={{ color: '#94a3b8', height: 26, fontSize: 12 }}>复制</Button>
-                            <Button type="text" size="small" icon={<ExportOutlined />} onClick={() => message.info('导出功能开发中')} style={{ color: '#94a3b8', height: 26, fontSize: 12 }}>导出</Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {sending && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                    <div style={{ background: '#f8fafc', borderRadius: '4px 18px 18px 18px', padding: '14px 20px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <LoadingOutlined style={{ color: '#2563eb' }} /><Text type="secondary" style={{ fontSize: 14 }}>{progressText}</Text>
-                    </div>
-                  </div>
-                )}
-                <div ref={msgEndRef} />
-              </div>
-            </div>
+            <div ref={msgEndRef} />
           </div>
         </div>
       </div>
 
-      {/* ─── 4. 底部输入区（920px居中） ─── */}
-      <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e8e5e0', padding: '14px 0 18px' }}>
-        <div style={{ maxWidth: 920, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, background: '#f8fafc', border: '1px solid #d1d5db', borderRadius: 14, padding: '8px 8px 8px 16px' }}>
+      {/* ─── 4. 底部输入区 ─── */}
+      <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e8e5e0', padding: '14px 24px 18px' }}>
+        <div style={{ maxWidth: 1020, margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 16, padding: '8px 8px 8px 18px', transition: 'border-color 0.15s' }}>
             <Input.TextArea ref={inputRef} value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onPressEnter={(e) => { if (!e.shiftKey) { e.preventDefault(); sendMessage(inputValue); } }}
@@ -374,8 +355,9 @@ export default function Kyrie() {
               style={{ height: 44, width: 44, borderRadius: 12, background: '#2563eb', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.3)', opacity: !inputValue.trim() ? 0.45 : 1 }}
             />
           </div>
-          <div style={{ marginTop: 6, padding: '0 4px' }}>
+          <div style={{ marginTop: 6, padding: '0 4px', display: 'flex', justifyContent: 'space-between' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>Shift + Enter 换行 · Enter 发送</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>v3 · 全栈运营智能体</Text>
           </div>
         </div>
       </div>
