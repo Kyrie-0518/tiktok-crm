@@ -590,32 +590,47 @@ router.get('/gmv-max/report', authMiddleware, async (req: Request, res: Response
       return res.status(400).json({ success: false, error: '缺少 advertiser_id / start_date / end_date' });
     }
 
-    // 从已有 GMV Max campaigns 缓存里取 store_id
-    const db = getDb();
+    // 步骤 1：拿 store_id — 不再依赖 list 接口的 store_id 字段（list 可能不返回 store_id），
+    //          而是先调 campaigns 拿一个 campaign_id，再调 info 接口拿 store_id
     let storeId: string | null = null;
+    let firstCampaignId: string | null = null;
+    // 先尝试从 campaigns 缓存或实时调用拿 campaign_id
+    const db = getDb();
     const cacheRow = db.prepare('SELECT value FROM settings WHERE key = ?').get(`tt_ads_gmvmax_${advertiserId}_${gmvType}`) as any;
     if (cacheRow?.value) {
       try {
         const cached = JSON.parse(cacheRow.value);
-        if (cached?.list?.[0]?.store_id) storeId = cached.list[0].store_id;
+        if (cached?.list?.[0]) {
+          firstCampaignId = cached.list[0].campaign_id;
+          if (cached.list[0].store_id) storeId = cached.list[0].store_id;
+        }
       } catch {}
     }
-
-    // 缓存没有就实时查一次
-    if (!storeId) {
-      console.log(`[ad-center] gmv-max/report: 无缓存，实时查 campaigns 拿 store_id`);
+    if (!firstCampaignId) {
+      console.log(`[ad-center] gmv-max/report: 无缓存，实时查 campaigns 拿第一个 campaign_id`);
       const campRes = await Ads.getGmvMaxCampaigns({
         advertiser_id: advertiserId,
         gmv_max_promotion_types: gmvType === 'live' ? ['LIVE_GMV_MAX'] : ['PRODUCT_GMV_MAX'],
         page: 1, page_size: 1,
       });
       const campList = campRes?.data?.list || [];
-      if (campList[0]?.store_id) storeId = campList[0].store_id;
+      if (campList[0]) {
+        firstCampaignId = campList[0].campaign_id;
+        if (campList[0].store_id) storeId = campList[0].store_id;
+      }
+    }
+
+    // 如果 list 里没 store_id，调 info 接口拿
+    if (!storeId && firstCampaignId) {
+      console.log(`[ad-center] gmv-max/report: list 没 store_id，调 info 接口拿`);
+      const infoRes = await Ads.getGmvMaxCampaignInfo(advertiserId, firstCampaignId);
+      const infoData = (infoRes as any)?.data || infoRes;
+      if (infoData?.store_id) storeId = infoData.store_id;
     }
     if (!storeId) {
-      return res.json({ success: false, error: 'no_store_id', message: '该账户下无 GMV Max 计划' });
+      return res.json({ success: false, error: 'no_store_id', message: '该账户下无 GMV Max 计划', debug: { firstCampaignId } });
     }
-    console.log(`[ad-center] gmv-max/report: store_id=${storeId} type=${gmvType} dates=${startDate}~${endDate}`);
+    console.log(`[ad-center] gmv-max/report: store_id=${storeId} (via ${firstCampaignId ? 'info API' : 'list cache'})`);
 
     const result = await Ads.getGmvMaxReport({
       advertiser_id: advertiserId,
@@ -635,7 +650,7 @@ router.get('/gmv-max/report', authMiddleware, async (req: Request, res: Response
     }
     // 把诊断信息塞到响应里
     const respData = (result as any)?.data || result;
-    (respData as any).__debug = { storeId, startDate, endDate, gmvType, listLen, advertiserId };
+    (respData as any).__debug = { storeId, startDate, endDate, gmvType, listLen, advertiserId, firstCampaignId };
     res.json({ success: true, data: respData });
   } catch (e: any) {
     console.error('[ad-center] gmv-max/report failed:', e.message);

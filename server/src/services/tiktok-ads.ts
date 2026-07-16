@@ -631,8 +631,9 @@ export async function getGmvMaxCampaigns(params: {
     filtering: JSON.stringify(filtering),
     page: String(params.page || 1),
     page_size: String(params.page_size || 50),
-    // 关键：显式传 fields，确保 store_id 等字段被返回
-    fields: JSON.stringify(params.fields || GMV_MAX_CAMPAIGN_FIELDS),
+    // 注：gmv_max/campaign/get/ 传 fields 可能返空 list（TikTok 字段校验严格），
+    //     所以默认不传 fields。list 元素可能不含 store_id — 如需 store_id，调 /campaign/gmv_max/info/ 接口
+    ...(params.fields ? { fields: JSON.stringify(params.fields) } : {}),
   });
 }
 
