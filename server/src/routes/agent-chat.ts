@@ -5,6 +5,7 @@ import {
   getAvailableChannels, callChannel, updateChannelStats,
   loadKnowledgeBase, Channel
 } from './ai';
+import * as Ads from '../services/tiktok-ads';
 
 const router = Router();
 
@@ -416,61 +417,110 @@ function executeTool(name: string, args: any): any {
       return JSON.stringify(results);
     }
 
-    // ── TikTok Ads 数据（从 settings 表取 GMV Max report 缓存） ──
+    // ── TikTok Ads 数据（实时调 TikTok Ads API 拿真实数据） ──
     case 'get_tiktok_ad_data': {
-      const result: any = { accounts: [] };
+      const result: any = { accounts: [], date_from: args.date_from, date_to: args.date_to };
       try {
-        // 从 settings 表获取所有授权广告主的 GMV Max 数据缓存
-        const cacheRows = db.prepare("SELECT value FROM settings WHERE key LIKE 'tt_ads_gmvmax_%_product'").all() as any[];
-        if (cacheRows.length === 0) {
-          return JSON.stringify({ notice: 'TikTok Ads 尚未授权或无 GMV Max 数据', accounts: [] });
+        // 1. 从 settings 表取所有授权广告主列表（含 advertiser_id + name）
+        const accountsCache = db.prepare("SELECT value FROM settings WHERE key = 'tt_ads_accounts_cache'").get() as any;
+        const accounts: any[] = accountsCache?.value ? JSON.parse(accountsCache.value) : [];
+        if (accounts.length === 0) {
+          return JSON.stringify({ notice: 'TikTok Ads 尚未授权任何广告账户', accounts: [] });
         }
-        for (const row of cacheRows) {
+        // 只查 enabled 的广告主
+        const enabledAccounts = accounts.filter((a: any) => a.enabled !== false);
+        if (enabledAccounts.length === 0) {
+          return JSON.stringify({ notice: '所有广告账户都已被禁用，请前往"账户授权管理"启用', accounts: [] });
+        }
+
+        // 2. 默认 30 天范围（避免 stat_time_day 30 天限制 + 提供有意义数据）
+        const dateFrom = args.date_from || (() => {
+          const d = new Date(); d.setDate(d.getDate() - 29);
+          return d.toISOString().slice(0, 10);
+        })();
+        const dateTo = args.date_to || new Date().toISOString().slice(0, 10);
+
+        // 3. 对每个广告主：先查 campaigns list 缓存拿 store_id，再调 report API
+        for (const acc of enabledAccounts) {
           try {
-            const data = JSON.parse(row.value);
-            if (!data?.list?.length) continue;
-            // 取该账户的报表缓存（30天内）
-            const advId = data.list[0]?.advertiser_id;
-            const reportCacheKey = `tt_ads_reports_${advId}_`;
-            const reportCacheRow = db.prepare("SELECT value FROM settings WHERE key LIKE ?").get(reportCacheKey + '%') as any;
-            let metrics: any = {};
-            if (reportCacheRow?.value) {
+            const advId = acc.advertiser_id;
+            if (!advId) continue;
+            // 从 campaigns 缓存里取 store_id
+            const campCache = db.prepare("SELECT value FROM settings WHERE key = ?").get(`tt_ads_gmvmax_${advId}_product`) as any;
+            let storeId: string | null = null;
+            if (campCache?.value) {
               try {
-                const reportData = JSON.parse(reportCacheRow.value);
-                const list = reportData.list || [];
-                // 汇总所有 campaign 的数据
-                let totalCost = 0, totalOrders = 0, totalRevenue = 0;
-                list.forEach((r: any) => {
-                  totalCost += Number(r.metrics?.cost || r.metrics?.spend || 0);
-                  totalOrders += Number(r.metrics?.orders || r.metrics?.conversions || 0);
-                  totalRevenue += Number(r.metrics?.gross_revenue || 0);
-                });
-                metrics = { cost: totalCost.toFixed(2), orders: totalOrders, revenue: totalRevenue.toFixed(2), roi: totalCost > 0 ? (totalRevenue / totalCost).toFixed(2) : '0' };
+                const campData = JSON.parse(campCache.value);
+                const list = campData.list || [];
+                if (list[0]?.store_id) storeId = list[0].store_id;
               } catch {}
             }
-            result.accounts.push({
-              advertiser_id: advId || '未知',
-              campaign_count: data.list.length,
-              cost: metrics.cost || '0.00',
-              orders: metrics.orders || 0,
-              revenue: metrics.revenue || '0.00',
-              roi: metrics.roi || '0',
+            if (!storeId) {
+              result.accounts.push({
+                advertiser_id: advId,
+                advertiser_name: acc.advertiser_name || acc.name || '',
+                notice: '无 store_id（GMV Max 计划缓存为空）',
+                cost: '0.00', orders: 0, revenue: '0.00', roi: '0', campaign_count: 0,
+              });
+              continue;
+            }
+            // 实时调 GMV Max report API
+            const campCount = (() => { try { return JSON.parse(campCache.value).list?.length || 0; } catch { return 0; } })();
+            const reportRes: any = await Ads.getGmvMaxReport({
+              advertiser_id: advId,
+              store_ids: [storeId],
+              start_date: dateFrom,
+              end_date: dateTo,
+              gmv_max_promotion_types: ['PRODUCT'],
+              dimensions: ['campaign_id'],
+              metrics: ['cost', 'net_cost', 'orders', 'cost_per_order', 'gross_revenue', 'roi'],
+              page_size: 200,
             });
-          } catch {}
+            const reportList: any[] = reportRes?.data?.list || [];
+            // 汇总
+            let totalCost = 0, totalOrders = 0, totalRevenue = 0;
+            reportList.forEach((r: any) => {
+              const m = r.metrics || {};
+              totalCost += Number(m.cost) || 0;
+              totalOrders += Number(m.orders) || 0;
+              totalRevenue += Number(m.gross_revenue) || 0;
+            });
+            result.accounts.push({
+              advertiser_id: advId,
+              advertiser_name: acc.advertiser_name || acc.name || '',
+              campaign_count: campCount,
+              cost: totalCost.toFixed(2),
+              net_cost: reportList.reduce((s: number, r: any) => s + (Number(r.metrics?.net_cost) || 0), 0).toFixed(2),
+              orders: totalOrders,
+              revenue: totalRevenue.toFixed(2),
+              roi: totalCost > 0 ? (totalRevenue / totalCost).toFixed(2) : '0',
+              date_from: dateFrom,
+              date_to: dateTo,
+            });
+          } catch (accErr: any) {
+            result.accounts.push({
+              advertiser_id: acc.advertiser_id,
+              advertiser_name: acc.advertiser_name || '',
+              notice: 'API 调用失败：' + (accErr.message || '未知错误'),
+              cost: '0.00', orders: 0, revenue: '0.00', roi: '0',
+            });
+          }
         }
-        // 汇总
-        const totalCost = result.accounts.reduce((s: number, a: any) => s + parseFloat(a.cost), 0);
-        const totalOrders = result.accounts.reduce((s: number, a: any) => s + a.orders, 0);
-        const totalRevenue = result.accounts.reduce((s: number, a: any) => s + parseFloat(a.revenue), 0);
+        // 4. 汇总
+        const totalCost = result.accounts.reduce((s: number, a: any) => s + parseFloat(a.cost || '0'), 0);
+        const totalOrders = result.accounts.reduce((s: number, a: any) => s + (a.orders || 0), 0);
+        const totalRevenue = result.accounts.reduce((s: number, a: any) => s + parseFloat(a.revenue || '0'), 0);
+        const totalCampaigns = result.accounts.reduce((s: number, a: any) => s + (a.campaign_count || 0), 0);
         result.summary = {
           account_count: result.accounts.length,
+          campaign_count: totalCampaigns,
           total_cost: totalCost.toFixed(2),
           total_orders: totalOrders,
           total_revenue: totalRevenue.toFixed(2),
           total_roi: totalCost > 0 ? (totalRevenue / totalCost).toFixed(2) : '0',
         };
       } catch (e: any) {
-        return JSON.stringify({ error: e.message });
+        return JSON.stringify({ error: e.message, accounts: [] });
       }
       return JSON.stringify(result);
     }
