@@ -194,7 +194,7 @@ const AdCampaigns: React.FC = () => {
 
   // 首次挂载：无论是否已选账户，先强制刷新一次 gmv-max 缓存（避开之前可能的空缓存或没有 store_id 的旧数据）
   // VERSION 标记：每次后端升级字段（fields 参数等）都需更新版本号，强制刷一次
-  const CACHE_BUST_VERSION = 'v3';
+  const CACHE_BUST_VERSION = 'v4';
   useEffect(() => {
     if (advertisers.length > 0 && sessionStorage.getItem('gmv_max_cache_busted') !== CACHE_BUST_VERSION) {
       sessionStorage.setItem('gmv_max_cache_busted', CACHE_BUST_VERSION);

@@ -593,12 +593,11 @@ export async function getMyAdvertisers() {
 
 // ── GMV Max ──
 
-// GMV Max campaign/get/ 默认必须传的 fields（TikTok 不指定时返回字段不固定，必须显式传）
+// GMV Max campaign/get/ 可请求的 fields（只列 list 接口确定支持的字段，避免传不合法字段导致 list 返空）
 const GMV_MAX_CAMPAIGN_FIELDS = [
   'campaign_id', 'campaign_name', 'store_id', 'operation_status',
-  'shopping_ads_type', 'product_specific_type', 'objective_type', 'optimization_goal',
-  'roi_protection_enabled', 'roas_bid', 'budget', 'deep_bid_type',
-  'create_time', 'modify_time',
+  'shopping_ads_type', 'product_specific_type', 'objective_type',
+  'roas_bid', 'budget',
 ];
 
 /** 获取 GMV Max 推广系列列表 */
