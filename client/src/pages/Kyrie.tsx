@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Input, Button, Typography, Space, Tag, message, Tooltip,
-  Empty, Drawer, Modal, Card
+  Empty, Card
 } from 'antd';
 import {
   SendOutlined, ThunderboltOutlined,
@@ -9,14 +9,13 @@ import {
   BookOutlined, UserOutlined,
   ClearOutlined, LoadingOutlined,
   ShopOutlined, ClockCircleOutlined,
-  MessageOutlined, PlusOutlined,
-  HistoryOutlined, DeleteOutlined,
+  PlusOutlined, DeleteOutlined,
   StarOutlined, StarFilled, CopyOutlined,
-  ExportOutlined, EditOutlined, SearchOutlined,
-  CloseOutlined, GlobalOutlined,
-  CheckCircleOutlined,
+  EditOutlined, SearchOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import api from '../api';
 
 const { Text, Title } = Typography;
@@ -86,7 +85,6 @@ export default function Kyrie() {
   const [sending, setSending] = useState(false);
   const [progressText, setProgressText] = useState('');
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [sessionSearch, setSessionSearch] = useState('');
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -166,7 +164,7 @@ export default function Kyrie() {
     });
   };
 
-  const loadSession = (session: Session) => { setMessages(session.messages); setInputValue(''); setDrawerOpen(false); };
+  const loadSession = (session: Session) => { setMessages(session.messages); setInputValue(''); };
   const deleteSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     Modal.confirm({ title: '删除会话', content: '删除后不可恢复', okText: '删除', okType: 'danger', cancelText: '取消', onOk: () => setSessions(prev => prev.filter(s => s.id !== id)) });
@@ -174,7 +172,7 @@ export default function Kyrie() {
   const toggleFavorite = (id: string, e: React.MouseEvent) => { e.stopPropagation(); setSessions(prev => prev.map(s => s.id === id ? { ...s, favorite: !s.favorite } : s)); };
   const startRename = (id: string, name: string, e: React.MouseEvent) => { e.stopPropagation(); setEditingSessionId(id); setEditName(name); };
   const confirmRename = (id: string) => { setSessions(prev => prev.map(s => s.id === id ? { ...s, name: editName || '未命名' } : s)); setEditingSessionId(null); };
-  const scrollToMessage = (id: string) => { setDrawerOpen(false); setTimeout(() => { const el = messageRefs.current[id]; if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100); };
+  const scrollToMessage = (id: string) => { setTimeout(() => { const el = messageRefs.current[id]; if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100); };
   const copyMessage = (content: string) => { navigator.clipboard.writeText(content).then(() => message.success('已复制到剪贴板')); };
   const copyIntro = () => {
     const text = `我是欧文——跨境电商全栈运营智能体\n专精市场：${MARKETS.join('、')}\n能力：${SERVICES.map(s => s.text).join('、')}`;
@@ -192,7 +190,72 @@ export default function Kyrie() {
   //  RENDER
   // ════════════════════════════════════════
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 80px)', overflow: 'hidden', background: '#faf9f7' }}>
+
+      {/* ═══ 左侧 280px 对话列表 ═══ */}
+      <div style={{ width: 280, flexShrink: 0, background: '#fff', borderRight: '1px solid #e8e5e0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '16px' }}>
+          <Button block icon={<PlusOutlined />} onClick={handleNewSession}
+            style={{ height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #2563eb, #6366f1)', border: 'none', color: '#fff', fontWeight: 600, fontSize: 14, boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
+            新建对话
+          </Button>
+        </div>
+        <div style={{ padding: '0 16px 12px' }}>
+          <Input prefix={<SearchOutlined style={{ color: '#94a3b8' }} />} placeholder="搜索历史对话..." size="small"
+            value={sessionSearch} onChange={e => setSessionSearch(e.target.value)} allowClear style={{ borderRadius: 8 }} />
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', padding: '0 12px 12px' }}>
+          {filteredSessions.length === 0 ? (
+            <div style={{ padding: '24px 8px', textAlign: 'center' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>暂无历史对话</Text>
+            </div>
+          ) : (
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              {filteredSessions.map(s => (
+                <div key={s.id} onClick={() => loadSession(s)}
+                  style={{
+                    padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                    background: '#f8fafc', border: '1px solid transparent', transition: 'all 0.15s',
+                  }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {editingSessionId === s.id ? (
+                      <Input size="small" value={editName} onChange={e => setEditName(e.target.value)}
+                        onBlur={() => confirmRename(s.id)} onPressEnter={() => confirmRename(s.id)} autoFocus
+                        style={{ fontSize: 13, flex: 1 }} onClick={e => e.stopPropagation()} />
+                    ) : (
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {s.favorite && <StarFilled style={{ color: '#f59e0b', fontSize: 11 }} />}
+                          <Text ellipsis style={{ fontSize: 13, color: '#1e293b', fontWeight: 500 }}>{s.name}</Text>
+                        </div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          {new Date(s.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} · {s.messages.filter(m => m.role === 'user').length} 问
+                        </Text>
+                      </div>
+                    )}
+                    <Space size={1} style={{ flexShrink: 0, marginLeft: 4 }}>
+                      <Button type="text" size="small"
+                        icon={s.favorite ? <StarFilled style={{ color: '#f59e0b', fontSize: 12 }} /> : <StarOutlined style={{ fontSize: 12 }} />}
+                        onClick={e => toggleFavorite(s.id, e)}
+                        style={{ color: '#94a3b8', minWidth: 24, height: 24, padding: 0 }} />
+                      <Button type="text" size="small"
+                        icon={<DeleteOutlined style={{ fontSize: 12 }} />}
+                        onClick={e => deleteSession(s.id, e)}
+                        style={{ color: '#94a3b8', minWidth: 24, height: 24, padding: 0 }} />
+                    </Space>
+                  </div>
+                </div>
+              ))}
+            </Space>
+          )}
+        </div>
+        <div style={{ borderTop: '1px solid #e8e5e0', padding: '12px 16px' }}>
+          <Text type="secondary" style={{ fontSize: 11 }}>当前对话 · {userMessages.length} 问</Text>
+        </div>
+      </div>
+
+      {/* ═══ 右侧主聊天区 ═══ */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
       {/* ─── 1. 顶部导航栏 ─── */}
       <div style={{ height: 52, display: 'flex', alignItems: 'center', background: '#fff', borderBottom: '1px solid #e8e5e0', flexShrink: 0, padding: '0 24px' }}>
@@ -208,7 +271,7 @@ export default function Kyrie() {
         <div style={{ flex: 1 }} />
         <Space size={4}>
           <Button type="text" size="small" icon={<PlusOutlined />} onClick={handleNewSession} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>新建会话</Button>
-          <Button type="text" size="small" icon={<HistoryOutlined />} onClick={() => setDrawerOpen(true)} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>会话归档</Button>
+
           <Button type="text" size="small" icon={<ClearOutlined />} onClick={handleClear} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>清空</Button>
         </Space>
       </div>
@@ -316,7 +379,7 @@ export default function Kyrie() {
                         </Space>
                       </div>
                     )}
-                    <div className="wb-markdown"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
+                    <div className="wb-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
                     {msg.role === 'assistant' && msg.id !== 'welcome' && (
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 12, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
                         <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => copyMessage(msg.content)} style={{ color: '#94a3b8', height: 26, fontSize: 12 }}>复制</Button>
@@ -363,56 +426,6 @@ export default function Kyrie() {
       </div>
 
       {/* ═══ 右侧悬浮抽屉 ═══ */}
-      <Drawer title={null} open={drawerOpen} onClose={() => setDrawerOpen(false)} width={360} closable={false} styles={{ body: { padding: 0 }, header: { display: 'none' } }} maskStyle={{ background: 'rgba(15,23,42,0.2)' }}>
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e8e5e0' }}>
-            <Space><HistoryOutlined style={{ color: '#2563eb', fontSize: 18 }} /><span style={{ fontSize: 16, fontWeight: 600, color: '#1e293b' }}>会话管理</span></Space>
-            <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setDrawerOpen(false)} style={{ color: '#94a3b8' }} />
-          </div>
-          <div style={{ padding: '12px 20px' }}>
-            <Input prefix={<SearchOutlined style={{ color: '#94a3b8' }} />} placeholder="搜索历史会话..." size="small" value={sessionSearch} onChange={e => setSessionSearch(e.target.value)} allowClear style={{ borderRadius: 8 }} />
-          </div>
-          <div style={{ flex: 1, overflow: 'auto', padding: '0 20px 12px' }}>
-            <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>历史会话</Text>
-            {sortedSessions.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无历史会话" style={{ marginTop: 40 }} /> : (
-              <Space direction="vertical" size={6} style={{ width: '100%' }}>
-                {sortedSessions.map(s => (
-                  <div key={s.id} onClick={() => loadSession(s)} style={{ padding: '10px 14px', borderRadius: 10, cursor: 'pointer', background: '#f8fafc', border: '1px solid #e8e5e0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      {editingSessionId === s.id ? (
-                        <Input size="small" value={editName} onChange={e => setEditName(e.target.value)} onBlur={() => confirmRename(s.id)} onPressEnter={() => confirmRename(s.id)} autoFocus style={{ fontSize: 13, flex: 1 }} onClick={e => e.stopPropagation()} />
-                      ) : (
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{s.favorite && <StarFilled style={{ color: '#f59e0b', fontSize: 12 }} />}<Text ellipsis style={{ fontSize: 13, color: '#1e293b', fontWeight: 500 }}>{s.name}</Text></div>
-                          <Text type="secondary" style={{ fontSize: 11 }}>{new Date(s.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} · {s.messages.filter(m => m.role === 'user').length} 轮对话</Text>
-                        </div>
-                      )}
-                      <Space size={2} style={{ flexShrink: 0, marginLeft: 8 }}>
-                        <Button type="text" size="small" icon={s.favorite ? <StarFilled style={{ color: '#f59e0b' }} /> : <StarOutlined />} onClick={e => toggleFavorite(s.id, e)} style={{ color: '#94a3b8', minWidth: 28, height: 28 }} />
-                        <Button type="text" size="small" icon={<EditOutlined />} onClick={e => startRename(s.id, s.name, e)} style={{ color: '#94a3b8', minWidth: 28, height: 28 }} />
-                        <Button type="text" size="small" icon={<DeleteOutlined />} onClick={e => deleteSession(s.id, e)} style={{ color: '#94a3b8', minWidth: 28, height: 28 }} />
-                      </Space>
-                    </div>
-                  </div>
-                ))}
-              </Space>
-            )}
-          </div>
-          <div style={{ borderTop: '1px solid #e8e5e0', padding: '16px 20px', maxHeight: 240, overflow: 'auto' }}>
-            <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>当前会话</Text>
-            {userMessages.length === 0 ? <Text type="secondary" style={{ fontSize: 12 }}>暂无提问记录</Text> : (
-              <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                {userMessages.map((msg, i) => (
-                  <Button key={msg.id} block size="small" icon={<MessageOutlined />} onClick={() => scrollToMessage(msg.id)} style={{ borderRadius: 8, textAlign: 'left', height: 'auto', padding: '6px 10px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 12 }}>
-                    <Text ellipsis style={{ width: '100%', fontSize: 12 }}>{i + 1}. {msg.content.slice(0, 35)}{msg.content.length > 35 ? '...' : ''}</Text>
-                  </Button>
-                ))}
-              </Space>
-            )}
-          </div>
-        </div>
-      </Drawer>
-
       <style>{`
         .wb-markdown { color: inherit; }
         .wb-markdown h1, .wb-markdown h2, .wb-markdown h3 { margin-top: 14px; margin-bottom: 8px; color: inherit; font-weight: 600; }
@@ -432,6 +445,7 @@ export default function Kyrie() {
         .wb-markdown hr { border: none; border-top: 1px solid #e2e8f0; margin: 14px 0; }
         .wb-markdown blockquote { border-left: 3px solid #2563eb; padding-left: 12px; margin: 8px 0; color: #64748b; background: rgba(37,99,235,0.04); padding: 8px 12px; border-radius: 0 6px 6px 0; }
       `}</style>
-    </div>
+      </div>{/* close right panel */}
+    </div>{/* close outer container */}
   );
 }
