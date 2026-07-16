@@ -335,7 +335,7 @@ const AdCampaigns: React.FC = () => {
       visibleMetrics.roi && {
         name: 'ROI',
         type: 'line',
-        yAxisIndex: 0,
+        yAxisIndex: 2, // 用第三个独立 Y 轴（避免跟成本/订单数量级冲突）
         data: dailyData.map(d => d.roi),
         smooth: 0.4,
         symbol: 'circle',
@@ -362,7 +362,7 @@ const AdCampaigns: React.FC = () => {
         },
       },
       legend: { show: false },
-      grid: { left: 50, right: 50, top: 20, bottom: 30, containLabel: true },
+      grid: { left: 60, right: 110, top: 20, bottom: 30, containLabel: true },
       xAxis: {
         type: 'category' as const,
         data: fullXLabels, // 完整日期作为 x 轴（tooltip 用）
@@ -370,19 +370,37 @@ const AdCampaigns: React.FC = () => {
         // x 轴标签显示简短格式（MM-DD）
         axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: string) => v.slice(5) },
       },
+      // 3 个独立 Y 轴：
+      //   yAxis[0] = 左：成本 + 收入（货币，量级大）
+      //   yAxis[1] = 右：订单数（整数，量级中等）
+      //   yAxis[2] = 右偏移：ROI（小数值 0-10，单独坐标避免被压成线）
       yAxis: [
         {
           type: 'value' as const,
+          name: '成本($)',
           position: 'left' as const,
+          nameTextStyle: { color: '#3b82f6', fontSize: 11 },
           axisLine: { show: false },
           axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: number) => `$${v}` },
           splitLine: { lineStyle: { color: '#f1f5f9' } },
         },
         {
           type: 'value' as const,
+          name: '订单数',
           position: 'right' as const,
+          nameTextStyle: { color: '#8b5cf6', fontSize: 11 },
           axisLine: { show: false },
           axisLabel: { color: '#64748b', fontSize: 11 },
+          splitLine: { show: false },
+        },
+        {
+          type: 'value' as const,
+          name: 'ROI',
+          position: 'right' as const,
+          offset: 50,
+          nameTextStyle: { color: '#7c3aed', fontSize: 11 },
+          axisLine: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: number) => v.toFixed(2) },
           splitLine: { show: false },
         },
       ],
