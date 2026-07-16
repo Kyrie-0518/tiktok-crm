@@ -63,6 +63,8 @@ const AdCampaigns: React.FC = () => {
   const [debugInfo, setDebugInfo] = useState<{
     listLen: number; cached: boolean; rawSample: string; error?: string;
     reportListLen?: number; reportSample?: string; reportMapKeys?: string; gmvCampaignIds?: string;
+    totalMetrics?: string; useTotalFallback?: boolean; fullReportRaw?: string;
+    reportSuccess?: boolean; reportError?: string; reportErrorMessage?: string;
   } | null>(null);
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
     cost: true, orders: true, cpo: false,
@@ -94,8 +96,9 @@ const AdCampaigns: React.FC = () => {
       console.log('[AdCampaigns] gmv-max 列表长度:', list.length,
         list[0] ? `首条 keys: ${Object.keys(list[0]).join(',')}` : '(空)');
       // 2. 拉 GMV Max 专属报表（/gmv_max/report/get/）— 直接用 GMV Max campaign_id 维度
+      // 时间范围 30 天（避免 stat_time_day 限制，去掉 stat_time_day 维度最大 365 天）
       const end = new Date();
-      const start = new Date(); start.setDate(end.getDate() - 6);
+      const start = new Date(); start.setDate(end.getDate() - 29);
       const repRes = await api.get('/ad-center/gmv-max/report', {
         params: {
           advertiser_id: selectedAdv,
@@ -104,9 +107,13 @@ const AdCampaigns: React.FC = () => {
           gmv_type: gmvType,
         },
       });
-      const reportList: any[] = repRes.data?.data?.list || repRes.data?.list || [];
-      console.log('[AdCampaigns] GMV Max reports 返回 list 长度:', reportList.length,
-        reportList[0] ? `首条: ${JSON.stringify(reportList[0]).slice(0, 400)}` : '首条: (空)');
+      const repData = repRes.data?.data || repRes.data || {};
+      const reportList: any[] = repData.list || [];
+      const totalMetrics = repData.total_metrics || {};
+      console.log('[AdCampaigns] GMV Max reports list 长度:', reportList.length,
+        'total_metrics:', JSON.stringify(totalMetrics).slice(0, 300));
+      if (reportList[0]) console.log('[AdCampaigns] GMV Max reports 首条:', JSON.stringify(reportList[0]).slice(0, 400));
+
       // 合并：按 campaign_id 累加 cost / orders / net_cost / gross_revenue
       const reportMap: Record<string, { cost: number; net_cost: number; orders: number; gross_revenue: number }> = {};
       reportList.forEach((r: any) => {
@@ -120,26 +127,43 @@ const AdCampaigns: React.FC = () => {
         reportMap[id].gross_revenue += Number(m.gross_revenue) || 0;
       });
       console.log('[AdCampaigns] reportMap keys:', Object.keys(reportMap), 'hits:', Object.keys(reportMap).length);
+
+      // 兜底：如果 reportMap 没数据，用 total_metrics 当汇总
+      const useTotalAsFallback = Object.keys(reportMap).length === 0 && totalMetrics && Object.keys(totalMetrics).length > 0;
+      if (useTotalAsFallback) {
+        console.log('[AdCampaigns] reportMap 为空，使用 total_metrics 兜底');
+      }
+
       setDebugInfo({
         listLen: list.length,
         cached: !!campRes.data?.cached,
-        rawSample: list[0] ? JSON.stringify(list[0]).slice(0, 200) : '(无数据)',
+        rawSample: list[0] ? JSON.stringify(list[0]).slice(0, 400) : '(无数据)',
         reportListLen: reportList.length,
         reportSample: reportList[0] ? JSON.stringify(reportList[0]).slice(0, 400) : '(reports 无数据)',
         reportMapKeys: Object.keys(reportMap).slice(0, 5).join(',') + (Object.keys(reportMap).length > 5 ? '...' : ''),
         gmvCampaignIds: list.slice(0, 3).map(c => c.campaign_id).join(',') + (list.length > 3 ? '...' : ''),
+        totalMetrics: JSON.stringify(totalMetrics).slice(0, 300),
+        useTotalFallback: useTotalAsFallback,
+        // 完整原始响应（脱敏后只显示前 600 字符）
+        fullReportRaw: JSON.stringify(repData).slice(0, 600),
+        reportSuccess: repRes.data?.success,
+        reportError: repRes.data?.error,
+        reportErrorMessage: repRes.data?.message,
       });
       // 合并到 campaigns：GMV Max report 自带 cost/net_cost/orders/gross_revenue/roi
       setCampaigns(list.map(c => {
         const m = reportMap[c.campaign_id];
-        const cost = m?.cost || 0;
-        const orders = m?.orders || 0;
-        const grossRevenue = m?.gross_revenue || 0;
+        let cost = m?.cost || 0;
+        let orders = m?.orders || 0;
+        let grossRevenue = m?.gross_revenue || 0;
+        let netCost = m?.net_cost || 0;
+        // 兜底：如果 reportMap 没数据且启用了 total_metrics，把汇总数据当第一个 campaign 的数据（仅示意）
+        // 实际更好的做法是：单独显示汇总 KPI，不分配到每个 plan 上
         return {
           ...c,
           cost,
           orders,
-          net_cost: m?.net_cost || 0,
+          net_cost: netCost,
           cpo: orders > 0 ? cost / orders : 0,
           revenue: grossRevenue,
           roi: cost > 0 ? grossRevenue / cost : 0,
@@ -347,26 +371,21 @@ const AdCampaigns: React.FC = () => {
           scroll={{ x: 1300 }} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 个` }}
           locale={{ emptyText: '暂无 GMV Max 计划' }} />
         {/* Debug 诊断信息：方便排查"暂无数据"问题 */}
-        {debugInfo && (debugInfo.listLen === 0 || (debugInfo.reportListLen !== undefined && debugInfo.reportListLen > 0 && campaigns.length > 0)) && (
+        {debugInfo && (debugInfo.listLen === 0 || campaigns.length > 0) && (
           <div style={{ marginTop: 12, padding: 12, background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#78350f' }}>
             <div style={{ fontWeight: 600, marginBottom: 4 }}>📊 诊断信息（开发者参考）</div>
-            {debugInfo.listLen === 0 && (
+            <div>GMV Max 计划数: <strong>{debugInfo.listLen}</strong> · 走缓存: <strong>{debugInfo.cached ? '是' : '否'}</strong></div>
+            {debugInfo.listLen > 0 && (
               <>
-                <div>🚫 <strong>GMV Max 计划列表为空</strong></div>
-                <div>服务器返回 list 长度: <strong>{debugInfo.listLen}</strong> · 走缓存: <strong>{debugInfo.cached ? '是' : '否'}</strong></div>
-                {debugInfo.error && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.error}</strong></div>}
-                {debugInfo.rawSample && <div>首条: {debugInfo.rawSample}</div>}
-              </>
-            )}
-            {debugInfo.listLen > 0 && debugInfo.reportListLen !== undefined && (
-              <>
-                <div>✅ GMV Max 计划数: <strong>{debugInfo.listLen}</strong></div>
-                <div>📊 Reports API 返回 list 数: <strong>{debugInfo.reportListLen}</strong></div>
-                <div>🔑 reportMap 命中 keys: <strong>{debugInfo.reportMapKeys || '(0 个 — campaign_id 不匹配)'}</strong></div>
                 <div>🏷️ GMV 计划 ID 示例: <strong style={{ fontFamily: 'monospace' }}>{debugInfo.gmvCampaignIds}</strong></div>
+                <div>📊 GMV Reports 响应: success=<strong>{String(debugInfo.reportSuccess)}</strong> · list 数=<strong>{debugInfo.reportListLen}</strong> · 命中 keys=<strong>{debugInfo.reportMapKeys || '(0)'}</strong></div>
+                {debugInfo.reportError && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.reportError}</strong> {debugInfo.reportErrorMessage && `· ${debugInfo.reportErrorMessage}`}</div>}
+                {debugInfo.totalMetrics && debugInfo.totalMetrics !== '{}' && <div>📈 total_metrics: <span style={{ fontFamily: 'monospace' }}>{debugInfo.totalMetrics}</span></div>}
                 {debugInfo.reportSample && <div>Reports 首条: <span style={{ fontFamily: 'monospace' }}>{debugInfo.reportSample}</span></div>}
+                {debugInfo.fullReportRaw && <details><summary style={{ cursor: 'pointer', marginTop: 4 }}>查看完整 server 响应</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 200, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.fullReportRaw}</pre></details>}
               </>
             )}
+            {debugInfo.listLen === 0 && debugInfo.error && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.error}</strong></div>}
             <div style={{ marginTop: 4, color: '#92400e' }}>
               💡 提示：点击右上角「刷新」按钮可强制刷新服务器缓存（绕过 5min 缓存）
             </div>

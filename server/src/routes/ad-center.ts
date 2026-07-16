@@ -569,7 +569,8 @@ router.get('/gmv-max/report', authMiddleware, async (req: Request, res: Response
       start_date: startDate,
       end_date: endDate,
       gmv_max_promotion_types: gmvType === 'live' ? ['LIVE'] : ['PRODUCT'],
-      dimensions: ['campaign_id', 'stat_time_day'],
+      // 关键：去掉 stat_time_day（避免 30 天限制），只用 campaign_id 维度，范围最大 365 天
+      dimensions: ['campaign_id'],
       metrics: ['cost', 'net_cost', 'orders', 'cost_per_order', 'gross_revenue', 'roi'],
       page_size: 200,
     });
@@ -578,8 +579,12 @@ router.get('/gmv-max/report', authMiddleware, async (req: Request, res: Response
     if (listLen > 0) {
       console.log(`[ad-center] gmv-max/report 首条:`, JSON.stringify((result as any).data.list[0]).slice(0, 400));
     }
-    res.json({ success: true, data: result?.data || result });
+    // 把诊断信息塞到响应里
+    const respData = (result as any)?.data || result;
+    (respData as any).__debug = { storeId, startDate, endDate, gmvType, listLen, advertiserId };
+    res.json({ success: true, data: respData });
   } catch (e: any) {
+    console.error('[ad-center] gmv-max/report failed:', e.message);
     return handleApiError(e, res);
   }
 });

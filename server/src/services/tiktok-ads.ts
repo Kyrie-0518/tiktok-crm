@@ -656,8 +656,8 @@ export async function getGmvMaxReport(params: {
   const filtering: any = {};
   if (params.gmv_max_promotion_types?.length) filtering.gmv_max_promotion_types = params.gmv_max_promotion_types;
   if (params.campaign_ids?.length) filtering.campaign_ids = params.campaign_ids;
-  console.log(`[TikTok Ads] getGmvMaxReport: advertiser=${params.advertiser_id} store=${params.store_ids[0]} dates=${params.start_date}~${params.end_date} dims=${JSON.stringify(params.dimensions)}`);
-  return tiktokAdsGet('/open_api/v1.3/gmv_max/report/get/', token, {
+  console.log(`[TikTok Ads] getGmvMaxReport: advertiser=${params.advertiser_id} store=${params.store_ids[0]} dates=${params.start_date}~${params.end_date} dims=${JSON.stringify(params.dimensions)} metrics=${JSON.stringify(params.metrics)}`);
+  const result = await tiktokAdsGet('/open_api/v1.3/gmv_max/report/get/', token, {
     advertiser_id: params.advertiser_id,
     store_ids: JSON.stringify(params.store_ids),
     start_date: params.start_date,
@@ -666,6 +666,15 @@ export async function getGmvMaxReport(params: {
     metrics: JSON.stringify(params.metrics || ['cost', 'net_cost', 'orders', 'cost_per_order', 'gross_revenue', 'roi']),
     page: String(params.page || 1),
     page_size: String(params.page_size || 100),
+    enable_total_metrics: 'true', // 关键：返回 total_metrics 汇总数据，避免 list 为空时显示 0
     ...(Object.keys(filtering).length ? { filtering: JSON.stringify(filtering) } : {}),
   });
+  // 详细日志：实际响应
+  const dataList = (result as any)?.data?.list || [];
+  const totalMetrics = (result as any)?.data?.total_metrics;
+  console.log(`[TikTok Ads] getGmvMaxReport response: code=${(result as any).code} list.length=${dataList.length} total_metrics=${JSON.stringify(totalMetrics).slice(0, 300)}`);
+  if (dataList.length > 0) {
+    console.log(`[TikTok Ads] getGmvMaxReport 首条:`, JSON.stringify(dataList[0]).slice(0, 500));
+  }
+  return result;
 }
