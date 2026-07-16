@@ -99,6 +99,15 @@ const AdCampaigns: React.FC = () => {
       // 时间范围 30 天（避免 stat_time_day 限制，去掉 stat_time_day 维度最大 365 天）
       const end = new Date();
       const start = new Date(); start.setDate(end.getDate() - 29);
+      // 先调测试接口（同时跑 campaign_id 维度和 advertiser_id 维度，确诊问题）
+      let testResult: any = null;
+      try {
+        const testRes = await api.get('/ad-center/gmv-max/report/test', { params: { advertiser_id: selectedAdv } });
+        testResult = testRes.data;
+        console.log('[AdCampaigns] 🧪 test endpoint 返回:', JSON.stringify(testResult).slice(0, 1500));
+      } catch (e: any) {
+        console.warn('[AdCampaigns] test endpoint 失败:', e.message);
+      }
       const repRes = await api.get('/ad-center/gmv-max/report', {
         params: {
           advertiser_id: selectedAdv,
@@ -149,6 +158,8 @@ const AdCampaigns: React.FC = () => {
         reportSuccess: repRes.data?.success,
         reportError: repRes.data?.error,
         reportErrorMessage: repRes.data?.message,
+        // 测试端点结果
+        testResult: testResult ? JSON.stringify(testResult).slice(0, 1000) : '(test 失败)',
       });
       // 合并到 campaigns：GMV Max report 自带 cost/net_cost/orders/gross_revenue/roi
       setCampaigns(list.map(c => {
@@ -382,6 +393,7 @@ const AdCampaigns: React.FC = () => {
                 {debugInfo.reportError && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.reportError}</strong> {debugInfo.reportErrorMessage && `· ${debugInfo.reportErrorMessage}`}</div>}
                 {debugInfo.totalMetrics && debugInfo.totalMetrics !== '{}' && <div>📈 total_metrics: <span style={{ fontFamily: 'monospace' }}>{debugInfo.totalMetrics}</span></div>}
                 {debugInfo.reportSample && <div>Reports 首条: <span style={{ fontFamily: 'monospace' }}>{debugInfo.reportSample}</span></div>}
+                {debugInfo.testResult && <details style={{ marginTop: 4 }}><summary style={{ cursor: 'pointer' }}>🧪 测试端点 4 种调用对比（点开看）</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 300, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.testResult}</pre></details>}
                 {debugInfo.fullReportRaw && <details><summary style={{ cursor: 'pointer', marginTop: 4 }}>查看完整 server 响应</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 200, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.fullReportRaw}</pre></details>}
               </>
             )}

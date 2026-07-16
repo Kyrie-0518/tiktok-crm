@@ -525,6 +525,60 @@ router.get('/gmv-max/campaigns/:id', authMiddleware, async (req: Request, res: R
   }
 });
 
+// GET /api/ad-center/gmv-max/report/test — 直接测试 GMV Max 报表 API（不过滤，不缓存）
+router.get('/gmv-max/report/test', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const advertiserId = req.query.advertiser_id as string;
+    if (!advertiserId) return res.status(400).json({ success: false, error: '缺少 advertiser_id' });
+    // 取 store_id
+    const db = getDb();
+    const cacheRow = db.prepare('SELECT value FROM settings WHERE key = ?').get(`tt_ads_gmvmax_${advertiserId}_product`) as any;
+    let storeId: string | null = null;
+    if (cacheRow?.value) {
+      try { const c = JSON.parse(cacheRow.value); if (c?.list?.[0]?.store_id) storeId = c.list[0].store_id; } catch {}
+    }
+    if (!storeId) {
+      const campRes = await Ads.getGmvMaxCampaigns({
+        advertiser_id: advertiserId,
+        gmv_max_promotion_types: ['PRODUCT_GMV_MAX'],
+        page: 1, page_size: 1,
+      });
+      storeId = campRes?.data?.list?.[0]?.store_id || null;
+    }
+    if (!storeId) return res.json({ success: false, error: 'no_store_id' });
+    // 调 4 种典型调用：1)campaign_id  2)advertiser_id  3)product+live  4)无 store_ids（看错误信息）
+    const end = new Date();
+    const start = new Date(); start.setDate(end.getDate() - 29);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const results: any = {};
+    try {
+      // 1. campaign_id 维度
+      const r1: any = await Ads.getGmvMaxReport({
+        advertiser_id: advertiserId, store_ids: [storeId],
+        start_date: fmt(start), end_date: fmt(end),
+        gmv_max_promotion_types: ['PRODUCT'],
+        dimensions: ['campaign_id'], metrics: ['cost', 'orders', 'gross_revenue', 'roi'],
+        page_size: 200,
+      });
+      results.test1_campaign_id_dim = { code: r1.code, message: r1.message, listLen: r1.data?.list?.length, total_metrics: r1.data?.total_metrics, firstRow: r1.data?.list?.[0] };
+    } catch (e: any) { results.test1_campaign_id_dim = { error: e.message }; }
+    try {
+      // 2. advertiser_id 维度（汇总）
+      const r2: any = await Ads.getGmvMaxReport({
+        advertiser_id: advertiserId, store_ids: [storeId],
+        start_date: fmt(start), end_date: fmt(end),
+        gmv_max_promotion_types: ['PRODUCT'],
+        dimensions: ['advertiser_id'], metrics: ['cost', 'orders', 'gross_revenue', 'roi'],
+        page_size: 200,
+      });
+      results.test2_advertiser_dim = { code: r2.code, message: r2.message, listLen: r2.data?.list?.length, total_metrics: r2.data?.total_metrics, firstRow: r2.data?.list?.[0] };
+    } catch (e: any) { results.test2_advertiser_dim = { error: e.message }; }
+    res.json({ success: true, storeId, advertiserId, dates: `${fmt(start)}_${fmt(end)}`, results });
+  } catch (e: any) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
 // GET /api/ad-center/gmv-max/report — GMV Max 专属报表（直接用 GMV Max campaign_id 维度）
 router.get('/gmv-max/report', authMiddleware, async (req: Request, res: Response) => {
   try {
