@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, Table, Tag, Button, Typography, message, Empty, Switch, Input } from 'antd';
+import { Card, Table, Tag, Button, Typography, message, Empty, Switch, Input, DatePicker, Space } from 'antd';
+import dayjs, { Dayjs } from 'dayjs';
 import {
   AppstoreOutlined, ReloadOutlined, SearchOutlined, SyncOutlined,
   DollarOutlined, ShoppingOutlined, RiseOutlined, TrophyOutlined, WalletOutlined,
@@ -61,6 +62,12 @@ const AdCampaigns: React.FC = () => {
   // 按天聚合的趋势图数据 { '2026-07-01': { cost, orders, gross_revenue }, ... }
   const [dailyData, setDailyData] = useState<Array<{ date: string; cost: number; orders: number; gross_revenue: number }>>([]);
   const [keyword, setKeyword] = useState('');
+  // 日期范围（默认近 7 天）
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>(() => {
+    const end = dayjs();
+    const start = end.subtract(6, 'day');
+    return [start, end];
+  });
   // 诊断信息：服务器返回的原始 list + 错误，方便排查"暂无数据"问题
   const [debugInfo, setDebugInfo] = useState<{
     listLen: number; cached: boolean; rawSample: string; error?: string;
@@ -104,23 +111,23 @@ const AdCampaigns: React.FC = () => {
       // 把第一个 plan 的完整 JSON 保存（脱敏后），方便诊断 store_id 等关键字段
       const firstCampaignFull = list[0] ? JSON.stringify(list[0]) : '(无)';
       // 2. 拉 GMV Max 专属报表（/gmv_max/report/get/）— 直接用 GMV Max campaign_id 维度
-      // 时间范围 30 天（避免 stat_time_day 限制，去掉 stat_time_day 维度最大 365 天）
-      const end = new Date();
-      const start = new Date(); start.setDate(end.getDate() - 29);
+      // 时间范围用 dateRange（默认近 7 天）
+      const startStr = dateRange[0].format('YYYY-MM-DD');
+      const endStr = dateRange[1].format('YYYY-MM-DD');
       // 先调测试接口（同时跑 campaign_id 维度和 advertiser_id 维度，确诊问题）
       let testResult: any = null;
       try {
         const testRes = await api.get('/ad-center/gmv-max/report/test', { params: { advertiser_id: selectedAdv } });
         testResult = testRes.data;
-        console.log('[AdCampaigns] 🧪 test endpoint 返回:', JSON.stringify(testResult).slice(0, 1500));
+        console.log('[AdCampaigns] 🧪 test endpoint 返回:', JSON.stringify(testRes.data).slice(0, 1500));
       } catch (e: any) {
         console.warn('[AdCampaigns] test endpoint 失败:', e.message);
       }
       const repRes = await api.get('/ad-center/gmv-max/report', {
         params: {
           advertiser_id: selectedAdv,
-          start_date: start.toISOString().slice(0, 10),
-          end_date: end.toISOString().slice(0, 10),
+          start_date: startStr,
+          end_date: endStr,
           gmv_type: gmvType,
         },
       });
@@ -217,9 +224,9 @@ const AdCampaigns: React.FC = () => {
       message.error('加载失败: ' + (e.response?.data?.error || e.message));
       setDebugInfo({ listLen: 0, cached: false, rawSample: '', error: e.response?.data?.error || e.message });
     } finally { setSyncing(false); }
-  }, [selectedAdv, gmvType]);
+  }, [selectedAdv, gmvType, dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')]);
 
-  useEffect(() => { if (selectedAdv) loadData(true); }, [selectedAdv, loadData]);
+  useEffect(() => { if (selectedAdv) loadData(true); }, [selectedAdv, loadData, dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')]);
 
   // 首次挂载：无论是否已选账户，先强制刷新一次 gmv-max 缓存（避开之前可能的空缓存或没有 store_id 的旧数据）
   // VERSION 标记：每次后端升级字段（fields 参数等）都需更新版本号，强制刷一次
@@ -261,6 +268,8 @@ const AdCampaigns: React.FC = () => {
   const revenueArr = dailyData.map(d => d.gross_revenue);
   // 趋势图 series 根据 visibleMetrics 过滤（用 useMemo 确保 visibleMetrics 变化时 option 引用改变）
   const chartOption: any = useMemo(() => {
+    // xLabels 用完整日期（YYYY-MM-DD）— tooltip 显示完整日期
+    const fullXLabels = dailyData.map(d => d.date);
     const allSeries: any[] = [
       visibleMetrics.cost && {
         name: '成本',
@@ -321,10 +330,14 @@ const AdCampaigns: React.FC = () => {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross' },
+        // 只显示当前勾选的 series（params 里只会有 visible series）+ 完整日期
         formatter: (params: any[]) => {
-          let html = `<div style="font-weight:600">${params[0]?.axisValue || ''}</div>`;
+          if (!params?.length) return '';
+          const dateLabel = fullXLabels[params[0]?.dataIndex] || params[0]?.axisValue || '';
+          let html = `<div style="font-weight:600;margin-bottom:4px">${dateLabel}</div>`;
           params.forEach(p => {
-            html += `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:2px"><span>${p.marker} ${p.seriesName}</span><span style="font-weight:600">${typeof p.value === 'number' ? p.value.toFixed(2) : p.value}</span></div>`;
+            const v = typeof p.value === 'number' ? p.value.toFixed(2) : p.value;
+            html += `<div style="display:flex;justify-content:space-between;gap:16px;margin-top:2px;min-width:140px"><span>${p.marker} ${p.seriesName}</span><span style="font-weight:600">${v}</span></div>`;
           });
           return html;
         },
@@ -333,9 +346,10 @@ const AdCampaigns: React.FC = () => {
       grid: { left: 50, right: 50, top: 20, bottom: 30, containLabel: true },
       xAxis: {
         type: 'category' as const,
-        data: xLabels,
+        data: fullXLabels, // 完整日期作为 x 轴（tooltip 用）
         axisLine: { lineStyle: { color: '#e2e8f0' } },
-        axisLabel: { color: '#64748b', fontSize: 11 },
+        // x 轴标签显示简短格式（MM-DD）
+        axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: string) => v.slice(5) },
       },
       yAxis: [
         {
@@ -356,6 +370,7 @@ const AdCampaigns: React.FC = () => {
       series: allSeries,
     };
   // 依赖 visibleMetrics.cost/orders/revenue + xLabels（costArr/ordersArr/revenueArr 是 dailyData 派生的，dailyData 变时 xLabels 也会变）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleMetrics.cost, visibleMetrics.orders, visibleMetrics.revenue, xLabels.join(','), costArr.join(','), ordersArr.join(','), revenueArr.join(',')]);
 
@@ -440,7 +455,23 @@ const AdCampaigns: React.FC = () => {
           </div>
           <Input prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
             placeholder="搜索广告计划名称或 ID" value={keyword} onChange={e => setKeyword(e.target.value)}
-            allowClear style={{ width: 280, borderRadius: 8 }} />
+            allowClear style={{ width: 220, borderRadius: 8 }} />
+          {/* 日期范围（默认近 7 天，带快捷选项） */}
+          <DatePicker.RangePicker
+            value={dateRange}
+            onChange={(dates) => { if (dates?.[0] && dates?.[1]) setDateRange([dates[0], dates[1]]); }}
+            allowClear={false}
+            presets={[
+              { label: '今天', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+              { label: '昨天', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
+              { label: '近 7 天', value: [dayjs().subtract(6, 'day'), dayjs()] },
+              { label: '近 30 天', value: [dayjs().subtract(29, 'day'), dayjs()] },
+              { label: '近 3 个月', value: [dayjs().subtract(3, 'month'), dayjs()] },
+              { label: '近 6 个月', value: [dayjs().subtract(6, 'month'), dayjs()] },
+              { label: '过去 12 个月', value: [dayjs().subtract(12, 'month'), dayjs()] },
+            ]}
+            style={{ borderRadius: 8 }}
+          />
           <Button icon={<ReloadOutlined spin={syncing} />} onClick={() => loadData(false)} style={{ borderRadius: 8 }}>刷新</Button>
           {syncing && <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}><SyncOutlined spin /> 同步中…</Text>}
         </div>
