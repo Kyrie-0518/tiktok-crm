@@ -441,6 +441,35 @@ router.post('/rules', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/ad-center/rules/auto-generate — 智能生成 9 条规则（仿 Adrate）
+router.post('/rules/auto-generate', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { advertiser_id, ...params } = req.body;
+    if (!advertiser_id) {
+      return res.status(400).json({ success: false, error: '缺少 advertiser_id' });
+    }
+    const generatedRules = Ads.generateAutoRules(advertiser_id, params || {});
+    console.log(`[ad-center] 智能生成 ${generatedRules.length} 条规则，advertiser=${advertiser_id}`);
+    // 批量调用 TikTok API 创建（关闭状态）
+    const result = await Ads.createOptimizerRule({
+      advertiser_id,
+      lang: 'ZH',
+      rules: generatedRules.map(r => ({ ...r, rule_status: 'OFF' })), // 关闭状态创建
+    });
+    const ruleIds = (result as any)?.data?.rule_ids || [];
+    res.json({
+      success: true,
+      generatedCount: generatedRules.length,
+      ruleIds,
+      rules: generatedRules,
+      data: result?.data || result,
+    });
+  } catch (e: any) {
+    console.error('[ad-center] auto-generate failed:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // PUT /api/ad-center/rules/:id — 更新自动化规则（含启停）
 router.put('/rules/:id', authMiddleware, async (req: Request, res: Response) => {
   try {

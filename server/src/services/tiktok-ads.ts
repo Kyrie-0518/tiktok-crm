@@ -687,3 +687,143 @@ export async function getGmvMaxReport(params: {
   }
   return result;
 }
+
+/**
+ * 智能生成规则 — 根据 9 个核心参数生成 9 条规则（仿 Adrate"智能生成规则"）
+ * @param params 9 个核心数值
+ *   - conversionTarget: 转化目标类型（VALUE / CONVERT / CLICK 等）
+ *   - creativeCostLimit: 单条创意消耗上限（默认 50）
+ *   - materialSpendLimit: 单个素材花费测试上限（默认 100）
+ *   - noEffectDays: 效果不好耗时（默认 3）
+ *   - goodEffectCount: 效果好的数据阈值（默认 3）
+ *   - dailyInitialBudget: 每日初始预算（默认 200）
+ *   - minBudget: 最低预算（默认 100）
+ *   - cpaHighThreshold: CPA 过高阈值（默认 15）
+ *   - roiLowThreshold: 素材 ROI 低于此值删除（默认 2）
+ */
+export interface AutoRuleParams {
+  conversionTarget?: string;
+  creativeCostLimit?: number;     // 单条创意消耗上限
+  materialSpendLimit?: number;     // 单个素材花费上限
+  noEffectDays?: number;          // 效果不好耗时
+  goodEffectCount?: number;        // 效果好的数据阈值
+  dailyInitialBudget?: number;     // 每日初始预算
+  minBudget?: number;              // 最低预算
+  cpaHighThreshold?: number;       // CPA 过高阈值
+  roiLowThreshold?: number;        // 素材 ROI 删除阈值
+}
+
+export function generateAutoRules(advertiserId: string, p: AutoRuleParams): any[] {
+  const tgt = p.conversionTarget || 'VALUE';
+  const creativeLimit = p.creativeCostLimit ?? 50;
+  const materialLimit = p.materialSpendLimit ?? 100;
+  const noEffectDays = p.noEffectDays ?? 3;
+  const goodEffect = p.goodEffectCount ?? 3;
+  const dailyBudget = p.dailyInitialBudget ?? 200;
+  const minBudget = p.minBudget ?? 100;
+  const cpaHigh = p.cpaHighThreshold ?? 15;
+  const roiLow = p.roiLowThreshold ?? 2;
+
+  // 通用应用对象：所有在用推广系列
+  const applyObjects = [{ dimension: 'CAMPAIGN', pre_condition_type: 'ALL_ACTIVE_CAMPAIGN' }];
+  // 通用执行计划：每 30 分钟
+  const execInfo = { exec_time_type: 'PER_HALF_HOUR' };
+  // 通用通知：有任何变化时通知
+  const notification = { notification_type: 'ANY_CHANGES' };
+
+  return [
+    // 1. 今日 CPA 过高 → 降低预算 30%
+    {
+      name: 'CPA过高降预算',
+      apply_objects: applyObjects,
+      conditions: [{ subject_type: 'CPA', range_type: 'TODAY', match_type: 'GT', values: [String(cpaHigh)] }],
+      actions: [{
+        subject_type: 'DAILY_BUDGET', action_type: 'DECREASE', value_type: 'PERCENT',
+        value: { value: 30, limit: minBudget, use_limit: true },
+      }],
+      notification, rule_exec_info: execInfo,
+    },
+    // 2. 日预算消耗率 ≥ 80% → 增加预算
+    {
+      name: '消耗率达标加预算',
+      apply_objects: applyObjects,
+      conditions: [{ subject_type: 'DAILY_BUDGET_SPENDING_RATE', range_type: 'TODAY', match_type: 'GT', values: ['80'] }],
+      actions: [{
+        subject_type: 'DAILY_BUDGET', action_type: 'INCREASE', value_type: 'EXACT',
+        value: { value: dailyBudget * 0.2, limit: dailyBudget * 5, use_limit: true },
+      }],
+      notification, rule_exec_info: execInfo,
+    },
+    // 3. 素材花费过高 + 0 转化 → 移除该素材
+    {
+      name: '素材花钱无转化',
+      apply_objects: applyObjects,
+      conditions: [
+        { subject_type: 'COST', range_type: 'TODAY', match_type: 'GT', values: [String(materialLimit)] },
+        { subject_type: 'CONVERSION', range_type: 'TODAY', match_type: 'EQUAL', values: ['0'] },
+      ],
+      actions: [{ subject_type: 'MESSAGE' }],
+      notification, rule_exec_info: execInfo,
+    },
+    // 4. 素材近期有转化且 CPA 健康 → 加回素材
+    {
+      name: '素材表现好加回',
+      apply_objects: applyObjects,
+      conditions: [
+        { subject_type: 'CONVERSION', range_type: 'PAST_SEVEN_DAYS', match_type: 'GT', values: [String(goodEffect)] },
+        { subject_type: 'CPA', range_type: 'PAST_SEVEN_DAYS', match_type: 'LT', values: [String(creativeLimit / 5)] },
+      ],
+      actions: [{ subject_type: 'MESSAGE' }],
+      notification, rule_exec_info: execInfo,
+    },
+    // 5. 单条创意花费过高 → 暂停创意
+    {
+      name: '单条创意花费高',
+      apply_objects: applyObjects,
+      conditions: [{ subject_type: 'COST', range_type: 'TODAY', match_type: 'GT', values: [String(creativeLimit)] }],
+      actions: [{ subject_type: 'TURN_OFF' }],
+      notification, rule_exec_info: execInfo,
+    },
+    // 6. 展现过低 → 增加预算
+    {
+      name: '展现过低提预算',
+      apply_objects: applyObjects,
+      conditions: [{ subject_type: 'IMPRESSION', range_type: 'TODAY', match_type: 'LT', values: ['100'] }],
+      actions: [{
+        subject_type: 'DAILY_BUDGET', action_type: 'INCREASE', value_type: 'PERCENT',
+        value: { value: 20, limit: dailyBudget * 3, use_limit: true },
+      }],
+      notification, rule_exec_info: execInfo,
+    },
+    // 7. ROI 优秀 → 每日递增预算
+    {
+      name: 'ROI优秀扩量',
+      apply_objects: applyObjects,
+      conditions: [{ subject_type: 'ROAS_PURCHASE', range_type: 'PAST_THREE_DAYS', match_type: 'GT', values: ['5'] }],
+      actions: [{
+        subject_type: 'DAILY_BUDGET', action_type: 'INCREASE', value_type: 'PERCENT',
+        value: { value: 10, limit: dailyBudget * 10, use_limit: true },
+      }],
+      notification, rule_exec_info: execInfo,
+    },
+    // 8. 预算跌至最低 → 恢复初始预算
+    {
+      name: '预算恢复初始',
+      apply_objects: applyObjects,
+      conditions: [{ subject_type: 'DAILY_BUDGET_SPENDING_RATE', range_type: 'TODAY', match_type: 'LT', values: ['20'] }],
+      actions: [{
+        subject_type: 'DAILY_BUDGET', action_type: 'ADJUST_TO', value_type: 'EXACT',
+        value: { value: dailyBudget },
+      }],
+      notification, rule_exec_info: execInfo,
+    },
+    // 9. ROI 低于阈值 → 暂停
+    {
+      name: 'ROI过低暂停',
+      apply_objects: applyObjects,
+      conditions: [{ subject_type: 'ROAS_PURCHASE', range_type: `PAST_${noEffectDays}_DAYS` as any, match_type: 'LT', values: [String(roiLow)] }],
+      actions: [{ subject_type: 'TURN_OFF' }],
+      notification, rule_exec_info: execInfo,
+    },
+  ];
+}

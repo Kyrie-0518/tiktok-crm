@@ -69,6 +69,10 @@ const AdRules: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RuleItem | null>(null);
   const [form] = Form.useForm();
+  // 智能生成 Modal
+  const [autoGenOpen, setAutoGenOpen] = useState(false);
+  const [autoGenLoading, setAutoGenLoading] = useState(false);
+  const [autoForm] = Form.useForm();
 
   const loadAdvertisers = useCallback(async () => {
     try {
@@ -224,6 +228,47 @@ const AdRules: React.FC = () => {
     }
   };
 
+  // ── 智能生成规则 ──
+  const openAutoGenModal = () => {
+    autoForm.resetFields();
+    autoForm.setFieldsValue({
+      // 默认值（与 Adrate 一致）
+      conversionTarget: 'VALUE',
+      creativeCostLimit: 50,
+      materialSpendLimit: 100,
+      noEffectDays: 3,
+      goodEffectCount: 3,
+      dailyInitialBudget: 200,
+      minBudget: 100,
+      cpaHighThreshold: 15,
+      roiLowThreshold: 2,
+    });
+    setAutoGenOpen(true);
+  };
+
+  const handleAutoGen = async () => {
+    const vals = await autoForm.validateFields().catch(() => null);
+    if (!vals) return;
+    setAutoGenLoading(true);
+    try {
+      const res = await api.post('/ad-center/rules/auto-generate', {
+        advertiser_id: selectedAdv,
+        ...vals,
+      });
+      if (res.data?.success) {
+        message.success(`已生成 ${res.data.generatedCount} 条规则（关闭状态），请检查后开启`);
+        setAutoGenOpen(false);
+        loadRules(false);
+      } else {
+        message.error('生成失败: ' + (res.data?.error || '未知错误'));
+      }
+    } catch (e: any) {
+      message.error('生成失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setAutoGenLoading(false);
+    }
+  };
+
   // ── 统计 ──
   const stat = {
     total: rules.length,
@@ -349,6 +394,7 @@ const AdRules: React.FC = () => {
                   onClick={() => handleBatchToggle(false)}>批量禁用</Button>
               </>
             )}
+            <Button icon={<ThunderboltOutlined />} onClick={openAutoGenModal} style={{ borderRadius: 8 }}>智能生成</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal} style={{ borderRadius: 8 }}>新建规则</Button>
             <Button icon={<ReloadOutlined spin={syncing} />} onClick={() => loadRules(false)} style={{ borderRadius: 8 }}>刷新</Button>
           </Space>
@@ -474,6 +520,89 @@ const AdRules: React.FC = () => {
               <Option value="TASK_FINISH">任务完成时通知</Option>
             </Select>
           </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 智能生成规则 Modal（仿 Adrate） */}
+      <Modal
+        title={<><ThunderboltOutlined style={{ color: PRIMARY, marginRight: 6 }} />智能生成规则</>}
+        open={autoGenOpen} onCancel={() => setAutoGenOpen(false)}
+        width={520} destroyOnClose
+        footer={[
+          <div key="tip" style={{ fontSize: 12, color: '#94a3b8', display: 'inline-block', marginRight: 8 }}>
+            规则将以关闭状态创建，您可以检查后再开启
+          </div>,
+          <Button key="cancel" onClick={() => setAutoGenOpen(false)}>取消</Button>,
+          <Button key="ok" type="primary" loading={autoGenLoading} onClick={handleAutoGen}
+            style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)' }}>确认生成</Button>,
+        ]}
+      >
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
+          选下面的规则类型，填上对应的信息，就会自动为您创建一组自动化规则，实现智能化自动化投放。
+        </div>
+        <Form form={autoForm} layout="vertical" size="small">
+          <Form.Item name="conversionTarget" label="转化目标类型">
+            <Select style={{ borderRadius: 6 }}>
+              <Option value="VALUE">转化价值</Option>
+              <Option value="CONVERT">转化（购买）</Option>
+              <Option value="CLICK">点击</Option>
+              <Option value="INSTALL">应用安装</Option>
+              <Option value="LEAD_GENERATION">表单提交</Option>
+              <Option value="REACH">覆盖</Option>
+            </Select>
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="creativeCostLimit" label="单条创意消耗上限" extra="花费超过此值则暂停">
+                <InputNumber style={{ width: '100%', borderRadius: 6 }} min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="materialSpendLimit" label="素材花费测试上限" extra="素材花费超过此值无转化则移除">
+                <InputNumber style={{ width: '100%', borderRadius: 6 }} min={0} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="noEffectDays" label="效果不好耗时实际多久" extra="几天没效果则暂停">
+                <InputNumber style={{ width: '100%', borderRadius: 6 }} min={1} max={28} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="goodEffectCount" label="素材有转化要加回投" extra="几天有效果则重启">
+                <InputNumber style={{ width: '100%', borderRadius: 6 }} min={1} max={28} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="dailyInitialBudget" label="单条创意需要消耗多少" extra="每日初始投放预算">
+                <InputNumber style={{ width: '100%', borderRadius: 6 }} min={50} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="minBudget" label="效果不好多少数据达到" extra="最低预算">
+                <InputNumber style={{ width: '100%', borderRadius: 6 }} min={20} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="cpaHighThreshold" label="每天初始投放设置多少" extra="CPA 过高阈值">
+            <InputNumber style={{ width: '100%', borderRadius: 6 }} min={0} />
+          </Form.Item>
+          <Text strong style={{ fontSize: 13, color: '#1e293b', display: 'block', marginBottom: 8 }}>素材管理策略阈值</Text>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="materialSpendLimit" label="素材花费上限（重复）" tooltip="同上（用于强调）">
+                <InputNumber style={{ width: '100%', borderRadius: 6 }} min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="roiLowThreshold" label="素材 ROI 低于多少时删除">
+                <InputNumber style={{ width: '100%', borderRadius: 6 }} step={0.1} min={0} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </div>
