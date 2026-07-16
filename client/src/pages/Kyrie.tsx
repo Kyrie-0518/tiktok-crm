@@ -81,6 +81,9 @@ function makeWelcomeMsg(): ChatMessage {
 export default function Kyrie() {
   const [messages, setMessages] = useState<ChatMessage[]>([makeWelcomeMsg()]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  // 跟踪当前活跃会话 ID：null = 全新对话（未保存到 sessions）；string = 正在查看/编辑某个已保存的 session
+  // 关键修复：loadSession 时设置、handleNewSession 时重置、sendMessage 时更新对应 session
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
   const [progressText, setProgressText] = useState('');
@@ -95,6 +98,13 @@ export default function Kyrie() {
 
   useEffect(() => { msgEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, progressText]);
   useEffect(() => { if (!sending) inputRef.current?.focus(); }, [sending]);
+  // 关键：messages 变化时，如果当前活跃 session 已存在，同步更新该 session 的 messages
+  // （包括"用户发消息后"和"AI 回复后"——避免依赖"新建对话"按钮来保存）
+  useEffect(() => {
+    if (currentSessionId && messages.length > 1) {
+      setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...messages] } : s));
+    }
+  }, [messages, currentSessionId]);
 
   const hasRealConversation = messages.length > 1;
   const isFirstVisit = messages.length === 1 && messages[0].id === 'welcome';
@@ -144,10 +154,19 @@ export default function Kyrie() {
   const handleQuickCommand = (cmd: typeof QUICK_COMMANDS[0]) => { setInputValue(cmd.query); inputRef.current?.focus(); };
 
   const handleNewSession = () => {
-    if (hasRealConversation) {
+    if (hasRealConversation && !currentSessionId) {
+      // 当前是新对话（还没保存过）→ 保存为新 session
       const firstName = userMessages[0]?.content?.slice(0, 30) || '新会话';
-      setSessions(prev => [{ id: `s-${Date.now()}`, name: firstName, messages: [...messages], createdAt: Date.now(), favorite: false }, ...prev]);
+      const newId = `s-${Date.now()}`;
+      setSessions(prev => [{ id: newId, name: firstName, messages: [...messages], createdAt: Date.now(), favorite: false }, ...prev]);
+      // 标记当前活跃会话 = 新保存的 session，后续发消息会更新它而不是再创建一个
+      setCurrentSessionId(newId);
+    } else if (hasRealConversation && currentSessionId) {
+      // 当前正在查看/编辑某个已保存的 session → 把最新 messages 同步回去（不创建新 session）
+      setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...messages] } : s));
     }
+    // currentSessionId 保持不变？还是重置？看场景：用户从历史加载 → 问问题 → 点"新建对话"
+    // 此时应保留 currentSessionId（因为已经保存过了），让用户继续在这个 session 上聊
     setMessages([makeWelcomeMsg()]); setInputValue('');
   };
 
@@ -155,16 +174,24 @@ export default function Kyrie() {
     Modal.confirm({
       title: '清空当前对话', content: '当前对话内容将被清空（已保存的历史会话不受影响），确认继续？', okText: '确认清空', cancelText: '取消',
       onOk: () => {
-        if (hasRealConversation) {
+        if (hasRealConversation && !currentSessionId) {
           const firstName = userMessages[0]?.content?.slice(0, 30) || '未命名';
-          setSessions(prev => [{ id: `s-${Date.now()}`, name: firstName, messages: [...messages], createdAt: Date.now(), favorite: false }, ...prev]);
+          const newId = `s-${Date.now()}`;
+          setSessions(prev => [{ id: newId, name: firstName, messages: [...messages], createdAt: Date.now(), favorite: false }, ...prev]);
+          setCurrentSessionId(newId);
+        } else if (hasRealConversation && currentSessionId) {
+          setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...messages] } : s));
         }
         setMessages([makeWelcomeMsg()]); setInputValue('');
       },
     });
   };
 
-  const loadSession = (session: Session) => { setMessages(session.messages); setInputValue(''); };
+  const loadSession = (session: Session) => {
+    setMessages(session.messages);
+    setInputValue('');
+    setCurrentSessionId(session.id); // 标记当前活跃 = 加载的 session
+  };
   const deleteSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     Modal.confirm({ title: '删除会话', content: '删除后不可恢复', okText: '删除', okType: 'danger', cancelText: '取消', onOk: () => setSessions(prev => prev.filter(s => s.id !== id)) });
