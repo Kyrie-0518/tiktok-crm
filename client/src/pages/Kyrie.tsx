@@ -270,8 +270,6 @@ export default function Kyrie() {
         </div>
         <div style={{ flex: 1 }} />
         <Space size={4}>
-          <Button type="text" size="small" icon={<PlusOutlined />} onClick={handleNewSession} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>新建会话</Button>
-
           <Button type="text" size="small" icon={<ClearOutlined />} onClick={handleClear} style={{ color: '#64748b', borderRadius: 8, height: 32 }}>清空</Button>
         </Space>
       </div>
