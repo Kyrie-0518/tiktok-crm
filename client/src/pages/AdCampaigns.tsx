@@ -95,7 +95,6 @@ const AdCampaigns: React.FC = () => {
         cached: !!campRes.data?.cached,
         rawSample: list[0] ? JSON.stringify(list[0]).slice(0, 200) : '(无数据)',
       });
-      const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
       // 2. 拉性能数据并合并（用 stat_time_day + campaign_id 双维度，按天分组，按 campaign 聚合）
       const end = new Date();
       const start = new Date(); start.setDate(end.getDate() - 6);
