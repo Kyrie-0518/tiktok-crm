@@ -101,8 +101,8 @@ const AdCampaigns: React.FC = () => {
     if (!selectedAdv) return;
     if (silent) setSyncing(true);
     try {
-      // 1. 拉 GMV Max 计划列表（首次加载强制刷新，避开之前可能缓存的空 list 或没有 store_id 的旧数据）
-      const campRes = await api.get('/ad-center/gmv-max/campaigns', {
+      // 1. 拉 GMV Max 计划列表 + 详情（campaigns-with-details 内部 list + 批量 info 合并）
+      const campRes = await api.get('/ad-center/gmv-max/campaigns-with-details', {
         params: { advertiser_id: selectedAdv, gmv_type: gmvType, page_size: 100, force_refresh: silent ? '0' : '1' },
       });
       const list: GmvMaxCampaign[] = campRes.data?.data?.list || [];
@@ -384,6 +384,13 @@ const AdCampaigns: React.FC = () => {
   const roiLabel = (s: string) => s === 'IN_EFFECT' ? '符合保障' : s === 'NOT_ELIGIBLE' ? '不符合' : s || '-';
   const shoppingLabel = (t: string) => t === 'PRODUCT' ? '商品 GMV Max' : t === 'LIVE' ? '直播 GMV Max' : t || '-';
   const productLabel = (t: string) => t === 'ALL' ? '自动选品' : t === 'CUSTOMIZED_PRODUCTS' ? '自定义选品' : t === 'UNSET' ? '未设置' : t || '-';
+  const optimizationGoalLabel = (g: string) => g === 'VALUE' ? '总收入' : g || '-';
+  const scheduleLabel = (r: GmvMaxCampaign) => {
+    if (!r.schedule_type) return '-';
+    if (r.schedule_type === 'SCHEDULE_FROM_NOW') return '持续投放';
+    if (r.schedule_type === 'SCHEDULE_START_END') return `${r.schedule_start_time?.slice(0, 10) || ''} ~ ${r.schedule_end_time?.slice(0, 10) || ''}`;
+    return r.schedule_type;
+  };
 
   const columns: ColumnsType<GmvMaxCampaign> = [
     { title: '状态', dataIndex: 'operation_status', key: 'operation_status', width: 80,
@@ -393,23 +400,26 @@ const AdCampaigns: React.FC = () => {
       ) },
     { title: '计划名称', dataIndex: 'campaign_name', key: 'campaign_name', width: 220,
       render: (n: string, r) => <Text strong>{n || r.campaign_id}</Text> },
-    { title: '优化目标', dataIndex: 'objective_type', key: 'objective_type', width: 110,
-      render: (v: string) => v ? <Tag color="blue">{v}</Tag> : '-' },
+    { title: '优化模式', dataIndex: 'optimization_goal', key: 'optimization_goal', width: 110,
+      render: (v: string) => v ? <Tag color="blue">{optimizationGoalLabel(v)}</Tag> : '-' },
     { title: 'GMV 类型', dataIndex: 'shopping_ads_type', key: 'shopping_ads_type', width: 120,
       render: (v: string) => <Tag color={v === 'PRODUCT' ? 'cyan' : 'magenta'}>{shoppingLabel(v)}</Tag> },
     { title: '日预算', dataIndex: 'budget', key: 'budget', width: 110, align: 'right' as const,
       render: (v: number) => v ? `$${v.toFixed(2)}` : '-' },
+    { title: '目标 ROI', dataIndex: 'roas_bid', key: 'roas_bid', width: 100, align: 'right' as const,
+      render: (v: number, r) => r.deep_bid_type === 'VO_MIN_ROAS' ? v : <Text type="secondary">-</Text> },
     { title: '成本', dataIndex: 'cost', key: 'cost', width: 110, align: 'right' as const,
       render: (v: number) => <Text strong>${Number(v || 0).toFixed(2)}</Text> },
-    { title: '净成本', dataIndex: 'net_cost', key: 'net_cost', width: 110, align: 'right' as const,
-      render: (v: number) => `$${Number(v || 0).toFixed(2)}` },
+    { title: 'ROI', dataIndex: 'roi', key: 'roi', width: 90, align: 'right' as const,
+      render: (v: number) => v > 0 ? <Text strong style={{ color: v >= 1 ? '#059669' : '#dc2626' }}>{v.toFixed(2)}</Text> : '-' },
     { title: '订单', dataIndex: 'orders', key: 'orders', width: 90, align: 'right' as const,
       render: (v: number) => v || 0 },
-    { title: '单均成本', dataIndex: 'cpo', key: 'cpo', width: 110, align: 'right' as const,
-      render: (v: number) => v > 0 ? `$${v.toFixed(2)}` : '-' },
+    { title: '总收入', dataIndex: 'revenue', key: 'revenue', width: 110, align: 'right' as const,
+      render: (v: number) => v > 0 ? <Text strong style={{ color: '#059669' }}>${v.toFixed(2)}</Text> : '-' },
+    { title: '排期', key: 'schedule', width: 200,
+      render: (_: any, r) => <Text type="secondary" style={{ fontSize: 12 }}>{scheduleLabel(r)}</Text> },
     { title: '创建时间', dataIndex: 'create_time', key: 'create_time', width: 140,
       render: (v: string) => {
-        // TikTok create_time 是秒级时间戳，需要 × 1000
         if (!v) return '-';
         const ts = /^\d+$/.test(v) ? Number(v) * 1000 : Date.parse(v);
         if (!ts || isNaN(ts)) return v;

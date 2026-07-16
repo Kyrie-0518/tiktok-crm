@@ -592,6 +592,45 @@ router.get('/gmv-max/campaigns/:id', authMiddleware, async (req: Request, res: R
   }
 });
 
+// GET /api/ad-center/gmv-max/campaigns-with-details — 列表 + 批量 info 合并（带 budget/roas_bid/shopping_ads_type 等详情字段）
+router.get('/gmv-max/campaigns-with-details', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const advertiserId = req.query.advertiser_id as string || '';
+    const gmvType = (req.query.gmv_type as string) || 'product';
+    const forceRefresh = req.query.force_refresh === '1';
+    const cacheKey = `tt_ads_gmvmax_with_details_${advertiserId}_${gmvType}`;
+    const result = await getCachedOrFetch(cacheKey, async () => {
+      // 1. 调 list 拿基础字段
+      const listRes = await Ads.getGmvMaxCampaigns({
+        advertiser_id: advertiserId,
+        gmv_max_promotion_types: gmvType === 'live' ? ['LIVE_GMV_MAX'] : ['PRODUCT_GMV_MAX'],
+        page: Number(req.query.page) || 1,
+        page_size: Number(req.query.page_size) || 100,
+      });
+      const list = (listRes as any)?.data?.list || [];
+      console.log(`[ad-center] gmv-max/campaigns-with-details: list 拿到 ${list.length} 个，开始批量 info`);
+      // 2. 对每个 plan 调 info 接口拿详情字段（串行避免触发 QPS 限制）
+      const enrichedList: any[] = [];
+      for (const c of list) {
+        try {
+          const infoRes = await Ads.getGmvMaxCampaignInfo(advertiserId, c.campaign_id);
+          const info = (infoRes as any)?.data || infoRes || {};
+          enrichedList.push({ ...c, ...info });
+        } catch (e: any) {
+          console.warn(`[ad-center] info 失败 campaign_id=${c.campaign_id}:`, e.message);
+          enrichedList.push(c); // 失败保留原 list 数据
+        }
+      }
+      return { list: enrichedList };
+    }, { forceRefresh, ttl: 3 * 60 * 1000 });
+    console.log(`[ad-center] gmv-max/campaigns-with-details 返回 ${(result.data as any)?.list?.length || 0} 个 (cached=${result.cached})`);
+    res.json({ success: true, data: result.data, cached: result.cached });
+  } catch (e: any) {
+    console.error('[ad-center] gmv-max/campaigns-with-details failed:', e.message);
+    return handleApiError(e, res);
+  }
+});
+
 // GET /api/ad-center/gmv-max/report/test — 直接测试 GMV Max 报表 API（不过滤，不缓存）
 router.get('/gmv-max/report/test', authMiddleware, async (req: Request, res: Response) => {
   try {
