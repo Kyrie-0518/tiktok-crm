@@ -431,42 +431,48 @@ const AdCampaigns: React.FC = () => {
   };
 
   const columns: ColumnsType<GmvMaxCampaign> = [
-    { title: '状态', dataIndex: 'operation_status', key: 'operation_status', width: 80,
+    { title: '状态', dataIndex: 'operation_status', key: 'operation_status', width: 70, fixed: 'left' as const,
       render: (s: string) => (
         <Switch checked={s === 'ENABLE'} disabled size="small"
           checkedChildren="开" unCheckedChildren="关" />
       ) },
-    { title: '计划名称', dataIndex: 'campaign_name', key: 'campaign_name', width: 220,
-      render: (n: string, r) => <Text strong>{n || r.campaign_id}</Text> },
-    { title: '优化模式', dataIndex: 'optimization_goal', key: 'optimization_goal', width: 110,
-      render: (v: string) => v ? <Tag color="blue">{optimizationGoalLabel(v)}</Tag> : '-' },
-    { title: 'GMV 类型', dataIndex: 'shopping_ads_type', key: 'shopping_ads_type', width: 120,
-      render: (v: string) => <Tag color={v === 'PRODUCT' ? 'cyan' : 'magenta'}>{shoppingLabel(v)}</Tag> },
-    { title: '日预算', dataIndex: 'budget', key: 'budget', width: 110, align: 'right' as const,
+    { title: '计划名称', dataIndex: 'campaign_name', key: 'campaign_name', width: 220, fixed: 'left' as const,
+      render: (n: string, r) => <Text strong style={{ fontSize: 13 }}>{n || r.campaign_id}</Text> },
+    { title: '模式', key: 'mode', width: 170,
+      render: (_: any, r) => (
+        <Space size={4} wrap>
+          <Tag color="blue" style={{ margin: 0 }}>{optimizationGoalLabel(r.optimization_goal)}</Tag>
+          <Tag color={r.shopping_ads_type === 'PRODUCT' ? 'cyan' : 'magenta'} style={{ margin: 0 }}>{shoppingLabel(r.shopping_ads_type)}</Tag>
+        </Space>
+      ) },
+    { title: '日预算', dataIndex: 'budget', key: 'budget', width: 100, align: 'right' as const,
       render: (v: number) => v ? `$${v.toFixed(2)}` : '-' },
-    { title: '目标 ROI', dataIndex: 'roas_bid', key: 'roas_bid', width: 100, align: 'right' as const,
+    { title: '目标 ROI', dataIndex: 'roas_bid', key: 'roas_bid', width: 90, align: 'right' as const,
       render: (v: number, r) => r.deep_bid_type === 'VO_MIN_ROAS' ? v : <Text type="secondary">-</Text> },
-    { title: '成本', dataIndex: 'cost', key: 'cost', width: 110, align: 'right' as const,
+    { title: '成本', dataIndex: 'cost', key: 'cost', width: 100, align: 'right' as const,
       render: (v: number) => <Text strong>${Number(v || 0).toFixed(2)}</Text> },
-    { title: 'ROI', dataIndex: 'roi', key: 'roi', width: 90, align: 'right' as const,
+    { title: 'ROI', dataIndex: 'roi', key: 'roi', width: 80, align: 'right' as const,
       render: (v: number) => v > 0 ? <Text strong style={{ color: v >= 1 ? '#059669' : '#dc2626' }}>{v.toFixed(2)}</Text> : '-' },
-    { title: '订单', dataIndex: 'orders', key: 'orders', width: 90, align: 'right' as const,
+    { title: '订单', dataIndex: 'orders', key: 'orders', width: 80, align: 'right' as const,
       render: (v: number) => v || 0 },
-    { title: '总收入', dataIndex: 'revenue', key: 'revenue', width: 110, align: 'right' as const,
+    { title: '总收入', dataIndex: 'revenue', key: 'revenue', width: 100, align: 'right' as const,
       render: (v: number) => v > 0 ? <Text strong style={{ color: '#059669' }}>${v.toFixed(2)}</Text> : '-' },
-    { title: '排期', key: 'schedule', width: 200,
-      render: (_: any, r) => <Text type="secondary" style={{ fontSize: 12 }}>{scheduleLabel(r)}</Text> },
-    { title: '创建时间', dataIndex: 'create_time', key: 'create_time', width: 140,
+    { title: '排期', key: 'schedule', width: 170,
+      render: (_: any, r) => {
+        const txt = scheduleLabel(r);
+        return <Text type="secondary" style={{ fontSize: 12 }}>{txt}</Text>;
+      } },
+    { title: '创建时间', dataIndex: 'create_time', key: 'create_time', width: 130,
       render: (v: string) => {
         if (!v) return '-';
         const ts = /^\d+$/.test(v) ? Number(v) * 1000 : Date.parse(v);
         if (!ts || isNaN(ts)) return v;
         const d = new Date(ts);
         const pad = (n: number) => String(n).padStart(2, '0');
-        return <Text type="secondary">{`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`}</Text>;
+        return <Text type="secondary" style={{ fontSize: 12 }}>{`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`}</Text>;
       } },
-    { title: '操作', key: 'action', width: 100, fixed: 'right' as const,
-      render: () => <Button type="link" size="small" style={{ color: PRIMARY }}>详情</Button> },
+    { title: '操作', key: 'action', width: 80, fixed: 'right' as const,
+      render: () => <Button type="link" size="small" style={{ color: PRIMARY, padding: 0 }}>详情</Button> },
   ];
 
   return (
@@ -574,8 +580,12 @@ const AdCampaigns: React.FC = () => {
           </div>
         </div>
         <div style={{ width: '100%', minHeight: 280 }}>
-          {campaigns.length > 0 ? (
+          {campaigns.length > 0 && dailyData.length > 0 ? (
             <ReactECharts key={`chart-${visibleMetrics.cost}-${visibleMetrics.orders}-${visibleMetrics.revenue}-${visibleMetrics.roi}`} option={chartOption} notMerge={true} lazyUpdate={true} style={{ height: 280, width: '100%' }} />
+          ) : campaigns.length > 0 ? (
+            <Empty description="所选日期范围内暂无趋势数据" descriptionStyle={{ fontSize: 13, color: '#94a3b8' }} image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>提示：单日范围通常无数据，请选择「近 7 天」或更长时间</Text>
+            </Empty>
           ) : (
             <Empty description={selectedAdv ? '暂无计划数据' : '请先选择广告账户'} image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }} />
           )}
@@ -591,31 +601,8 @@ const AdCampaigns: React.FC = () => {
         </div>
         <Table columns={columns} dataSource={filtered} rowKey="campaign_id" size="middle"
           loading={syncing && campaigns.length === 0}
-          scroll={{ x: 1300 }} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 个` }}
+          scroll={{ x: 1500 }} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 个` }}
           locale={{ emptyText: '暂无 GMV Max 计划' }} />
-        {/* Debug 诊断信息：方便排查"暂无数据"问题 */}
-        {debugInfo && (debugInfo.listLen === 0 || campaigns.length > 0) && (
-          <div style={{ marginTop: 12, padding: 12, background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#78350f' }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>📊 诊断信息（开发者参考）</div>
-            <div>GMV Max 计划数: <strong>{debugInfo.listLen}</strong> · 走缓存: <strong>{debugInfo.cached ? '是' : '否'}</strong></div>
-            {debugInfo.listLen > 0 && (
-              <>
-                <div>🏷️ GMV 计划 ID 示例: <strong style={{ fontFamily: 'monospace' }}>{debugInfo.gmvCampaignIds}</strong></div>
-                <div>📊 GMV Reports 响应: success=<strong>{String(debugInfo.reportSuccess)}</strong> · list 数=<strong>{debugInfo.reportListLen}</strong> · 命中 keys=<strong>{debugInfo.reportMapKeys || '(0)'}</strong></div>
-                {debugInfo.reportError && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.reportError}</strong> {debugInfo.reportErrorMessage && `· ${debugInfo.reportErrorMessage}`}</div>}
-                {debugInfo.totalMetrics && debugInfo.totalMetrics !== '{}' && <div>📈 total_metrics: <span style={{ fontFamily: 'monospace' }}>{debugInfo.totalMetrics}</span></div>}
-                {debugInfo.reportSample && <div>Reports 首条: <span style={{ fontFamily: 'monospace' }}>{debugInfo.reportSample}</span></div>}
-                {debugInfo.firstCampaignFull && <details style={{ marginTop: 4 }}><summary style={{ cursor: 'pointer' }}>📋 第一个 GMV Max 计划完整字段（点开看 store_id 等）</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 300, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.firstCampaignFull}</pre></details>}
-                {debugInfo.testResult && <details style={{ marginTop: 4 }}><summary style={{ cursor: 'pointer' }}>🧪 测试端点 4 种调用对比（点开看）</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 300, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.testResult}</pre></details>}
-                {debugInfo.fullReportRaw && <details><summary style={{ cursor: 'pointer', marginTop: 4 }}>查看完整 server 响应</summary><pre style={{ fontFamily: 'monospace', fontSize: 10, maxHeight: 200, overflow: 'auto', background: '#fff', padding: 6, marginTop: 4, borderRadius: 4 }}>{debugInfo.fullReportRaw}</pre></details>}
-              </>
-            )}
-            {debugInfo.listLen === 0 && debugInfo.error && <div>错误: <strong style={{ color: '#dc2626' }}>{debugInfo.error}</strong></div>}
-            <div style={{ marginTop: 4, color: '#92400e' }}>
-              💡 提示：点击右上角「刷新」按钮可强制刷新服务器缓存（绕过 5min 缓存）
-            </div>
-          </div>
-        )}
       </Card>
     </div>
   );
