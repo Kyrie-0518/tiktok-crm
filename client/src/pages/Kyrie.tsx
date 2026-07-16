@@ -423,7 +423,7 @@ export default function Kyrie() {
         </div>
       </div>
 
-      {/* ═══ 右侧悬浮抽屉 ═══ */}
+      {/* ═══ Markdown 样式（独立 style 块） ═══ */}
       <style>{`
         .wb-markdown { color: inherit; }
         .wb-markdown h1, .wb-markdown h2, .wb-markdown h3 { margin-top: 14px; margin-bottom: 8px; color: inherit; font-weight: 600; }
@@ -443,7 +443,6 @@ export default function Kyrie() {
         .wb-markdown hr { border: none; border-top: 1px solid #e2e8f0; margin: 14px 0; }
         .wb-markdown blockquote { border-left: 3px solid #2563eb; padding-left: 12px; margin: 8px 0; color: #64748b; background: rgba(37,99,235,0.04); padding: 8px 12px; border-radius: 0 6px 6px 0; }
       `}</style>
-      </div>{/* close right panel */}
-    </div>{/* close outer container */}
+    </div>
   );
 }
