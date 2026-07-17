@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  Input, Button, Typography, Space, Tag, message, Card, Modal, Badge,
+  Input, Button, Typography, Space, Tag, message, Card, Modal, Badge, Avatar,
 } from 'antd';
 import {
   SendOutlined, ThunderboltOutlined, BarChartOutlined,
