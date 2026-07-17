@@ -38,7 +38,6 @@ export default function AIStudio() {
     }
   };
 
-  // 模拟最近任务（实际可从后端获取）
   const recentTasks = [
     { name: '西游宣传片', status: 'success', time: '09:32', progress: 100 },
     { name: '汽车广告', status: 'running', time: '', progress: 65 },
@@ -46,7 +45,8 @@ export default function AIStudio() {
     { name: '产品展示', status: 'failed', time: '08:15', progress: 0 },
   ];
 
-  const recentVideos = stats && stats.total_videos > 0
+  const hasVideos = (stats?.total_videos ?? 0) > 0;
+  const recentVideos = hasVideos
     ? [{ title: '西游宣传片.mp4', model: 'Seedance V2', duration: '00:15', time: '09:32' },
        { title: '品牌故事.mp4', model: 'Kling 2.1', duration: '00:22', time: '昨天' },
        { title: '产品特写.mp4', model: 'MiniMax', duration: '00:08', time: '2天前' },
@@ -70,7 +70,7 @@ export default function AIStudio() {
   }
 
   return (
-    <div style={{ maxWidth: 1400 }}>
+    <div style={{ maxWidth: 1680, margin: '0 auto' }}>
       {/* ═══ Header ═══ */}
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{
@@ -87,32 +87,43 @@ export default function AIStudio() {
         </div>
       </div>
 
-      {/* ═══ 1. 快捷创作 ═══ */}
-      <Card style={{ borderRadius: 16, border: `2px dashed #d4bfff`, background: 'linear-gradient(135deg, #FAF5FF, #FFF)', marginBottom: 24 }} bodyStyle={{ padding: '28px 32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: T.textPrimary, marginBottom: 4 }}>开始视频创作</div>
-            <Text style={{ fontSize: 13, color: T.textSecondary }}>输入一句话即可生成视频</Text>
-            <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
-              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 文生视频</Text>
-              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 图生视频</Text>
-              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 首尾帧</Text>
-              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 数字人</Text>
-              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 多模型</Text>
+      {/* ═══ 1. 快捷创作 Banner（200px 视觉重心）═══ */}
+      <Card style={{
+        borderRadius: 16, border: `2px dashed #d4bfff`,
+        background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 40%, #FFF 100%)',
+        marginBottom: 24, minHeight: 200,
+      }} bodyStyle={{ padding: '36px 40px 32px', height: '100%' }}>
+        <Row align="middle" style={{ height: '100%' }}>
+          <Col flex="1">
+            <div style={{ fontSize: 22, fontWeight: 800, color: T.textPrimary, marginBottom: 6 }}>
+              开始创作你的 AI 视频
             </div>
-          </div>
-          <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => navigate('/seedance')}
-            style={{
-              height: 48, padding: '0 32px', borderRadius: 12, fontSize: 16, fontWeight: 700,
-              background: 'linear-gradient(135deg, #8b5cf6, #7B61FF)',
-              border: 'none', boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
-            }}>
-            新建视频
-          </Button>
-        </div>
+            <Text style={{ fontSize: 14, color: T.textSecondary, display: 'block', marginBottom: 16 }}>
+              一句 Prompt 即可生成高质量视频
+            </Text>
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              {['文生视频', '图生视频', '首尾帧', '数字人', '多模型'].map((t, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CheckCircleFilled style={{ color: '#8b5cf6', fontSize: 13 }} />
+                  <Text style={{ fontSize: 13, color: T.textSecondary }}>{t}</Text>
+                </div>
+              ))}
+            </div>
+          </Col>
+          <Col>
+            <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => navigate('/seedance')}
+              style={{
+                height: 56, padding: '0 40px', borderRadius: 14, fontSize: 17, fontWeight: 700,
+                background: 'linear-gradient(135deg, #8b5cf6, #7B61FF)',
+                border: 'none', boxShadow: '0 6px 20px rgba(139,92,246,0.40)',
+              }}>
+              立即创建
+            </Button>
+          </Col>
+        </Row>
       </Card>
 
-      {/* ═══ 2. 数据概览 ═══ */}
+      {/* ═══ 2. 数据概览（3+3+3+3 栅格，96px 高）═══ */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {[
           { label: '今日生成', value: (stats?.total_ai_chats ?? 0) || '—', color: '#8b5cf6', bg: '#F5F3FF', icon: <RobotOutlined /> },
@@ -121,12 +132,19 @@ export default function AIStudio() {
           { label: '素材数量', value: stats?.total_materials ?? 0, color: '#0891b2', bg: '#ECFEFF', icon: <PictureOutlined /> },
         ].map((s, i) => (
           <Col xs={12} sm={6} key={i}>
-            <Card style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }} bodyStyle={{ padding: '14px 18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color, fontSize: 20 }}>{s.icon}</div>
+            <Card style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, minHeight: 96 }}
+              bodyStyle={{ padding: '20px 24px', display: 'flex', alignItems: 'center', height: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: '100%' }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 12, background: s.bg,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: s.color, fontSize: 22, flexShrink: 0,
+                }}>{s.icon}</div>
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: s.color, fontFamily: '"Inter", sans-serif', lineHeight: 1 }}>{s.value}</div>
-                  <Text style={{ fontSize: 12, color: T.textTertiary }}>{s.label}</Text>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: T.textPrimary, fontFamily: '"Inter", sans-serif', lineHeight: 1 }}>
+                    {typeof s.value === 'number' ? s.value.toLocaleString() : s.value}
+                  </div>
+                  <Text style={{ fontSize: 13, color: T.textTertiary, marginTop: 2 }}>{s.label}</Text>
                 </div>
               </div>
             </Card>
@@ -134,18 +152,19 @@ export default function AIStudio() {
         ))}
       </Row>
 
-      {/* ═══ 3. 操作区双栏 = 最近任务 + 快捷入口 ═══ */}
+      {/* ═══ 3. 最近任务(7) + 快捷入口(5) — 等高 ═══ */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {/* 最近生成任务 */}
         <Col xs={24} lg={14}>
-          <Card title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>📋 最近生成任务</span>}
-            style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }} bodyStyle={{ padding: '12px 20px' }}
+          <Card
+            title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>📋 最近生成任务</span>}
+            style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, height: '100%' }}
+            bodyStyle={{ padding: '12px 20px', display: 'flex', flexDirection: 'column' }}
             extra={<Button type="link" size="small" style={{ color: T.textTertiary }} onClick={() => navigate('/seedance')}>全部 <ArrowRightOutlined /></Button>}
           >
             {recentTasks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: T.textTertiary, fontSize: 13 }}>暂无生成任务</div>
+              <div style={{ textAlign: 'center', padding: '32px 0', color: T.textTertiary, fontSize: 13, flex: 1 }}>暂无生成任务</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {recentTasks.map((task, i) => {
                   const statusConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
                     success: { icon: <CheckCircleFilled />, color: '#22C55E', label: '完成' },
@@ -155,14 +174,22 @@ export default function AIStudio() {
                   };
                   const s = statusConfig[task.status];
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: i === 0 ? '#F8FAFC' : 'transparent' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6', fontSize: 14 }}><VideoCameraOutlined /></div>
-                        <Text style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{task.name}</Text>
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '12px 16px', borderRadius: 10,
+                      background: i === 0 ? '#F8FAFC' : 'transparent',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 9, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6', fontSize: 15, flexShrink: 0 }}>
+                          <VideoCameraOutlined />
+                        </div>
+                        <Text style={{ fontSize: 14, fontWeight: 600, color: T.textPrimary }}>{task.name}</Text>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Text style={{ fontSize: 11, color: T.textTertiary }}>{task.time}</Text>
-                        <Tag style={{ borderRadius: 6, border: 'none', background: `${s.color}18`, color: s.color, fontSize: 11, fontWeight: 600, margin: 0 }}>{s.icon} <span style={{ marginLeft: 4 }}>{s.label}</span></Tag>
+                        <Tag style={{ borderRadius: 6, border: 'none', background: `${s.color}18`, color: s.color, fontSize: 12, fontWeight: 600, margin: 0 }}>
+                          {s.icon} <span style={{ marginLeft: 4 }}>{s.label}</span>
+                        </Tag>
                       </div>
                     </div>
                   );
@@ -172,24 +199,31 @@ export default function AIStudio() {
           </Card>
         </Col>
 
-        {/* 快捷入口 */}
         <Col xs={24} lg={10}>
-          <Card title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>⚡ 快捷入口</span>}
-            style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }} bodyStyle={{ padding: '12px 20px' }}
+          <Card
+            title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>⚡ 快捷入口</span>}
+            style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, height: '100%' }}
+            bodyStyle={{ padding: '16px 20px', display: 'flex', flexDirection: 'column' }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
               {quickEntries.map((entry) => (
                 <div key={entry.key} onClick={() => navigate(entry.path)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: entry.bg, cursor: 'pointer', transition: 'all .15s' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = 'brightness(0.96)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
+                    borderRadius: 12, background: entry.bg, cursor: 'pointer',
+                    transition: 'all .2s', flex: 1,
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateX(4px)'; (e.currentTarget as HTMLElement).style.filter = 'brightness(0.96)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.filter = ''; }}
                 >
-                  <div style={{ width: 36, height: 36, borderRadius: 9, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: entry.color, fontSize: 17 }}>{entry.icon}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{entry.label}</div>
-                    <div style={{ fontSize: 11, color: T.textTertiary }}>{entry.desc}</div>
+                  <div style={{ width: 42, height: 42, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: entry.color, fontSize: 19, flexShrink: 0 }}>
+                    {entry.icon}
                   </div>
-                  <ArrowRightOutlined style={{ color: T.textTertiary, fontSize: 12 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: T.textPrimary }}>{entry.label}</div>
+                    <div style={{ fontSize: 12, color: T.textTertiary }}>{entry.desc}</div>
+                  </div>
+                  <ArrowRightOutlined style={{ color: T.textTertiary, fontSize: 13 }} />
                 </div>
               ))}
             </div>
@@ -197,34 +231,44 @@ export default function AIStudio() {
         </Col>
       </Row>
 
-      {/* ═══ 4. 最近作品 ═══ */}
-      <Card title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>🎬 最近作品</span>}
-        style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }} bodyStyle={{ padding: '16px 20px' }}
-        extra={<Button type="link" size="small" style={{ color: T.textTertiary }}>全部 <ArrowRightOutlined /></Button>}
+      {/* ═══ 4. 最近作品（12 列铺满）═══ */}
+      <Card
+        title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>🎬 最近作品</span>}
+        style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }}
+        bodyStyle={{ padding: '16px 20px' }}
+        extra={<Button type="link" size="small" style={{ color: T.textTertiary }} onClick={() => navigate('/seedance')}>全部 <ArrowRightOutlined /></Button>}
       >
-        {recentVideos.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>🎬</div>
-            <Text style={{ fontSize: 14, color: T.textSecondary, display: 'block', marginBottom: 16 }}>还没有作品，开始你的第一个视频创作吧</Text>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/seedance')} style={{ borderRadius: 8 }}>创建视频</Button>
+        {!hasVideos ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>🎬</div>
+            <Text style={{ fontSize: 15, color: T.textSecondary, display: 'block', marginBottom: 8, fontWeight: 600 }}>
+              还没有作品
+            </Text>
+            <Text style={{ fontSize: 13, color: T.textTertiary, display: 'block', marginBottom: 20 }}>
+              立即创建你的第一个 AI 视频，开始积累你的作品库
+            </Text>
+            <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => navigate('/seedance')}
+              style={{ borderRadius: 10, height: 44, padding: '0 28px', fontSize: 15 }}>
+              开始创作
+            </Button>
           </div>
         ) : (
           <Row gutter={[16, 16]}>
             {recentVideos.map((v, i) => (
               <Col xs={12} sm={8} md={6} key={i}>
                 <Card hoverable style={{ borderRadius: 10, overflow: 'hidden' }} bodyStyle={{ padding: 0 }}
-                  cover={<div style={{ height: 120, background: `linear-gradient(135deg, ${['#7B61FF20','#8b5cf620','#0891b220','#d9770620'][i]}, #F1F5F9)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>🎬</div>}
+                  cover={<div style={{ height: 140, background: `linear-gradient(135deg, ${['#7B61FF20','#8b5cf620','#0891b220','#d9770620'][i]}, #F1F5F9)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44 }}>🎬</div>}
                 >
-                  <div style={{ padding: '10px 14px' }}>
-                    <Text ellipsis={{ tooltip: v.title }} style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary, display: 'block', marginBottom: 4 }}>{v.title}</Text>
+                  <div style={{ padding: '12px 16px' }}>
+                    <Text ellipsis={{ tooltip: v.title }} style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, display: 'block', marginBottom: 4 }}>{v.title}</Text>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 10, color: T.textTertiary }}>{v.model} · {v.duration}</Text>
-                      <Text style={{ fontSize: 10, color: T.textTertiary }}>{v.time}</Text>
+                      <Text style={{ fontSize: 11, color: T.textTertiary }}>{v.model} · {v.duration}</Text>
+                      <Text style={{ fontSize: 11, color: T.textTertiary }}>{v.time}</Text>
                     </div>
                     <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-                      <Tooltip title="预览"><Button size="small" type="text" icon={<PlayCircleOutlined />} style={{ fontSize: 13, color: T.textSecondary }} /></Tooltip>
-                      <Tooltip title="下载"><Button size="small" type="text" icon={<DownloadOutlined />} style={{ fontSize: 13, color: T.textSecondary }} /></Tooltip>
-                      <Tooltip title="编辑"><Button size="small" type="text" icon={<EditOutlined />} style={{ fontSize: 13, color: T.textSecondary }} /></Tooltip>
+                      <Tooltip title="预览"><Button size="small" type="text" icon={<PlayCircleOutlined />} style={{ fontSize: 14, color: T.textSecondary }} /></Tooltip>
+                      <Tooltip title="下载"><Button size="small" type="text" icon={<DownloadOutlined />} style={{ fontSize: 14, color: T.textSecondary }} /></Tooltip>
+                      <Tooltip title="编辑"><Button size="small" type="text" icon={<EditOutlined />} style={{ fontSize: 14, color: T.textSecondary }} /></Tooltip>
                     </div>
                   </div>
                 </Card>
