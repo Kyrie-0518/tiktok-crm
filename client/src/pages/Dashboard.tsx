@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Row, Col, Typography, Spin, Tag, Result, Select } from 'antd';
+import { Row, Col, Typography, Spin, Tag, Result, Select, Tooltip, Button } from 'antd';
 import {
   ShoppingCartOutlined, DollarOutlined, AppstoreOutlined,
   ReloadOutlined, BarChartOutlined, TrophyOutlined, RiseOutlined,
@@ -28,16 +28,36 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { fetchDashboard(); }, []);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  const fetchDashboard = async () => {
-    try { setLoading(true); setError(null); const res = await api.get('/dashboard'); setData(res.data); }
-    catch (e: any) { setError(e.response?.data?.error || e.message || '未知错误'); }
-    finally { setLoading(false); }
+  // 初始加载 + 每小时自动刷新（添加店铺/产品后约 1 小时内更新）
+  useEffect(() => {
+    fetchDashboard();
+    const timer = setInterval(() => {
+      fetchDashboard(true);
+    }, 60 * 60 * 1000); // 1 小时
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchDashboard = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      setError(null);
+      const res = await api.get('/dashboard');
+      setData(res.data);
+      setLastUpdated(new Date());
+    } catch (e: any) {
+      setError(e.response?.data?.error || e.message || '未知错误');
+    } finally {
+      if (!silent) setLoading(false);
+    }
   };
 
   const avgOrderValue = data ? data.cards.total_revenue_myr / Math.max(1, data.cards.total_orders) : 0;
   const totalSalesQty = data ? data.top_products.reduce((s, p) => s + (p.total_qty || 0), 0) : 0;
+  // 占比基准：top_products 实际销售额总和（不是全店 GMV）
+  // 这样 10 个商品的占比加起来等于 100%，更具参考价值
+  const topProductsTotalRevenue = data ? data.top_products.reduce((s, p) => s + (p.total_sales_myr || 0), 0) : 0;
 
   const [trendRange, setTrendRange] = useState<'7d' | '30d'>('30d');
   const trendData = useMemo(() => {
@@ -91,7 +111,15 @@ export default function Dashboard() {
 
   return (
     <div style={{ fontFamily: 'var(--bo-font-family)' }}>
-      <PageHeader title="经营概览" description="店铺经营数据驾驶舱" icon={<BarChartOutlined />} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+        <PageHeader title="经营概览" description="店铺经营数据驾驶舱" icon={<BarChartOutlined />} />
+        <Space size={8} style={{ marginTop: 4 }}>
+          <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+            更新于 {lastUpdated.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} · 每小时自动刷新
+          </Text>
+          <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchDashboard()}>刷新</Button>
+        </Space>
+      </div>
 
       {/* ═══ Row 1: 4 KPI 卡片 ═══ */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -117,8 +145,8 @@ export default function Dashboard() {
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <Card title="店铺概况" bodyStyle={{ padding: '12px 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
+            <Card title="店铺概况" bodyStyle={{ padding: '12px 16px', height: '100%' }} style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
                 <Text style={{ fontSize: 11, color: T.textTertiary }}>💰 累计销售</Text>
                 <Text strong style={{ fontSize: 20, color: T.primary, fontFamily: '"Inter", sans-serif' }}>
@@ -132,7 +160,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card title="📦 订单状态" bodyStyle={{ padding: '12px 16px' }}>
+            <Card title="📦 订单状态" bodyStyle={{ padding: '12px 16px', height: '100%' }} style={{ flex: 1 }}>
               {(() => {
                 const s = data.order_status_counts || {};
                 const items: { key: string; label: string; color: string; match: (k: string) => boolean }[] = [
@@ -235,7 +263,7 @@ export default function Dashboard() {
             { title: '商品', dataIndex: 'name', render: (_: any, r: any) => (<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>{r.image ? <img src={r.image} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: '#F8FAFC' }} onError={(e: any) => { e.target.style.display = 'none'; }} /> : <div style={{ width: 36, height: 36, borderRadius: 8, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><AppstoreOutlined style={{ color: T.textTertiary, fontSize: 14 }} /></div>}<Text ellipsis={{ tooltip: r.name }} style={{ fontSize: 13, color: T.textPrimary, maxWidth: 260 }}>{r.name}</Text></div>) },
             { title: '销量', dataIndex: 'total_qty', width: 70, align: 'right' as const, render: (v: number) => <Text strong style={{ fontSize: 13, color: T.textPrimary }}>{v}</Text> },
             { title: '销售额', dataIndex: 'total_sales_myr', width: 110, align: 'right' as const, render: (v: number) => <Text strong style={{ fontSize: 13, color: T.primary, fontFamily: '"Inter", sans-serif' }}>RM{v?.toFixed(2)}</Text> },
-            { title: '占比', width: 65, align: 'right' as const, render: (_: any, r: any) => { const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0; return (<div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#F1F5F9', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: 2, background: pct > 30 ? T.primary : pct > 10 ? '#6B8CFF' : '#CBD5E1', transition: 'width 0.3s' }} /></div><Text style={{ fontSize: 11, color: T.textTertiary, minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</Text></div>); } },
+            { title: '占比', width: 65, align: 'right' as const, render: (_: any, r: any) => { const pct = topProductsTotalRevenue > 0 ? ((r.total_sales_myr / topProductsTotalRevenue) * 100) : 0; return (<Tooltip title={`该商品占 Top 10 销售额的 ${pct.toFixed(1)}%（Top 10 合计 RM ${topProductsTotalRevenue.toFixed(2)}）`}><div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#F1F5F9', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: 2, background: pct > 30 ? T.primary : pct > 10 ? '#6B8CFF' : '#CBD5E1', transition: 'width 0.3s' }} /></div><Text style={{ fontSize: 11, color: T.textTertiary, minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</Text></div></Tooltip>); } },
             { title: '趋势', width: 60, align: 'right' as const, render: (_: any, r: any, i: number) => { const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0; if (i < 2 || pct > 20) return <RiseOutlined style={{ color: '#22C55E', fontSize: 14 }} />; return <Text style={{ fontSize: 11, color: T.textTertiary }}>—</Text>; } },
             { title: '状态', width: 80, render: (_: any, r: any) => { const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0; if (pct > 30) return <Tag color="gold" style={{ borderRadius: 6, margin: 0, fontSize: 10, fontWeight: 600 }}>🔥 核心商品</Tag>; if (pct > 10) return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#F0FDF4', color: '#22C55E', border: 'none', fontWeight: 600 }}>📈 热销</Tag>; if (pct < 3) return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', fontWeight: 600 }}>⚠️ 慢销</Tag>; return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#F1F5F9', color: T.textTertiary, border: 'none' }}>正常</Tag>; } },
           ]}
