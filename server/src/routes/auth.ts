@@ -115,7 +115,8 @@ router.post('/register', authMiddleware, (req: Request, res: Response) => {
 router.get('/users', authMiddleware, (_req: Request, res: Response) => {
   const db = getDb();
   const users = db.prepare(`
-    SELECT u.id, u.username, u.display_name, u.role_id, u.created_at,
+    SELECT u.id, u.username, u.display_name, u.email, u.identity,
+           u.role_id, u.created_at, u.last_login_at, u.last_login_ip, u.last_user_agent,
            r.name as role_name, r.role_key as role_key, r.permissions as permissions
     FROM users u
     LEFT JOIN roles r ON u.role_id = r.id
