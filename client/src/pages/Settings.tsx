@@ -324,13 +324,13 @@ export default function Settings() {
 
       {/* System Info — all roles */}
       <Card title="系统信息">
-        <p><strong>系统名称：</strong>博众智汇全域跨境经营管理系统</p>
+        <p><strong>系统名称：</strong>MERA 全域跨境经营管理系统</p>
         <p><strong>品牌寓意：</strong>博纳四方商机，汇聚众家智慧。以专业数字化架构融合前沿人工智能技术，全面赋能跨境出海商业发展，一体化统筹店铺运维、产品管理、订单流转全链路业务，深度搭载 AI 智能内容创作体系，一站式构建跨境出海完整运营生态。</p>
         <p><strong>业务定位：</strong>集跨境 ERP 综合管理与 AI 智能创意创作于一体，既可实现店铺、商品、订单全流程精细化管控，也能完成海外市场竞品研判、营销脚本定制、跨境带货短视频智能生成，全方位适配 TikTok 等海外主流平台出海运营全场景需求。</p>
         <p><strong>技术栈：</strong>React + Ant Design + Express + SQLite</p>
         <p><strong>数据存储：</strong>本地SQLite数据库（server/data/erp.db）</p>
         <p><strong>当前版本：</strong>v1.3.0</p>
-        <p><strong>版权声明：</strong>© 博众智汇 全域跨境经营管理系统 版权所有</p>
+        <p><strong>版权声明：</strong>© MERA 全域跨境经营管理系统 版权所有</p>
       </Card>
 
       {/* Change Password Modal */}

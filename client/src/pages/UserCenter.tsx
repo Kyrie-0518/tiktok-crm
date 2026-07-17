@@ -65,7 +65,7 @@ export default function UserCenter() {
         // fallback：用 store 数据构造
         setProfile({
           id: 1, username: username || 'User',
-          email: `${username}@bozone.cn`, phone: null,
+          email: `${username}@mera.cn`, phone: null,
           role: roleKey || 'staff',
           role_name: ROLE_INFO[roleKey || 'staff']?.label || '员工',
           avatar_url: null,
@@ -162,7 +162,7 @@ export default function UserCenter() {
                 )}
               </Space>
               <Space size={16}>
-                <Text><MailOutlined style={{ marginRight: 6 }} />{profile?.email || `${username}@bozone.cn`}</Text>
+                <Text><MailOutlined style={{ marginRight: 6 }} />{profile?.email || `${username}@mera.cn`}</Text>
                 {profile?.phone && <Text><PhoneOutlined style={{ marginRight: 6 }} />{profile.phone}</Text>}
               </Space>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -194,7 +194,7 @@ export default function UserCenter() {
               }>
                 <Form form={profileForm} layout="vertical" initialValues={{
                   username: profile?.username || username,
-                  email: profile?.email || `${username}@bozone.cn`,
+                  email: profile?.email || `${username}@mera.cn`,
                   phone: profile?.phone || '',
                 }} onFinish={handleSaveProfile}>
                   <Row gutter={20}>

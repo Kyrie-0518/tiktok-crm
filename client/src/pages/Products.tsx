@@ -184,7 +184,7 @@ export default function Products() {
       })));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '产品列表');
-      XLSX.writeFile(wb, `博众智汇_产品列表_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(wb, `MERA_产品列表_${new Date().toISOString().slice(0, 10)}.xlsx`);
       message.success('导出成功');
     } catch {
       message.error('导出失败');

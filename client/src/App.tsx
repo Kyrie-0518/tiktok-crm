@@ -517,7 +517,7 @@ function AppLayout() {
           flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/logo-icon.png" alt="Bozone"
+            <img src="/logo-icon.png" alt="MERA"
               style={{ width: 32, height: 32, flexShrink: 0 }}
             />
             {!siderCollapsed && (
@@ -525,7 +525,7 @@ function AppLayout() {
                 <span style={{
                   fontSize: 16, fontWeight: 700,
                   color: 'var(--bo-logo-color)', lineHeight: 1.2,
-                }}>博众智汇</span>
+                }}>MERA</span>
                 <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--bo-text-tertiary)', lineHeight: 1.2 }}>
                   ERP
                 </span>
