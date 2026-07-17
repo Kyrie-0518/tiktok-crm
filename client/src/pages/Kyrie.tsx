@@ -119,8 +119,17 @@ export default function Kyrie() {
   useEffect(() => { msgEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, progressText]);
   useEffect(() => { if (!sending) inputRef.current?.focus(); }, [sending]);
   useEffect(() => {
-    if (currentSessionId && messages.length > 1) {
-      setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...messages] } : s));
+    if (messages.length > 1) {
+      if (currentSessionId) {
+        // 已有 session：同步最新 messages
+        setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...messages] } : s));
+      } else {
+        // 第一次发消息：自动创建 session
+        const name = userMessages[0]?.content?.slice(0, 30) || '新会话';
+        const newId = `s-${Date.now()}`;
+        setSessions(prev => [{ id: newId, name, messages: [...messages], createdAt: Date.now(), favorite: false }, ...prev]);
+        setCurrentSessionId(newId);
+      }
     }
   }, [messages, currentSessionId]);
 
@@ -157,16 +166,11 @@ export default function Kyrie() {
   };
 
   // ── 会话管理 ──
+  // useEffect 已接管：每次 messages 变化时自动创建/更新 session
   const handleNewSession = () => {
-    if (hasRealConversation && !currentSessionId) {
-      const name = userMessages[0]?.content?.slice(0, 30) || '新会话';
-      const newId = `s-${Date.now()}`;
-      setSessions(prev => [{ id: newId, name, messages: [...messages], createdAt: Date.now(), favorite: false }, ...prev]);
-      setCurrentSessionId(newId);
-    } else if (hasRealConversation && currentSessionId) {
-      setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...messages] } : s));
-    }
-    setMessages([makeWelcomeMsg()]); setInputValue('');
+    setMessages([makeWelcomeMsg()]);
+    setInputValue('');
+    setCurrentSessionId(null);
   };
 
   const loadSession = (s: Session) => { setMessages(s.messages); setInputValue(''); setCurrentSessionId(s.id); setActiveNav('chat'); };
