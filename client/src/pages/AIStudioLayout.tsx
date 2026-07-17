@@ -11,6 +11,7 @@ import { useAuthStore } from '../stores/authStore';
 import AIStudio from './AIStudio';
 import AIAnalysis from './AIAnalysis';
 import SkiisAnalysis from './SkiisAnalysis';
+import SeedanceWorkspace from './SeedanceWorkspace';
 import SeedanceVideoGenerator from './SeedanceVideoGenerator';
 import VideoModelConfig from './VideoModelConfig';
 import MaterialLibrary from './MaterialLibrary';
@@ -342,7 +343,7 @@ export default function AIStudioLayout() {
                 <Route index element={<AIStudio />} />
                 <Route path="ai-analysis" element={<AIAnalysis />} />
                 <Route path="skiis" element={<SkiisAnalysis />} />
-                <Route path="seedance" element={<SeedanceVideoGenerator />} />
+                <Route path="seedance" element={<SeedanceWorkspace />} />
                 <Route path="video-models" element={<VideoModelConfig />} />
                 <Route path="material-library" element={<MaterialLibrary />} />
                 <Route path="raw-materials" element={<RawMaterials />} />
