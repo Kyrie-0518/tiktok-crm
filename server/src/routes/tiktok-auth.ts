@@ -177,6 +177,7 @@ async function upsertShop(token: {
       refresh_token: token.refresh_token,
       token_expires_at: expiresAt,
       sync_enabled: 1,
+      product_sync_enabled: 1,
     };
     if (token.shop_cipher) updates.shop_cipher = token.shop_cipher;
     if (token.shop_name) updates.name = token.shop_name;
@@ -191,8 +192,8 @@ async function upsertShop(token: {
   } else {
     // 创建新店铺
     const result = db.prepare(`
-      INSERT INTO tiktok_shops (name, region, shop_id, shop_cipher, app_key, app_secret, access_token, refresh_token, token_expires_at, api_version, sync_enabled, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      INSERT INTO tiktok_shops (name, region, shop_id, shop_cipher, app_key, app_secret, access_token, refresh_token, token_expires_at, api_version, sync_enabled, product_sync_enabled, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)
     `).run(
       token.shop_name || `Shop ${token.shop_id.slice(-6)}`,
       'MY',
