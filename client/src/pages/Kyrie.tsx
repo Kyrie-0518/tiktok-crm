@@ -47,6 +47,8 @@ const AGENT_REQUEST_TIMEOUT_MS = 180_000;
 const NAV_ITEMS = [
   { key: 'dashboard', icon: <ThunderboltOutlined />, label: '工作台' },
   { key: 'chat', icon: <RobotOutlined />, label: 'AI 对话' },
+  { key: 'knowledge', icon: <BookOutlined />, label: '知识库' },
+  { key: 'settings', icon: <SettingOutlined />, label: '设置' },
 ];
 
 // ════════════════════════════════════════
