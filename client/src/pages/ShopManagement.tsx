@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import api from '../api';
 import { useHasPerm } from '../stores/authStore';
+import { PageHeader } from '../components/design-system';
 
 const { Text, Title } = Typography;
 
@@ -34,10 +35,10 @@ const COUNTRY_EMOJI: Record<string, string> = {
 
 // ═══════════════════ DESIGN TOKENS ═══════════════════
 const T = {
-  bg: '#f5f3f0', cardBg: '#FFFFFF', cardBorder: '#E8ECF5',
-  primary: '#4F6BFF', primaryHover: '#3F5AF5',
-  textPrimary: '#1E293B', textSecondary: '#64748B', textTertiary: '#94A3B8',
-  success: '#22C55E', successBg: '#ECFDF3',
+  bg: '#F7F8FA', cardBg: '#FFFFFF', cardBorder: '#EEF1F6',
+  primary: '#4568FF', primaryHover: '#3B56E5',
+  textPrimary: '#172033', textSecondary: '#64748B', textTertiary: '#94A3B8',
+  success: '#22C55E', successBg: '#F0FDF4',
   cardRadius: 20,
 };
 
@@ -136,26 +137,13 @@ export default function ShopManagement() {
   const enabledCount = shops.length;
 
   return (
-    <div style={{ padding: '20px 24px', background: T.bg, minHeight: '100%', fontFamily: '"PingFang SC", -apple-system, "Inter", sans-serif' }}>
+    <div style={{ padding: '20px 24px', background: 'var(--bo-page-bg)', minHeight: '100%' }}>
 
       {/* ═══ HEADER ═══ */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 32 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 12,
-              background: `linear-gradient(135deg, #6B8CFF, ${T.primary})`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: `0 4px 12px ${T.primary}30`,
-            }}>
-              <ShopOutlined style={{ fontSize: 20, color: '#fff' }} />
-            </div>
-            <div>
-              <Title level={3} style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.textPrimary }}>店铺授权中心</Title>
-              <Text style={{ fontSize: 13, color: T.textTertiary }}>连接你的 TikTok Shop 店铺</Text>
-            </div>
-          </div>
-          <div style={{ marginLeft: 50, marginTop: 2 }}>
+          <PageHeader title="店铺授权中心" description="连接你的 TikTok Shop 店铺" icon={<ShopOutlined />} style={{ marginBottom: 4 }} />
+          <div style={{ marginLeft: 52, marginTop: -4 }}>
             <Text style={{ fontSize: 13, color: T.textSecondary }}>
               已授权 <Text strong style={{ color: T.primary }}>{enabledCount}</Text> 个店铺
             </Text>

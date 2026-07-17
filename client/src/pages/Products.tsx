@@ -8,8 +8,9 @@ import { useHasPerm } from '../stores/authStore';
 import type { ColumnsType } from 'antd/es/table';
 import DataTable from '../components/DataTable';
 import ExportButton from '../components/ExportButton';
+import { PageHeader } from '../components/design-system';
 
-const T = { primary: '#4F6BFF', primaryLight: '#EEF3FF', cardBorder: '#E8ECF5', cardRadius: 16, textPrimary: '#1E293B', textSecondary: '#64748B', textTertiary: '#94A3B8', success: '#22C55E', warning: '#F59E0B', danger: '#EF4444' };
+const T = { primary: '#4568FF', primaryLight: '#EDF0FF', cardBorder: '#EEF1F6', cardRadius: 16, textPrimary: '#172033', textSecondary: '#64748B', textTertiary: '#94A3B8', success: '#22C55E', warning: '#F59E0B', danger: '#EF4444' };
 
 /** Sync result statistic card */
 function ResultCard({ icon, color, bg, label, value }: {
@@ -345,22 +346,8 @@ export default function Products() {
   ];
 
   return (
-    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
-      {/* ═══ Header ═══ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 12,
-          background: 'linear-gradient(135deg, #6B8CFF, #4F6BFF)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 2px 10px rgba(79,107,255,0.25)',
-        }}>
-          <AppstoreOutlined style={{ color: '#fff', fontSize: 18 }} />
-        </div>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1E293B', lineHeight: 1.3 }}>商品管理</h2>
-          <div style={{ fontSize: 12, color: '#94A3B8' }}>产品信息 · SKU管理 · 库存追踪</div>
-        </div>
-      </div>
+    <div style={{ padding: '20px 24px', background: 'var(--bo-page-bg)', minHeight: '100%' }}>
+      <PageHeader title="商品管理" description="产品信息 · SKU管理 · 库存追踪" icon={<AppstoreOutlined />} />
 
       {/* ═══ Stats Summary ═══ */}
       {(() => {
