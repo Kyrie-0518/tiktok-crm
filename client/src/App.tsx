@@ -197,40 +197,40 @@ function AppLayout() {
     {/* ═══ Bozone 设计系统：全局样式变量 ═══ */}
     <style>{`
       :root {
-        --bo-primary: #2563eb;
-        --bo-success: #059669;
-        --bo-warning: #d97706;
-        --bo-danger: #dc2626;
-        --bo-bg: #f5f3f0;
-        --bo-sider-bg: #faf9f7;
-        --bo-border: #e8e5e0;
-        --bo-text-primary: #1d2129;
-        --bo-text-secondary: #4e5969;
-        --bo-text-tertiary: #86909c;
-        --bo-logo-color: #1e293b;
-        --bo-menu-bg: #faf9f7;
-        --bo-content-bg: #f5f3f0;
+        --bo-primary: #4F6BFF;
+        --bo-success: #22C55E;
+        --bo-warning: #F59E0B;
+        --bo-danger: #EF4444;
+        --bo-bg: #F7F9FC;
+        --bo-sider-bg: #FFFFFF;
+        --bo-border: #E8ECF5;
+        --bo-text-primary: #1E293B;
+        --bo-text-secondary: #64748B;
+        --bo-text-tertiary: #94A3B8;
+        --bo-logo-color: #1E293B;
+        --bo-menu-bg: #FFFFFF;
+        --bo-content-bg: #F7F9FC;
         --bo-user-color: #475569;
         --bo-user-role-color: #94a3b8;
-        --bo-sider-border: #e8e5e0;
-        --bo-collapse-border: #e8e5e0;
-        --bo-collapse-color: #94a3b8;
-        --bo-scrollbar-thumb: rgba(0,0,0,0.12);
+        --bo-sider-border: #E8ECF5;
+        --bo-collapse-border: #E8ECF5;
+        --bo-collapse-color: #94A3B8;
+        --bo-scrollbar-thumb: rgba(0,0,0,0.10);
         /* 分组标签 */
-        --bo-group-label-color: #94a3b8;
+        --bo-group-label-color: #94A3B8;
         /* 底部区域 */
         --bo-bottom-section-bg: transparent;
-        --bo-bottom-section-border: rgba(0,0,0,0.06);
-        --bo-bottom-item-color: #64748b;
-        --bo-bottom-item-hover-bg: rgba(0,0,0,0.04);
-        --bo-bottom-item-active-bg: rgba(37,99,235,0.10);
-        --bo-bottom-item-active-color: #2563eb;
-        /* 菜单选中态：圆角背景 */
-        --bo-selected-bg: rgba(37,99,235,0.09);
-        --bo-selected-color: #1d4ed8;
+        --bo-bottom-section-border: rgba(0,0,0,0.05);
+        --bo-bottom-item-color: #64748B;
+        --bo-bottom-item-hover-bg: rgba(79,107,255,0.06);
+        --bo-bottom-item-active-bg: rgba(79,107,255,0.10);
+        --bo-bottom-item-active-color: #4F6BFF;
+        /* 菜单选中态 */
+        --bo-selected-bg: #EEF3FF;
+        --bo-selected-color: #4F6BFF;
         /* 用户区 */
-        --bo-avatar-bg: #e8e5e0;
-        --bo-avatar-color: #64748b;
+        --bo-avatar-bg: #F1F5F9;
+        --bo-avatar-color: #4F6BFF;
       }
       [data-theme='dark'] {
         --bo-bg: #0f172a;
@@ -276,8 +276,8 @@ function AppLayout() {
       ::-webkit-scrollbar-track { background-color: transparent; }
 
       /* 按钮微阴影 */
-      .ant-btn-primary { box-shadow: 0 2px 4px rgba(37,99,235,0.2); }
-      .ant-btn-primary:hover { box-shadow: 0 4px 8px rgba(37,99,235,0.3); }
+      .ant-btn-primary { box-shadow: 0 2px 4px rgba(79,107,255,0.20); }
+      .ant-btn-primary:hover { box-shadow: 0 4px 8px rgba(79,107,255,0.30); }
 
       /* Table */
       .ant-table-thead > tr > th::before { display: none !important; }
@@ -308,13 +308,13 @@ function AppLayout() {
         color: var(--bo-text-secondary) !important;
       }
       .ant-menu-submenu-title:hover {
-        background: rgba(37,99,235,0.04) !important;
+        background: rgba(79,107,255,0.04) !important;
       }
       .ant-menu-submenu-open > .ant-menu-submenu-title {
-        color: var(--bo-primary) !important;
+        color: #4F6BFF !important;
       }
       .ant-menu-submenu-open > .ant-menu-submenu-title .anticon {
-        color: var(--bo-primary) !important;
+        color: #4F6BFF !important;
       }
       .ant-menu-submenu-arrow {
         color: var(--bo-text-tertiary) !important;
@@ -382,55 +382,54 @@ function AppLayout() {
         transition: color 0.2s;
       }
 
-      /* 悬停态 — 更明显的柔和反馈 */
+      /* 悬停态 */
       .ant-menu-light .ant-menu-item:hover:not(.ant-menu-item-selected),
       .ant-menu-dark .ant-menu-item:hover:not(.ant-menu-item-selected) {
-        background-color: rgba(37,99,235,0.06) !important;
+        background-color: rgba(79,107,255,0.06) !important;
       }
       .ant-menu-light .ant-menu-item:hover:not(.ant-menu-item-selected) .anticon,
       .ant-menu-dark .ant-menu-item:hover:not(.ant-menu-item-selected) .anticon {
-        color: #6090e8 !important;
+        color: #6B8CFF !important;
       }
 
-      /* 选中态：柔和渐变背景 + 左侧装饰条 */
+      /* 选中态：纯色背景 + 左侧 4px 品牌色装饰条 */
       .ant-menu-light .ant-menu-item-selected,
       .ant-menu-dark .ant-menu-item-selected {
-        background: linear-gradient(135deg, rgba(37,99,235,0.10), rgba(59,130,246,0.08)) !important;
-        color: var(--bo-selected-color) !important;
+        background: #EEF3FF !important;
+        color: #4F6BFF !important;
         font-weight: 600;
-        box-shadow: 0 1px 3px rgba(37,99,235,0.08);
         position: relative;
       }
-      /* 去掉默认左边框 */
+      /* 去掉默认右边框 */
       .ant-menu-light .ant-menu-item-selected::after,
       .ant-menu-dark .ant-menu-item-selected::after {
         display: none !important;
       }
-      /* 选中态左侧装饰竖线 */
+      /* 左侧 4px 品牌色标识 */
       .ant-menu-light .ant-menu-item-selected::before,
       .ant-menu-dark .ant-menu-item-selected::before {
         content: '';
         position: absolute;
-        left: 0;
+        left: 6px;
         top: 50%;
         transform: translateY(-50%);
-        width: 3px;
-        height: 18px;
-        border-radius: 0 3px 3px 0;
-        background: var(--bo-primary);
+        width: 4px;
+        height: 20px;
+        border-radius: 2px;
+        background: #4F6BFF;
       }
 
       /* 选中图标颜色 */
-      .ant-menu-light .ant-menu-item-selected .anticon { color: var(--bo-selected-color) !important; }
-      .ant-menu-dark .ant-menu-item-selected .anticon { color: var(--bo-selected-color) !important; }
+      .ant-menu-light .ant-menu-item-selected .anticon { color: #4F6BFF !important; }
+      .ant-menu-dark .ant-menu-item-selected .anticon { color: #4F6BFF !important; }
 
       /* 管理后台入口卡片样式 */
       .admin-entry-card {
         margin: 8px 12px 12px;
         padding: 12px 14px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(59,130,246,0.05));
-        border: 1px solid rgba(37,99,235,0.12);
+        border-radius: 12px;
+        background: rgba(79,107,255,0.04);
+        border: 1px solid rgba(79,107,255,0.10);
         cursor: pointer;
         transition: all 0.2s ease;
         display: flex;
@@ -438,30 +437,30 @@ function AppLayout() {
         gap: 10px;
       }
       .admin-entry-card:hover {
-        background: linear-gradient(135deg, rgba(37,99,235,0.14), rgba(59,130,246,0.10));
-        border-color: rgba(37,99,235,0.20);
-        box-shadow: 0 2px 8px rgba(37,99,235,0.10);
+        background: rgba(79,107,255,0.08);
+        border-color: rgba(79,107,255,0.18);
+        box-shadow: 0 2px 8px rgba(79,107,255,0.08);
       }
       .admin-entry-card .admin-icon-wrap {
         width: 36px;
         height: 36px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        border-radius: 10px;
+        background: linear-gradient(135deg, #6B8CFF, #4F6BFF);
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+        box-shadow: 0 2px 8px rgba(79,107,255,0.25);
       }
       .admin-entry-card .admin-title {
         font-size: 13.5px;
         font-weight: 700;
-        color: #1e293b;
+        color: #1E293B;
         line-height: 1.3;
       }
       .admin-entry-card .admin-subtitle {
         font-size: 11px;
-        color: #64748b;
+        color: #64748B;
         line-height: 1.3;
       }
     `}</style>
@@ -469,41 +468,46 @@ function AppLayout() {
     <Layout style={{ minHeight: '100vh', background: 'var(--bo-bg)' }}>
       {/* ═══ 侧边栏 ═══ */}
       <Sider
-        width={220}
+        width={240}
         collapsedWidth={56}
         collapsible
         collapsed={siderCollapsed || isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie}
         trigger={null}
         style={{
-          background: 'var(--bo-sider-bg)',
+          background: '#FFFFFF',
           position: 'fixed', left: 0, top: 0, bottom: 0,
           overflow: 'hidden', zIndex: 100,
-          borderRight: '1px solid var(--bo-sider-border)',
+          borderRight: '1px solid #E8ECF5',
+          boxShadow: '2px 0 12px rgba(15,23,42,0.06)',
           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           display: 'flex', flexDirection: 'column',
-          // AI工作室 / 管理后台页面隐藏主侧边栏
           visibility: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'hidden' : 'visible',
           pointerEvents: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'none' : 'auto',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* ── Logo 区域 ── */}
+        {/* ── Logo 区域 (72px) ── */}
         <div style={{
-          minHeight: 50,
+          height: 72, minHeight: 72,
           display: 'flex', alignItems: 'center',
           justifyContent: siderCollapsed ? 'center' : 'space-between',
-          padding: siderCollapsed ? '0' : '0 12px 0 16px',
+          padding: siderCollapsed ? '0' : '0 14px 0 18px',
+          borderBottom: `1px solid ${isDarkMode ? '#1e293b' : 'rgba(0,0,0,0.04)'}`,
+          flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <img src="/logo-icon.png" alt="Bozone"
-              style={{ width: 28, height: 28, flexShrink: 0 }}
+              style={{ width: 32, height: 32, flexShrink: 0 }}
             />
             {!siderCollapsed && (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{
-                  fontSize: 15, fontWeight: 700,
+                  fontSize: 16, fontWeight: 700,
                   color: 'var(--bo-logo-color)', lineHeight: 1.2,
                 }}>博众智汇</span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--bo-text-tertiary)', lineHeight: 1.2 }}>
+                  ERP
+                </span>
               </div>
             )}
           </div>
@@ -513,13 +517,13 @@ function AppLayout() {
               onClick={() => setSiderCollapsed(!siderCollapsed)}
               style={{
                 display: 'flex', justifyContent: 'center', alignItems: 'center',
-                width: 24, height: 24, borderRadius: 4,
+                width: 28, height: 28, borderRadius: 6,
                 cursor: 'pointer', color: 'var(--bo-collapse-color)', fontSize: 12,
                 transition: 'all 0.15s',
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.background = 'var(--bo-bottom-item-hover-bg)';
-                e.currentTarget.style.color = '#2563eb';
+                e.currentTarget.style.color = 'var(--bo-primary)';
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.background = 'transparent';
@@ -560,7 +564,7 @@ function AppLayout() {
                 cursor: 'pointer', color: 'var(--bo-collapse-color)', fontSize: 13,
                 transition: 'color 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#2563eb'; }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#4F6BFF'; }}
               onMouseLeave={e => { e.currentTarget.style.color = 'var(--bo-collapse-color)'; }}
             >
               <MenuUnfoldOutlined />
@@ -575,9 +579,9 @@ function AppLayout() {
             onClick={() => navigate('/admin')}
             style={{
               borderColor: location.pathname === '/admin'
-                ? 'rgba(37,99,235,0.25)' : undefined,
+                ? 'rgba(79,107,255,0.25)' : undefined,
               background: location.pathname === '/admin'
-                ? 'linear-gradient(135deg, rgba(37,99,235,0.14), rgba(59,130,246,0.10))' : undefined,
+                ? 'rgba(79,107,255,0.10)' : undefined,
             }}
           >
             <div className="admin-icon-wrap">
@@ -602,16 +606,16 @@ function AppLayout() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 background: location.pathname === '/admin'
-                  ? 'linear-gradient(135deg, rgba(37,99,235,0.14), rgba(59,130,246,0.10))'
-                  : 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(59,130,246,0.05))',
-                border: `1px solid ${location.pathname === '/admin' ? 'rgba(37,99,235,0.25)' : 'rgba(37,99,235,0.12)'}`,
+                  ? 'rgba(79,107,255,0.10)'
+                  : 'rgba(79,107,255,0.04)',
+                border: `1px solid ${location.pathname === '/admin' ? 'rgba(79,107,255,0.25)' : 'rgba(79,107,255,0.10)'}`,
                 transition: 'all 0.2s ease',
               }}
             >
-              <SafetyOutlined style={{
-                color: location.pathname === '/admin' ? '#2563eb' : '#64748b',
-                fontSize: 18,
-              }} />
+          <SafetyOutlined style={{
+            color: location.pathname === '/admin' ? '#4F6BFF' : '#64748B',
+            fontSize: 18,
+          }} />
             </div>
           </Tooltip>
         )}
@@ -781,14 +785,14 @@ function AppLayout() {
         </div>
       </Sider>
 
-      {/* ═══ 主内容区（无 Header） ═══ */}
+      {/* ═══ 主内容区 ═══ */}
       <Layout style={{
-        marginLeft: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 0 : (siderCollapsed ? 56 : 220),
-        background: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'transparent' : 'var(--bo-content-bg)',
+        marginLeft: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 0 : (siderCollapsed ? 56 : 240),
+        background: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'transparent' : '#F7F9FC',
         transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <Content style={{
-          padding: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 0 : '20px',
+          padding: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 0 : '32px 40px',
           height: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? '100%' : '100vh', overflow: 'auto',
           background: 'transparent',
         }}>
