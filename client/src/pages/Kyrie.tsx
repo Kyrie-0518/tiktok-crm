@@ -5,15 +5,15 @@ import {
 import {
   SendOutlined, ThunderboltOutlined, BarChartOutlined,
   DollarOutlined, BookOutlined, UserOutlined,
-  ClearOutlined, LoadingOutlined, ShopOutlined,
+  ClearOutlined, LoadingOutlined,
   ClockCircleOutlined, PlusOutlined, DeleteOutlined,
   StarOutlined, StarFilled, CopyOutlined,
-  EditOutlined, SearchOutlined, GlobalOutlined,
+  SearchOutlined,
   HomeOutlined, RobotOutlined, RiseOutlined,
-  AppstoreOutlined, SettingOutlined, ApiOutlined,
-  SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
+  AppstoreOutlined, SettingOutlined,
+  SyncOutlined, CheckCircleOutlined,
   BellOutlined, ArrowUpOutlined, ArrowDownOutlined,
-  FundOutlined, PictureOutlined, ShoppingOutlined,
+  PictureOutlined, ShoppingOutlined, ArrowLeftOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -45,17 +45,11 @@ const T = {
 const AGENT_REQUEST_TIMEOUT_MS = 180_000;
 
 // ════════════════════════════════════════
-//  SIDEBAR NAV
+//  SIDEBAR NAV（精简到 4 项 — 其它模块去主 App 访问）
 // ════════════════════════════════════════
 const NAV_ITEMS = [
   { key: 'dashboard', icon: <HomeOutlined />, label: '工作台' },
   { key: 'chat', icon: <RobotOutlined />, label: 'AI助手' },
-  { key: 'analytics', icon: <FundOutlined />, label: '数据分析' },
-  { key: 'products', icon: <AppstoreOutlined />, label: '商品' },
-  { key: 'orders', icon: <ShoppingOutlined />, label: '订单' },
-  { key: 'finance', icon: <DollarOutlined />, label: '利润' },
-  { key: 'influencer', icon: <UserOutlined />, label: '达人' },
-  { key: 'ads', icon: <BarChartOutlined />, label: '广告' },
   { key: 'knowledge', icon: <BookOutlined />, label: '知识库' },
   { key: 'settings', icon: <SettingOutlined />, label: '设置' },
 ];
@@ -291,9 +285,20 @@ export default function Kyrie() {
           height: T.headerHeight, flexShrink: 0, background: T.cardBg, borderBottom: `1px solid ${T.cardBorder}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${T.spacing.lg}px`,
         }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: T.textPrimary }}>欢迎回来</div>
-            <Text style={{ fontSize: 13, color: T.textTertiary }}>今天是 {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}</Text>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => window.location.href = '/dashboard'}
+              style={{ color: T.textSecondary, borderRadius: 10, fontSize: 13 }}
+            >
+              返回主系统
+            </Button>
+            <div style={{ width: 1, height: 24, background: T.cardBorder }} />
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: T.textPrimary }}>欢迎回来</div>
+              <Text style={{ fontSize: 13, color: T.textTertiary }}>今天是 {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}</Text>
+            </div>
           </div>
           <Space size={16}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, background: '#F0FDF4', fontSize: 12, color: '#16A34A' }}>
