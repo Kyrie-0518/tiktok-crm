@@ -63,12 +63,15 @@ router.get('/me', authMiddleware, (req: Request, res: Response) => {
 });
 
 // Helper: get current user's role_key from DB (always fresh)
+// 同时支持 identity=SUPER_ADMIN 兜底（防止角色映射缺失）
 function getUserRoleKey(req: Request, db: any): string {
   const user = req.user as JwtPayload;
   const row = db.prepare(`
-    SELECT r.role_key FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = ?
+    SELECT r.role_key, u.identity FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = ?
   `).get(user.userId) as any;
-  return row?.role_key || user.roleKey || 'staff';
+  if (row?.role_key) return row.role_key;
+  if (row?.identity === 'SUPER_ADMIN' || user.roleKey === 'developer') return 'developer';
+  return user.roleKey || 'staff';
 }
 
 // POST /api/auth/register (developer/manager can create accounts)
