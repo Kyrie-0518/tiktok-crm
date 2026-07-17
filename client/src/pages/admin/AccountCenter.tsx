@@ -9,10 +9,10 @@ import LoginLogs from './LoginLogs';
 const { Text } = Typography;
 
 const T_COLOR = {
-  primary: '#4F6BFF', primaryLight: '#EEF3FF',
+  primary: '#4568FF', primaryLight: '#EDF0FF',
   cardShadow: '0 8px 24px rgba(15,23,42,0.06)',
-  cardBorder: '#E8ECF5', cardRadius: 20,
-  textPrimary: '#1E293B', textSecondary: '#64748B', textTertiary: '#94A3B8',
+  cardBorder: '#EEF1F6', cardRadius: 20,
+  textPrimary: '#172033', textSecondary: '#64748B', textTertiary: '#94A3B8',
 };
 
 interface StatData { totalUsers: number; totalRoles: number; todayLogins: number; activeUsers: number; }
@@ -42,7 +42,7 @@ export default function AccountCenter() {
   }, [activeTab]);
 
   const statCards = [
-    { label: '用户总数', value: stats.totalUsers, icon: <TeamOutlined />, color: '#4F6BFF', bg: '#EEF3FF' },
+    { label: '用户总数', value: stats.totalUsers, icon: <TeamOutlined />, color: '#4568FF', bg: '#EDF0FF' },
     { label: '角色数量', value: stats.totalRoles, icon: <SafetyOutlined />, color: '#8B5CF6', bg: '#F6F0FF' },
     { label: '今日登录', value: stats.todayLogins, icon: <LoginOutlined />, color: '#22C55E', bg: '#F0FDF4' },
     { label: '活跃账号', value: stats.activeUsers, icon: <UserOutlined />, color: '#F59E0B', bg: '#FFFBEB' },

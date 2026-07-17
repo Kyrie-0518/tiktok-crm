@@ -6,9 +6,9 @@ import api from '../../api';
 const { Text } = Typography;
 
 const T_COLOR = {
-  primary: '#4F6BFF', cardShadow: '0 8px 24px rgba(15,23,42,0.06)',
-  cardBorder: '#E8ECF5', cardRadius: 20,
-  textPrimary: '#1E293B', textSecondary: '#64748B', textTertiary: '#94A3B8',
+  primary: '#4568FF', cardShadow: '0 8px 24px rgba(15,23,42,0.06)',
+  cardBorder: '#EEF1F6', cardRadius: 20,
+  textPrimary: '#172033', textSecondary: '#64748B', textTertiary: '#94A3B8',
 };
 
 interface LoginRecord {

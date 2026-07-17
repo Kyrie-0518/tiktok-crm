@@ -9,10 +9,10 @@ import api from '../../api';
 const { Text } = Typography;
 
 const T_COLOR = {
-  primary: '#4F6BFF', primaryLight: '#EEF3FF',
+  primary: '#4568FF', primaryLight: '#EDF0FF',
   cardShadow: '0 8px 24px rgba(15,23,42,0.06)',
-  cardBorder: '#E8ECF5', cardRadius: 20,
-  textPrimary: '#1E293B', textSecondary: '#64748B', textTertiary: '#94A3B8',
+  cardBorder: '#EEF1F6', cardRadius: 20,
+  textPrimary: '#172033', textSecondary: '#64748B', textTertiary: '#94A3B8',
 };
 
 const MODULE_KEYS = [
@@ -112,7 +112,7 @@ export default function Roles() {
     }));
   };
 
-  const roleColors: Record<string, string> = { developer: '#4F6BFF', manager: '#F59E0B', staff: '#22C55E', viewer: '#94A3B8' };
+  const roleColors: Record<string, string> = { developer: '#4568FF', manager: '#F59E0B', staff: '#22C55E', viewer: '#94A3B8' };
 
   return (
     <Card
