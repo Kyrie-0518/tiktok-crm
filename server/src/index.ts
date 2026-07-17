@@ -41,6 +41,7 @@ import productsTiktokRoutes from './routes/products-tiktok';
 import adCenterRoutes from './routes/ad-center';
 import { connectToMCPServer } from './services/tiktok-mcp/client';
 import { startFeishuWebSocket } from './routes/bot-feishu-ws';
+import { startTokenScheduler } from './services/tiktok-oauth';
 import getDb from './db';
 
 // ── 启动时强制检查 tiktok_shops 表结构迁移 ──
@@ -149,6 +150,9 @@ app.listen(PORT, () => {
 
   // 启动飞书长连接（如已配置 FEISHU_APP_ID/SECRET）
   startFeishuWebSocket();
+
+  // 启动 TikTok Shop token 自动刷新调度器（每 5 分钟扫描一次，提前刷新即将过期的 token）
+  startTokenScheduler();
 
   // 启动时立即更新一次汇率
   autoUpdateExchangeRate();

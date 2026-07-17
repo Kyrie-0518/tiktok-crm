@@ -248,11 +248,68 @@ export async function refreshToken(refreshTokenStr: string): Promise<{
   };
 }
 
-// ── 自动刷新 Token（所有 API 调用的统一入口） ──
+// ════════════════════════════════════════════════════════════════════
+//  企业级 Token 自动刷新（mutex + 预刷 + 后台调度 + 失败计数）
+// ════════════════════════════════════════════════════════════════════
+
+// 预刷新窗口：过期前 10 分钟就开始刷新（之前是 5 分钟，给慢网络更多缓冲）
+const REFRESH_AHEAD_MS = 10 * 60 * 1000;
+// 旧 token 兜底窗口：即使过期不超过 30 分钟，刷新失败时仍可继续用
+const FALLBACK_GRACE_MS = 30 * 60 * 1000;
+// 后台调度扫描间隔
+const SCHEDULE_INTERVAL_MS = 5 * 60 * 1000;
+// 失败 3 次标记为需要人工重授权
+const MAX_CONSECUTIVE_FAILURES = 3;
+// 单次刷新重试次数 + 指数退避
+const REFRESH_RETRY_TIMES = 3;
+
+// In-memory mutex: 同一 shopId 同一时刻只允许 1 个真正刷新，其他等待共享结果
+const refreshLocks = new Map<number, Promise<string>>();
+// 连续失败计数（in-memory，重启清零；可未来持久化）
+const failureCounters = new Map<number, number>();
+// 后台调度是否已启动
+let schedulerStarted = false;
+
+/** 内部：实际执行一次刷新（带重试 + 指数退避） */
+async function doRefresh(shopId: number, refreshTokenStr: string): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
+  let lastErr: any;
+  for (let attempt = 1; attempt <= REFRESH_RETRY_TIMES; attempt++) {
+    try {
+      const token = await refreshToken(refreshTokenStr);
+      failureCounters.set(shopId, 0); // 成功 → 清零
+      return token;
+    } catch (e: any) {
+      lastErr = e;
+      const wait = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 4s
+      console.warn(`[getValidToken] shop ${shopId} 刷新失败 (第 ${attempt}/${REFRESH_RETRY_TIMES} 次): ${e.message} · ${wait}ms 后重试`);
+      if (attempt < REFRESH_RETRY_TIMES) await new Promise(r => setTimeout(r, wait));
+    }
+  }
+  // 3 次都失败
+  const fails = (failureCounters.get(shopId) || 0) + 1;
+  failureCounters.set(shopId, fails);
+  if (fails >= MAX_CONSECUTIVE_FAILURES) {
+    console.error(`[getValidToken] 🚨 shop ${shopId} 连续 ${fails} 次刷新失败，需要人工重新授权！`);
+    // TODO: 这里可对接告警系统（飞书/邮件），目前打 critical log
+  }
+  throw lastErr;
+}
+
+/** 内部：保存新 token 到 DB */
+function saveToken(shopId: number, accessToken: string, refreshTokenStr: string, expiresIn: number) {
+  const db = getDb();
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+  db.prepare(`
+    UPDATE tiktok_shops SET access_token = ?, refresh_token = ?, token_expires_at = ? WHERE id = ?
+  `).run(accessToken, refreshTokenStr, expiresAt, shopId);
+}
+
 /**
- * 获取店铺的有效 access_token（自动检测过期并静默刷新）
- * @param shopId 店铺 ID
- * @returns 有效的 access_token
+ * 获取店铺的有效 access_token（企业级自动刷新）
+ * - mutex: 同 shopId 并发只 1 次真实刷新
+ * - 预刷: 过期前 10 分钟提前刷新
+ * - 重试: 3 次指数退避
+ * - 兜底: 刷新失败但旧 token 未过 grace 期仍可用
  */
 export async function getValidToken(shopId: number): Promise<string> {
   const db = getDb();
@@ -262,41 +319,113 @@ export async function getValidToken(shopId: number): Promise<string> {
     throw new Error('店铺未授权，请先完成 TikTok Shop 授权');
   }
 
-  // token 还没过期（预留 5 分钟 buffer）→ 直接返回
   const now = Date.now();
   const expiresAt = shop.token_expires_at ? new Date(shop.token_expires_at).getTime() : 0;
-  if (expiresAt > now + 5 * 60 * 1000) {
+
+  // ✅ token 还有效（>= 10min buffer）→ 零开销直接返回
+  if (expiresAt > now + REFRESH_AHEAD_MS) {
     return shop.access_token;
   }
 
-  // token 已过期或即将过期 → 用 refresh_token 刷新
+  // ❌ 没有 refresh_token（首次授权异常）→ 用旧 token 兜底
   if (!shop.refresh_token) {
-    // 无 refresh_token 但有 access_token 且还没完全过期 → 用最后一次
     if (expiresAt > now) {
-      console.warn(`[getValidToken] shop ${shopId} token 即将过期但无 refresh_token，用现有 token 尝试`);
+      console.warn(`[getValidToken] shop ${shopId} 即将过期但无 refresh_token，用现有 token 尝试`);
       return shop.access_token;
     }
     throw new Error('Token 已过期且缺少 refresh_token，请重新授权店铺');
   }
 
-  console.log(`[getValidToken] shop ${shopId} token 已过期，自动刷新中...`);
-  try {
-    const newToken = await refreshToken(shop.refresh_token);
-    const newExpiresAt = new Date(Date.now() + newToken.expires_in * 1000).toISOString();
-    db.prepare(`
-      UPDATE tiktok_shops SET access_token = ?, refresh_token = ?, token_expires_at = ? WHERE id = ?
-    `).run(newToken.access_token, newToken.refresh_token, newExpiresAt, shopId);
-    console.log(`[getValidToken] shop ${shopId} ✅ token 自动刷新成功`);
-    return newToken.access_token;
-  } catch (e: any) {
-    console.error(`[getValidToken] shop ${shopId} ❌ token 刷新失败:`, e.message);
-    // 如果旧 token 还没完全过期，尝试用旧的
-    if (expiresAt > now) {
-      console.warn(`[getValidToken] shop ${shopId} 刷新失败但旧 token 仍有效，继续使用`);
-      return shop.access_token;
-    }
-    throw new Error(`Token 刷新失败: ${e.message}，请重新授权`);
+  // 🔒 mutex: 同一 shopId 多个并发请求共享同一个刷新 Promise
+  if (refreshLocks.has(shopId)) {
+    console.log(`[getValidToken] shop ${shopId} 已有刷新进行中，等待共享结果`);
+    return refreshLocks.get(shopId)!;
   }
+
+  // 启动新的刷新
+  const refreshPromise = (async () => {
+    try {
+      console.log(`[getValidToken] shop ${shopId} token 即将过期 (剩余 ${Math.round((expiresAt - now) / 1000)}s)，开始自动刷新`);
+      const newToken = await doRefresh(shopId, shop.refresh_token);
+      saveToken(shopId, newToken.access_token, newToken.refresh_token, newToken.expires_in);
+      console.log(`[getValidToken] shop ${shopId} ✅ token 自动刷新成功（new expires_in=${newToken.expires_in}s）`);
+      return newToken.access_token;
+    } catch (e: any) {
+      console.error(`[getValidToken] shop ${shopId} ❌ token 刷新失败: ${e.message}`);
+      // 兜底：旧 token 还在 grace 期内（过期不超过 30min）→ 继续用
+      if (expiresAt > now - FALLBACK_GRACE_MS) {
+        console.warn(`[getValidToken] shop ${shopId} 刷新失败但旧 token 仍在 grace 期内，继续使用`);
+        return shop.access_token;
+      }
+      throw new Error(`Token 刷新失败: ${e.message}，请重新授权`);
+    } finally {
+      refreshLocks.delete(shopId);
+    }
+  })();
+
+  refreshLocks.set(shopId, refreshPromise);
+  return refreshPromise;
+}
+
+/** 后台调度：定期扫描所有店铺，提前刷新即将过期的 token（每 5 分钟一次） */
+export function startTokenScheduler() {
+  if (schedulerStarted) return;
+  schedulerStarted = true;
+  console.log('[tokenScheduler] ✅ 已启动 - 5 分钟扫描一次所有店铺的 token 状态');
+
+  setInterval(async () => {
+    try {
+      const db = getDb();
+      // 找出所有启用了同步的店铺
+      const shops = db.prepare(`
+        SELECT id, name, token_expires_at, refresh_token FROM tiktok_shops
+        WHERE sync_enabled = 1 AND refresh_token != ''
+      `).all() as any[];
+
+      const now = Date.now();
+      const windowMs = 30 * 60 * 1000; // 30 分钟内即将过期的就预刷
+
+      for (const shop of shops) {
+        const expiresAt = shop.token_expires_at ? new Date(shop.token_expires_at).getTime() : 0;
+        if (expiresAt > 0 && expiresAt < now + windowMs) {
+          try {
+            await getValidToken(shop.id);
+            console.log(`[tokenScheduler] shop ${shop.id} (${shop.name}) 已预刷`);
+          } catch (e: any) {
+            console.warn(`[tokenScheduler] shop ${shop.id} 预刷失败: ${e.message}`);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error('[tokenScheduler] 扫描异常:', e.message);
+    }
+  }, SCHEDULE_INTERVAL_MS);
+}
+
+/** 健康检查：返回所有店铺的 token 状态（用于运维/告警） */
+export function getTokenHealth() {
+  const db = getDb();
+  const shops = db.prepare(`
+    SELECT id, name, region, token_expires_at, refresh_token, sync_enabled
+    FROM tiktok_shops ORDER BY id
+  `).all() as any[];
+
+  const now = Date.now();
+  return shops.map(s => {
+    const expiresAt = s.token_expires_at ? new Date(s.token_expires_at).getTime() : 0;
+    const hasRefresh = !!s.refresh_token;
+    const isExpired = expiresAt > 0 && expiresAt < now;
+    const isExpiringSoon = expiresAt > 0 && expiresAt < now + 10 * 60 * 1000;
+    const hasFailures = (failureCounters.get(s.id) || 0) > 0;
+    return {
+      id: s.id, name: s.name, region: s.region, sync_enabled: !!s.sync_enabled,
+      token_expires_at: s.token_expires_at,
+      seconds_remaining: Math.max(0, Math.floor((expiresAt - now) / 1000)),
+      status: !hasRefresh ? 'no_refresh_token' : isExpired ? 'expired' : isExpiringSoon ? 'expiring_soon' : 'healthy',
+      consecutive_refresh_failures: failureCounters.get(s.id) || 0,
+      needs_reauth: hasFailures,
+    };
+  });
 }
 
 // ── 获取已授权的店铺列表 ──

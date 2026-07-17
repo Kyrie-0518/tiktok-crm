@@ -61,6 +61,7 @@ export async function syncShopProducts(
     access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
+    shopId,
   });
 
   const platform = 'tiktok';
@@ -162,6 +163,7 @@ export async function syncSingleProduct(
     access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
+    shopId,
   });
 
   try {
@@ -199,6 +201,7 @@ export async function syncBrands(
     access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: '202309',
+    shopId,
   });
 
   try {
@@ -233,6 +236,7 @@ export async function syncCategories(
     access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: '202309',
+    shopId,
   });
 
   try {
@@ -266,6 +270,7 @@ export async function syncProductDiagnostics(
     access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: '202405',
+    shopId,
   });
 
   try {

@@ -10,6 +10,8 @@ export interface TikTokAuth {
   access_token: string;
   shop_cipher: string;
   api_version?: string;
+  /** 店铺 ID — 设置后，401 会自动用 getValidToken 强制刷新并重试一次 */
+  shopId?: number;
 }
 
 /** 对请求进行 HMAC-SHA256 签名（官方算法） */

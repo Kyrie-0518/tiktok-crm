@@ -5,6 +5,7 @@
  * API 版本覆盖：202309 ~ 202606（共 18 个版本，54 个商品 API 方法）
  */
 import { buildSignedRequest, TikTokAuth } from '../utils/tiktok-sign';
+import { getValidToken } from './tiktok-oauth';
 
 export class TikTokAPI {
   private auth: TikTokAuth;
@@ -33,45 +34,67 @@ export class TikTokAPI {
     body?: Record<string, any>,
     apiVersionOverride?: string,
   ): Promise<any> {
-    const { url, headers } = buildSignedRequest(this.auth, endpoint, queryParams, body, apiVersionOverride);
+    // 最多 2 次：第一次失败 + 401 且配置了 shopId → 自动刷 token 重试
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const { url, headers } = buildSignedRequest(this.auth, endpoint, queryParams, body, apiVersionOverride);
 
-    const fetchOptions: RequestInit = { method, headers };
-    if (method !== 'GET' && body && Object.keys(body).length > 0) {
-      fetchOptions.body = JSON.stringify(body);
-    }
+      const fetchOptions: RequestInit = { method, headers };
+      if (method !== 'GET' && body && Object.keys(body).length > 0) {
+        fetchOptions.body = JSON.stringify(body);
+      }
 
-    console.log(`[TikTokAPI] → ${method} ${url}`);
-    if (body && Object.keys(body).length > 0) {
-      console.log(`[TikTokAPI]   body:`, JSON.stringify(body).slice(0, 200));
-    }
+      if (attempt === 1) {
+        console.log(`[TikTokAPI] → ${method} ${url}`);
+        if (body && Object.keys(body).length > 0) {
+          console.log(`[TikTokAPI]   body:`, JSON.stringify(body).slice(0, 200));
+        }
+      }
 
-    let res: Response;
-    try {
-      res = await fetch(url, fetchOptions);
-    } catch (fetchErr: any) {
-      console.error(`[TikTokAPI] ❌ fetch() 底层失败:`, fetchErr.message);
-      throw new Error(`网络连接失败: ${fetchErr.message || fetchErr} (${url})`);
-    }
-
-    const text = await res.text();
-
-    if (!res.ok) {
-      let errMsg = `TikTok API ${res.status}`;
+      let res: Response;
       try {
-        const errJson = JSON.parse(text);
-        errMsg = errJson.message || errJson.msg || errMsg;
-      } catch { /* ignore parse error */ }
-      console.error(`[TikTokAPI] ❌ HTTP ${res.status}:`, text.slice(0, 500));
-      throw new Error(`[${res.status}] ${errMsg}`);
+        res = await fetch(url, fetchOptions);
+      } catch (fetchErr: any) {
+        console.error(`[TikTokAPI] ❌ fetch() 底层失败:`, fetchErr.message);
+        throw new Error(`网络连接失败: ${fetchErr.message || fetchErr} (${url})`);
+      }
+
+      const text = await res.text();
+
+      // 401 + 配置了 shopId + 第一次尝试 → 自动强制刷新 + 重试
+      if (res.status === 401 && this.auth.shopId && attempt === 1) {
+        console.warn(`[TikTokAPI] 🔐 401 race condition detected, force-refreshing token for shop ${this.auth.shopId}...`);
+        try {
+          const fresh = await getValidToken(this.auth.shopId);
+          this.auth.access_token = fresh;
+          console.log(`[TikTokAPI] 🔄 token 已更新，重试请求`);
+          continue; // 重新 build url（用新 token）并 fetch
+        } catch (e: any) {
+          console.error(`[TikTokAPI] 自动刷新后仍失败: ${e.message}`);
+          // 继续走下面的 401 报错流程
+        }
+      }
+
+      if (!res.ok) {
+        let errMsg = `TikTok API ${res.status}`;
+        try {
+          const errJson = JSON.parse(text);
+          errMsg = errJson.message || errJson.msg || errMsg;
+        } catch { /* ignore parse error */ }
+        console.error(`[TikTokAPI] ❌ HTTP ${res.status}:`, text.slice(0, 500));
+        throw new Error(`[${res.status}] ${errMsg}`);
+      }
+
+      try {
+        const json = JSON.parse(text);
+        console.log(`[TikTokAPI] ← code=${json.code}, message=${json.message || json.msg || 'OK'}`);
+        return json;
+      } catch {
+        return text;
+      }
     }
 
-    try {
-      const json = JSON.parse(text);
-      console.log(`[TikTokAPI] ← code=${json.code}, message=${json.message || json.msg || 'OK'}`);
-      return json;
-    } catch {
-      return text;
-    }
+    // 理论上不会到这里（循环里要么 return 要么 throw）
+    throw new Error('TikTokAPI: unexpected end of request loop');
   }
 
   private get(endpoint: string, queryParams?: Record<string, string>, apiVersionOverride?: string) {

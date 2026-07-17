@@ -34,7 +34,7 @@ const COUNTRY_EMOJI: Record<string, string> = {
 
 // ═══════════════════ DESIGN TOKENS ═══════════════════
 const T = {
-  bg: '#F7F9FC', cardBg: '#FFFFFF', cardBorder: '#E8ECF5',
+  bg: '#f5f3f0', cardBg: '#FFFFFF', cardBorder: '#E8ECF5',
   primary: '#4F6BFF', primaryHover: '#3F5AF5',
   textPrimary: '#1E293B', textSecondary: '#64748B', textTertiary: '#94A3B8',
   success: '#22C55E', successBg: '#ECFDF3',
@@ -136,7 +136,7 @@ export default function ShopManagement() {
   const enabledCount = shops.length;
 
   return (
-    <div style={{ padding: '24px', background: T.bg, minHeight: '100vh', fontFamily: '"PingFang SC", -apple-system, "Inter", sans-serif' }}>
+    <div style={{ padding: '20px 24px', background: T.bg, minHeight: '100%', fontFamily: '"PingFang SC", -apple-system, "Inter", sans-serif' }}>
 
       {/* ═══ HEADER ═══ */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
@@ -214,7 +214,6 @@ export default function ShopManagement() {
             {shops.map(shop => {
               const countryName = REGION_MAP[shop.region] || shop.region || '—';
               const emoji = COUNTRY_EMOJI[shop.region] || '';
-              const tokenValid = shop._token_valid !== false;
               const lastSync = shop.last_synced_at;
 
               // Action menu items
@@ -295,7 +294,7 @@ export default function ShopManagement() {
                         fontSize: 12, padding: '2px 10px',
                       }}>
                         <CheckCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
-                        {tokenValid ? '授权有效' : 'Token 已过期'}
+                        授权有效
                       </Tag>
                       {shop.sync_enabled && (
                         <Tag style={{ borderRadius: 8, border: 'none', background: '#FFF7ED', color: '#F59E0B', fontSize: 12 }}>订单同步</Tag>

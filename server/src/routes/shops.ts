@@ -3,6 +3,7 @@ import getDb from '../db';
 import authMiddleware from '../middleware/auth';
 import { syncShopOrders, testApiConnection, resyncAllOrderItems } from '../services/order-sync';
 import { syncShopProducts } from '../services/tiktok-product-sync';
+import { getTokenHealth } from '../services/tiktok-oauth';
 
 const router = Router();
 
@@ -222,6 +223,23 @@ router.post('/:id/test', authMiddleware, async (req: Request, res: Response) => 
     res.json(result);
   } catch (e: any) {
     res.status(500).json({ success: false, message: `测试异常: ${e.message}` });
+  }
+});
+
+// GET /api/shops/token-health — 所有店铺 token 健康状态（运维/告警用）
+router.get('/token-health', authMiddleware, (_req: Request, res: Response) => {
+  try {
+    const health = getTokenHealth();
+    const needsAttention = health.filter(h => h.status !== 'healthy');
+    res.json({
+      success: true,
+      total: health.length,
+      healthy: health.length - needsAttention.length,
+      needs_attention: needsAttention.length,
+      shops: health,
+    });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 

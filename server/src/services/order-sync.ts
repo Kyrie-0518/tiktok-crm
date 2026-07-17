@@ -72,6 +72,7 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
     access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
+    shopId,
   });
 
   try {
@@ -411,6 +412,7 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
     access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
+    shopId,
   });
 
   const apiBase = process.env.TIKTOK_API_BASE || 'https://open-api.tiktokglobalshop.com';
@@ -479,6 +481,7 @@ export async function resyncAllOrderItems(shopId: number): Promise<{ processed: 
     access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
+    shopId,
   });
 
   // 2. 从数据库取出所有该店铺的订单号
