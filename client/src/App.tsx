@@ -201,7 +201,7 @@ function AppLayout() {
         --bo-success: #22C55E;
         --bo-warning: #F59E0B;
         --bo-danger: #EF4444;
-        --bo-bg: #F7F9FC;
+        --bo-bg: #f5f3f0;
         --bo-sider-bg: #FFFFFF;
         --bo-border: #E8ECF5;
         --bo-text-primary: #1E293B;
@@ -209,7 +209,7 @@ function AppLayout() {
         --bo-text-tertiary: #94A3B8;
         --bo-logo-color: #1E293B;
         --bo-menu-bg: #FFFFFF;
-        --bo-content-bg: #F7F9FC;
+        --bo-content-bg: #f5f3f0;
         --bo-user-color: #475569;
         --bo-user-role-color: #94a3b8;
         --bo-sider-border: #E8ECF5;
@@ -788,7 +788,7 @@ function AppLayout() {
       {/* ═══ 主内容区 ═══ */}
       <Layout style={{
         marginLeft: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 0 : (siderCollapsed ? 56 : 240),
-        background: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'transparent' : '#F7F9FC',
+        background: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'transparent' : '#f5f3f0',
         transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <Content style={{
