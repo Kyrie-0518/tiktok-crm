@@ -781,7 +781,7 @@ export default function Finance() {
   );
 
   return (
-    <div style={{ padding: '20px 24px', background: '#F7F8FA', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
       {/* 页面标题 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{

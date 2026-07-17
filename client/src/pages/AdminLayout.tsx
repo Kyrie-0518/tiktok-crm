@@ -78,7 +78,7 @@ export default function AdminLayout() {
         :root {
           --admin-primary: #4568FF;
           --admin-primary-light: #6B8CFF;
-          --admin-bg: #F7F8FA;
+          --admin-bg: #f5f3f0;
           --admin-sider-bg: #ffffff;
           --admin-border: #EEF1F6;
           --admin-text: #172033;
@@ -300,7 +300,7 @@ export default function AdminLayout() {
               style={{
                 padding: '20px',
                 minHeight: `calc(100vh - ${HEADER_H}px)`,
-                background: '#F7F8FA',
+                background: '#f5f3f0',
               }}
             >
               <ActiveComponent />

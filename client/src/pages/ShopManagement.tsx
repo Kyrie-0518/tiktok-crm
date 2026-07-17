@@ -35,7 +35,7 @@ const COUNTRY_EMOJI: Record<string, string> = {
 
 // ═══════════════════ DESIGN TOKENS ═══════════════════
 const T = {
-  bg: '#F7F8FA', cardBg: '#FFFFFF', cardBorder: '#EEF1F6',
+  bg: '#f5f3f0', cardBg: '#FFFFFF', cardBorder: '#EEF1F6',
   primary: '#4568FF', primaryHover: '#3B56E5',
   textPrimary: '#172033', textSecondary: '#64748B', textTertiary: '#94A3B8',
   success: '#22C55E', successBg: '#F0FDF4',

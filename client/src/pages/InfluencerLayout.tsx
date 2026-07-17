@@ -109,7 +109,7 @@ export default function InfluencerLayout() {
         :root {
           --inf-primary: ${PRIMARY};
           --inf-primary-light: ${PRIMARY_LIGHT};
-          --inf-bg: #F7F8FA;
+          --inf-bg: #f5f3f0;
           --inf-sider-bg: #ffffff;
           --inf-border: #e8e5e0;
           --inf-text: #172033;
