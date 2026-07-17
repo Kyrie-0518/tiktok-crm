@@ -194,7 +194,7 @@ export default function Kyrie() {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: `16px 12px`, overflow: 'auto' }}>
+        <nav style={{ flexShrink: 0, padding: `16px 12px 8px` }}>
           <Space direction="vertical" size={4} style={{ width: '100%' }}>
             {NAV_ITEMS.map(item => {
               const active = activeNav === item.key;
