@@ -46,9 +46,7 @@ const AGENT_REQUEST_TIMEOUT_MS = 180_000;
 // ════════════════════════════════════════
 const NAV_ITEMS = [
   { key: 'dashboard', icon: <ThunderboltOutlined />, label: '工作台' },
-  { key: 'chat', icon: <RobotOutlined />, label: 'AI助手' },
-  { key: 'knowledge', icon: <BookOutlined />, label: '知识库' },
-  { key: 'settings', icon: <SettingOutlined />, label: '设置' },
+  { key: 'chat', icon: <RobotOutlined />, label: 'AI 对话' },
 ];
 
 // ════════════════════════════════════════
@@ -281,26 +279,24 @@ export default function Kyrie() {
               <ThunderboltOutlined style={{ fontSize: 20, color: '#fff' }} />
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: T.textPrimary, lineHeight: 1.3 }}>早上好，欢迎回来</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: T.textPrimary, lineHeight: 1.3 }}>
+                {(() => {
+                  const h = new Date().getHours();
+                  if (h < 6) return '夜深了，注意休息';
+                  if (h < 12) return '早上好，欢迎回来';
+                  if (h < 14) return '中午好，休息一下';
+                  if (h < 18) return '下午好，继续加油';
+                  return '晚上好，今天辛苦了';
+                })()}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Text style={{ fontSize: 12, color: T.textTertiary }}>欧文正在管理你的跨境业务</Text>
               </div>
             </div>
           </div>
-          <Space size={12}>
-            {/* Status pill */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 14px', borderRadius: 20,
-              background: '#ECFDF3', fontSize: 12, color: '#16A34A',
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: 3, background: '#22C55E' }} />
-              Agent 在线
-            </div>
-            <div style={{ fontSize: 11, color: T.textTertiary }}>
-              已连接 <span style={{ color: T.primary, fontWeight: 600 }}>TikTok Shop</span> · <span style={{ color: T.primary, fontWeight: 600 }}>Ads</span> · <span style={{ color: T.primary, fontWeight: 600 }}>ERP</span>
-            </div>
-          </Space>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Avatar size={32} style={{ background: T.primary, fontWeight: 600 }}>K</Avatar>
+          </div>
         </header>
 
         {/* ── MAIN AREA (DASHBOARD or CHAT) ── */}
