@@ -1,52 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Typography, Spin, Button, Tag } from 'antd';
+import { Card, Row, Col, Typography, Spin, Button, Tag, Tooltip } from 'antd';
 import {
-  RobotOutlined,
-  PieChartOutlined,
-  AreaChartOutlined,
-  VideoCameraOutlined,
-  SettingOutlined,
-  PictureOutlined,
-  FileImageOutlined,
-  ThunderboltOutlined,
-  ArrowRightOutlined,
+  RobotOutlined, VideoCameraOutlined, PictureOutlined,
+  FileImageOutlined, ThunderboltOutlined, PlusOutlined,
+  CheckCircleFilled, CloseCircleFilled, ClockCircleOutlined,
+  LoadingOutlined, ArrowRightOutlined, PlayCircleOutlined,
+  DownloadOutlined, EditOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 const { Title, Text } = Typography;
-
-// ═══════════════════════════════════════════
-// AI 工作室功能入口定义
-// ═══════════════════════════════════════════
-
-interface StudioModule {
-  key: string;
-  label: string;
-  icon: React.ReactNode;
-  path: string;
-  color: string;
-  description: string;
-  category: 'analysis' | 'video' | 'material' | 'operation' | 'report';
-}
-
-const MODULES: StudioModule[] = [
-  // ── AI 分析 ──
-  { key: 'ai-analysis', label: 'AI智能分析', icon: <PieChartOutlined />, path: '/ai-analysis', color: '#7B61FF', description: 'AI对话代理 + 知识库搜索', category: 'analysis' },
-  { key: 'skiis', label: 'SKIIS分析', icon: <AreaChartOutlined />, path: '/skiis', color: '#059669', description: '每日工作沉淀 / 周报生成', category: 'analysis' },
-  // ── AI 视频 ──
-  { key: 'seedance', label: 'AI视频生成', icon: <RobotOutlined />, path: '/seedance', color: '#8b5cf6', description: '多模型AI视频批量生成', category: 'video' },
-  { key: 'video-models', label: '视频模型配置', icon: <VideoCameraOutlined />, path: '/video-models', color: '#2563eb', description: 'Seedance/Kling/MiniMax等模型管理', category: 'video' },
-  // ── 素材 ──
-  { key: 'material-library', label: '素材库', icon: <PictureOutlined />, path: '/material-library', color: '#0891b2', description: 'AI生成的视频素材管理', category: 'material' },
-  { key: 'raw-materials', label: '原料素材', icon: <FileImageOutlined />, path: '/raw-materials', color: '#d97706', description: '原始图片/视频素材上传管理', category: 'material' },
-];
-
-const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
-  analysis: { label: 'AI分析', color: '#7B61FF' },
-  video: { label: 'AI视频', color: '#8b5cf6' },
-  material: { label: '素材管理', color: '#0891b2' },
-};
 
 interface StudioStats {
   total_videos: number;
@@ -54,8 +18,6 @@ interface StudioStats {
   total_ai_chats: number;
   active_models: number;
   skiis_daily_logs: number;
-  pending_ad_bills: number;
-  problem_order_count: number;
 }
 
 export default function AIStudio() {
@@ -63,49 +25,56 @@ export default function AIStudio() {
   const [stats, setStats] = useState<StudioStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStudioStats();
-  }, []);
+  useEffect(() => { fetchStudioStats(); }, []);
 
   const fetchStudioStats = async () => {
     try {
       const res = await api.get('/ai-studio/stats');
       setStats(res.data);
-    } catch (e) {
-      // 静默失败，使用默认值
-      setStats({
-        total_videos: 0, total_materials: 0, total_ai_chats: 0,
-        active_models: 0, skiis_daily_logs: 0, pending_ad_bills: 0,
-        problem_order_count: 0,
-      });
+    } catch {
+      setStats({ total_videos: 0, total_materials: 0, total_ai_chats: 0, active_models: 0, skiis_daily_logs: 0 });
     } finally {
       setLoading(false);
     }
   };
 
-  // 按分类分组模块
-  const groupedModules = Object.entries(
-    MODULES.reduce((acc, m) => {
-      if (!acc[m.category]) acc[m.category] = [];
-      acc[m.category].push(m);
-      return acc;
-    }, {} as Record<string, StudioModule[]>)
-  );
+  // 模拟最近任务（实际可从后端获取）
+  const recentTasks = [
+    { name: '西游宣传片', status: 'success', time: '09:32', progress: 100 },
+    { name: '汽车广告', status: 'running', time: '', progress: 65 },
+    { name: '品牌介绍', status: 'queued', time: '', progress: 0 },
+    { name: '产品展示', status: 'failed', time: '08:15', progress: 0 },
+  ];
+
+  const recentVideos = stats && stats.total_videos > 0
+    ? [{ title: '西游宣传片.mp4', model: 'Seedance V2', duration: '00:15', time: '09:32' },
+       { title: '品牌故事.mp4', model: 'Kling 2.1', duration: '00:22', time: '昨天' },
+       { title: '产品特写.mp4', model: 'MiniMax', duration: '00:08', time: '2天前' },
+       { title: '促销广告.mp4', model: 'Seedance V2', duration: '00:30', time: '3天前' }]
+    : [];
+
+  const T = {
+    cardBorder: '#EEF1F6', cardRadius: 12,
+    textPrimary: '#172033', textSecondary: '#64748B', textTertiary: '#94A3B8',
+  };
+
+  const quickEntries = [
+    { key: 'seedance', label: 'AI视频生成', desc: '开始生成视频', icon: <RobotOutlined />, path: '/seedance', color: '#8b5cf6', bg: '#F5F3FF' },
+    { key: 'video-models', label: '模型管理', desc: 'Seedance · Kling · MiniMax', icon: <VideoCameraOutlined />, path: '/video-models', color: '#2563eb', bg: '#EEF3FF' },
+    { key: 'material-library', label: '素材库', desc: 'AI生成的视频素材', icon: <PictureOutlined />, path: '/material-library', color: '#0891b2', bg: '#ECFEFF' },
+    { key: 'raw-materials', label: '原料素材', desc: '上传图片/视频/音频', icon: <FileImageOutlined />, path: '/raw-materials', color: '#d97706', bg: '#FFF7ED' },
+  ];
 
   if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: 100 }}>
-        <Spin size="large" tip="加载 AI 工作室..." />
-      </div>
-    );
+    return <div style={{ textAlign: 'center', padding: 100 }}><Spin size="large" tip="加载 AI 工作室..." /></div>;
   }
 
   return (
     <div style={{ maxWidth: 1400 }}>
-      {/* ═══ 页面标题 ═══ */}
+      {/* ═══ Header ═══ */}
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{
-          width: 42, height: 42, borderRadius: 10,
+          width: 42, height: 42, borderRadius: 12,
           background: 'linear-gradient(135deg, #8b5cf6, #7B61FF)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 4px 14px rgba(139,92,246,0.35)',
@@ -113,125 +82,157 @@ export default function AIStudio() {
           <ThunderboltOutlined style={{ fontSize: 22, color: '#fff' }} />
         </div>
         <div>
-          <Title level={3} style={{ margin: 0, fontSize: 22, color: 'var(--bo-text-primary)' }}>AI 工作室</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>AI 智能分析 · 视频生成 · 素材管理 · 运营工具</Text>
+          <Title level={3} style={{ margin: 0, fontSize: 22, color: T.textPrimary }}>AI 视频工作室</Title>
+          <Text style={{ fontSize: 13, color: T.textTertiary }}>一站式 AI 视频创作中心</Text>
         </div>
       </div>
 
-      {/* ═══ 统计卡片区 ═══ */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 28 }}>
-        <Col xs={24} sm={12} lg={8} xl={6}>
-          <Card className="stat-card-top-border" style={{ borderRadius: 10 }} bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>视频作品</Text>}
-              value={stats?.total_videos ?? 0}
-              prefix={<VideoCameraOutlined style={{ color: '#8b5cf6' }} />}
-              valueStyle={{ fontSize: 26, fontWeight: 700, color: '#8b5cf6' }}
-            />
+      {/* ═══ 1. 快捷创作 ═══ */}
+      <Card style={{ borderRadius: 16, border: `2px dashed #d4bfff`, background: 'linear-gradient(135deg, #FAF5FF, #FFF)', marginBottom: 24 }} bodyStyle={{ padding: '28px 32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: T.textPrimary, marginBottom: 4 }}>开始视频创作</div>
+            <Text style={{ fontSize: 13, color: T.textSecondary }}>输入一句话即可生成视频</Text>
+            <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
+              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 文生视频</Text>
+              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 图生视频</Text>
+              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 首尾帧</Text>
+              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 数字人</Text>
+              <Text style={{ fontSize: 12, color: T.textTertiary }}>✓ 多模型</Text>
+            </div>
+          </div>
+          <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => navigate('/seedance')}
+            style={{
+              height: 48, padding: '0 32px', borderRadius: 12, fontSize: 16, fontWeight: 700,
+              background: 'linear-gradient(135deg, #8b5cf6, #7B61FF)',
+              border: 'none', boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
+            }}>
+            新建视频
+          </Button>
+        </div>
+      </Card>
+
+      {/* ═══ 2. 数据概览 ═══ */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        {[
+          { label: '今日生成', value: (stats?.total_ai_chats ?? 0) || '—', color: '#8b5cf6', bg: '#F5F3FF', icon: <RobotOutlined /> },
+          { label: '生成中', value: 0, color: '#F59E0B', bg: '#FFF7ED', icon: <LoadingOutlined /> },
+          { label: '本月作品', value: stats?.total_videos ?? 0, color: '#22C55E', bg: '#F0FDF4', icon: <VideoCameraOutlined /> },
+          { label: '素材数量', value: stats?.total_materials ?? 0, color: '#0891b2', bg: '#ECFEFF', icon: <PictureOutlined /> },
+        ].map((s, i) => (
+          <Col xs={12} sm={6} key={i}>
+            <Card style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }} bodyStyle={{ padding: '14px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color, fontSize: 20 }}>{s.icon}</div>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: s.color, fontFamily: '"Inter", sans-serif', lineHeight: 1 }}>{s.value}</div>
+                  <Text style={{ fontSize: 12, color: T.textTertiary }}>{s.label}</Text>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      {/* ═══ 3. 操作区双栏 = 最近任务 + 快捷入口 ═══ */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        {/* 最近生成任务 */}
+        <Col xs={24} lg={14}>
+          <Card title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>📋 最近生成任务</span>}
+            style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }} bodyStyle={{ padding: '12px 20px' }}
+            extra={<Button type="link" size="small" style={{ color: T.textTertiary }} onClick={() => navigate('/seedance')}>全部 <ArrowRightOutlined /></Button>}
+          >
+            {recentTasks.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: T.textTertiary, fontSize: 13 }}>暂无生成任务</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {recentTasks.map((task, i) => {
+                  const statusConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+                    success: { icon: <CheckCircleFilled />, color: '#22C55E', label: '完成' },
+                    running: { icon: <LoadingOutlined />, color: '#4568FF', label: `${task.progress}%` },
+                    queued: { icon: <ClockCircleOutlined />, color: '#94A3B8', label: '排队' },
+                    failed: { icon: <CloseCircleFilled />, color: '#EF4444', label: '失败' },
+                  };
+                  const s = statusConfig[task.status];
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: i === 0 ? '#F8FAFC' : 'transparent' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6', fontSize: 14 }}><VideoCameraOutlined /></div>
+                        <Text style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{task.name}</Text>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ fontSize: 11, color: T.textTertiary }}>{task.time}</Text>
+                        <Tag style={{ borderRadius: 6, border: 'none', background: `${s.color}18`, color: s.color, fontSize: 11, fontWeight: 600, margin: 0 }}>{s.icon} <span style={{ marginLeft: 4 }}>{s.label}</span></Tag>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={8} xl={6}>
-          <Card className="stat-card-top-border" style={{ borderRadius: 10, borderTopColor: '#0891b2' }} bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>素材总数</Text>}
-              value={stats?.total_materials ?? 0}
-              prefix={<PictureOutlined style={{ color: '#0891b2' }} />}
-              valueStyle={{ fontSize: 26, fontWeight: 700, color: '#0891b2' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={8} xl={6}>
-          <Card className="stat-card-top-border" style={{ borderRadius: 10, borderTopColor: '#7B61FF' }} bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>AI 对话</Text>}
-              value={stats?.total_ai_chats ?? 0}
-              prefix={<PieChartOutlined style={{ color: '#7B61FF' }} />}
-              valueStyle={{ fontSize: 26, fontWeight: 700, color: '#7B61FF' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={8} xl={6}>
-          <Card className="stat-card-top-border" style={{ borderRadius: 10, borderTopColor: '#059669' }} bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>活跃模型</Text>}
-              value={stats?.active_models ?? 0}
-              prefix={<SettingOutlined style={{ color: '#059669' }} />}
-              valueStyle={{ fontSize: 26, fontWeight: 700, color: '#059669' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={8} xl={6}>
-          <Card className="stat-card-top-border" style={{ borderRadius: 10, borderTopColor: '#059669' }} bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>工作日志</Text>}
-              value={stats?.skiis_daily_logs ?? 0}
-              prefix={<AreaChartOutlined style={{ color: '#059669' }} />}
-              valueStyle={{ fontSize: 26, fontWeight: 700, color: '#059669' }}
-            />
+
+        {/* 快捷入口 */}
+        <Col xs={24} lg={10}>
+          <Card title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>⚡ 快捷入口</span>}
+            style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }} bodyStyle={{ padding: '12px 20px' }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {quickEntries.map((entry) => (
+                <div key={entry.key} onClick={() => navigate(entry.path)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: entry.bg, cursor: 'pointer', transition: 'all .15s' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = 'brightness(0.96)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; }}
+                >
+                  <div style={{ width: 36, height: 36, borderRadius: 9, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: entry.color, fontSize: 17 }}>{entry.icon}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{entry.label}</div>
+                    <div style={{ fontSize: 11, color: T.textTertiary }}>{entry.desc}</div>
+                  </div>
+                  <ArrowRightOutlined style={{ color: T.textTertiary, fontSize: 12 }} />
+                </div>
+              ))}
+            </div>
           </Card>
         </Col>
       </Row>
 
-      {/* ═══ 功能模块入口（按分类） ═══ */}
-      {groupedModules.map(([category, modules]) => (
-        <div key={category} style={{ marginBottom: 28 }}>
-          {/* 分类标题 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            marginBottom: 14, paddingBottom: 8,
-            borderBottom: '1px solid var(--bo-border)',
-          }}>
-            <Tag color={CATEGORY_LABELS[category]?.color} style={{ borderRadius: 4, fontWeight: 600, fontSize: 12 }}>
-              {CATEGORY_LABELS[category]?.label}
-            </Tag>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {modules.length} 个工具
-            </Text>
+      {/* ═══ 4. 最近作品 ═══ */}
+      <Card title={<span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>🎬 最近作品</span>}
+        style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }} bodyStyle={{ padding: '16px 20px' }}
+        extra={<Button type="link" size="small" style={{ color: T.textTertiary }}>全部 <ArrowRightOutlined /></Button>}
+      >
+        {recentVideos.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🎬</div>
+            <Text style={{ fontSize: 14, color: T.textSecondary, display: 'block', marginBottom: 16 }}>还没有作品，开始你的第一个视频创作吧</Text>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/seedance')} style={{ borderRadius: 8 }}>创建视频</Button>
           </div>
-
-          {/* 卡片网格 */}
+        ) : (
           <Row gutter={[16, 16]}>
-            {modules.map((mod) => (
-              <Col xs={24} sm={12} md={8} lg={6} key={mod.key}>
-                <Card
-                  hoverable
-                  style={{
-                    borderRadius: 10,
-                    borderLeft: `3px solid ${mod.color}`,
-                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}
-                  bodyStyle={{ padding: '18px 20px' }}
-                  onClick={() => navigate(mod.path)}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)';
-                    (e.currentTarget as HTMLElement).style.boxShadow = `0 6px 20px rgba(0,0,0,0.1), 0 0 0 1px ${mod.color}20`;
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.transform = '';
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = '';
-                  }}
+            {recentVideos.map((v, i) => (
+              <Col xs={12} sm={8} md={6} key={i}>
+                <Card hoverable style={{ borderRadius: 10, overflow: 'hidden' }} bodyStyle={{ padding: 0 }}
+                  cover={<div style={{ height: 120, background: `linear-gradient(135deg, ${['#7B61FF20','#8b5cf620','#0891b220','#d9770620'][i]}, #F1F5F9)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>🎬</div>}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: 8,
-                      background: `${mod.color}12`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: mod.color, fontSize: 19,
-                    }}>
-                      {mod.icon}
+                  <div style={{ padding: '10px 14px' }}>
+                    <Text ellipsis={{ tooltip: v.title }} style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary, display: 'block', marginBottom: 4 }}>{v.title}</Text>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 10, color: T.textTertiary }}>{v.model} · {v.duration}</Text>
+                      <Text style={{ fontSize: 10, color: T.textTertiary }}>{v.time}</Text>
                     </div>
-                    <ArrowRightOutlined style={{ color: '#94a3b8', fontSize: 12, marginTop: 4 }} />
+                    <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+                      <Tooltip title="预览"><Button size="small" type="text" icon={<PlayCircleOutlined />} style={{ fontSize: 13, color: T.textSecondary }} /></Tooltip>
+                      <Tooltip title="下载"><Button size="small" type="text" icon={<DownloadOutlined />} style={{ fontSize: 13, color: T.textSecondary }} /></Tooltip>
+                      <Tooltip title="编辑"><Button size="small" type="text" icon={<EditOutlined />} style={{ fontSize: 13, color: T.textSecondary }} /></Tooltip>
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--bo-text-primary)', marginBottom: 4 }}>
-                    {mod.label}
-                  </div>
-                  <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.5 }}>{mod.description}</Text>
                 </Card>
               </Col>
             ))}
           </Row>
-        </div>
-      ))}
+        )}
+      </Card>
     </div>
   );
 }

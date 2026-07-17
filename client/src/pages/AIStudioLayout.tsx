@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Layout, Menu, Button, Typography, Avatar } from 'antd';
 import {
-  RobotOutlined, PieChartOutlined, AreaChartOutlined,
+  RobotOutlined,
   VideoCameraOutlined, SettingOutlined, PictureOutlined,
   FileImageOutlined, ThunderboltOutlined,
   ArrowLeftOutlined,
@@ -44,20 +44,25 @@ const STUDIO_MENU_GROUPS = [
     ],
   },
   {
-    key: 'group-analysis',
-    label: '数据智能',
+    key: 'group-video',
+    label: '视频创作',
     items: [
-      { key: '/ai-studio/ai-analysis', icon: <PieChartOutlined />, label: 'AI智能分析' },
-      { key: '/ai-studio/skiis', icon: <AreaChartOutlined />, label: 'SKIIS分析' },
+      { key: '/ai-studio/seedance', icon: <VideoCameraOutlined />, label: 'AI视频生成' },
     ],
   },
   {
-    key: 'group-video',
-    label: 'AI 智创视频',
+    key: 'group-material',
+    label: '素材管理',
     items: [
-      { key: '/ai-studio/seedance', icon: <RobotOutlined />, label: 'AI视频生成' },
-      { key: '/ai-studio/material-library', icon: <PictureOutlined />, label: '素材库' },
       { key: '/ai-studio/raw-materials', icon: <FileImageOutlined />, label: '原料素材' },
+      { key: '/ai-studio/material-library', icon: <PictureOutlined />, label: 'AI 素材库' },
+    ],
+  },
+  {
+    key: 'group-models',
+    label: '模型管理',
+    items: [
+      { key: '/ai-studio/video-models', icon: <SettingOutlined />, label: '视频模型配置' },
     ],
   },
 ];
