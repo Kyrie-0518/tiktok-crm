@@ -107,22 +107,22 @@ export default function Dashboard() {
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
-            <Card title="店铺概况" bodyStyle={{ padding: '14px 18px', flex: 1 }}>
-              <div style={{ marginBottom: 8 }}>
-                <Text style={{ fontSize: 11, color: T.textTertiary, display: 'block' }}>💰 累计销售额</Text>
-                <Text strong style={{ fontSize: 22, color: T.primary, fontFamily: '"Inter", sans-serif' }}>
-                  RM {data.cards.total_revenue_myr.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Card title="店铺概况" bodyStyle={{ padding: '12px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+                <Text style={{ fontSize: 11, color: T.textTertiary }}>💰 累计销售</Text>
+                <Text strong style={{ fontSize: 20, color: T.primary, fontFamily: '"Inter", sans-serif' }}>
+                  RM {(data.cards.total_revenue_myr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </div>
-              <div style={{ display: 'flex', gap: 16, paddingTop: 8, borderTop: `1px dashed ${T.cardBorder}` }}>
-                <div><Text style={{ fontSize: 11, color: T.textTertiary }}>🛒 订单</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_orders}</Text></div></div>
-                <div><Text style={{ fontSize: 11, color: T.textTertiary }}>📦 商品</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_products}</Text></div></div>
-                <div><Text style={{ fontSize: 11, color: T.textTertiary }}>👤 达人</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_influencers}</Text></div></div>
+              <div style={{ display: 'flex', gap: 12, paddingTop: 8, borderTop: `1px dashed ${T.cardBorder}` }}>
+                <div style={{ flex: 1 }}><Text style={{ fontSize: 10, color: T.textTertiary }}>订单</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_orders}</Text></div></div>
+                <div style={{ flex: 1 }}><Text style={{ fontSize: 10, color: T.textTertiary }}>商品</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_products}</Text></div></div>
+                <div style={{ flex: 1 }}><Text style={{ fontSize: 10, color: T.textTertiary }}>达人</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_influencers}</Text></div></div>
               </div>
             </Card>
 
-            <Card title="📦 订单状态" bodyStyle={{ padding: '14px 18px', flex: 1 }}>
+            <Card title="📦 订单状态" bodyStyle={{ padding: '12px 16px' }}>
               {(() => {
                 const s = data.order_status_counts || {};
                 const items: { key: string; label: string; color: string; match: (k: string) => boolean }[] = [
@@ -132,16 +132,16 @@ export default function Dashboard() {
                   { key: 'cancelled', label: '异常', color: '#EF4444', match: k => k === 'cancelled' || k === 'refunded' || k === 'auto_cancelled' || k === 'exception' },
                 ];
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
                     {items.map(item => {
                       const count = Object.entries(s).filter(([k]) => item.match(k)).reduce((sum, [, v]) => sum + (v as number), 0);
                       return (
-                        <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: 6, background: `${item.color}0D` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <div style={{ width: 6, height: 6, borderRadius: 3, background: item.color }} />
-                            <Text style={{ fontSize: 13, color: T.textSecondary }}>{item.label}</Text>
+                            <Text style={{ fontSize: 12, color: T.textSecondary }}>{item.label}</Text>
                           </div>
-                          <Text strong style={{ fontSize: 14, color: item.color, fontFamily: '"Inter", sans-serif' }}>{count}</Text>
+                          <Text strong style={{ fontSize: 13, color: item.color, fontFamily: '"Inter", sans-serif' }}>{count}</Text>
                         </div>
                       );
                     })}
