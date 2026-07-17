@@ -47,7 +47,6 @@ export default function Dashboard() {
   // ── 衍生指标 ──
   const avgOrderValue = data ? data.cards.total_revenue_myr / Math.max(1, data.cards.total_orders) : 0;
   const totalSalesQty = data ? data.top_products.reduce((s, p) => s + (p.total_qty || 0), 0) : 0;
-  const orderTrendRevenue = data?.order_trend.reduce((s, d) => s + d.revenue_myr, 0) || 0;
   const topProductName = data?.top_products?.[0]?.name || '—';
 
   // 趋势图时间范围（近7天/近30天）
@@ -67,12 +66,12 @@ export default function Dashboard() {
     chart.setOption({
       backgroundColor: 'transparent',
       tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: T.cardBorder, textStyle: { color: '#333', fontSize: 12 }, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
-      legend: { bottom: 0, textStyle: { fontSize: 11, color: T.textTertiary }, itemWidth: 12, itemHeight: 8 },
-      grid: { left: '3%', right: '5%', top: '8%', bottom: '12%' },
-      xAxis: { type: 'category', data: trendData.map(d => d.date.slice(5)), axisLine: { lineStyle: { color: T.cardBorder } }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary } },
+      legend: { bottom: 4, textStyle: { fontSize: 11, color: T.textTertiary }, itemWidth: 14, itemHeight: 8, itemGap: 16 },
+      grid: { left: 50, right: 60, top: 20, bottom: 56 },
+      xAxis: { type: 'category', data: trendData.map(d => d.date.slice(5)), axisLine: { lineStyle: { color: T.cardBorder } }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary, margin: 14 } },
       yAxis: [
-        { type: 'value', name: '单', nameTextStyle: { color: T.textTertiary, fontSize: 10 }, splitLine: { lineStyle: { color: '#F1F5F9' } }, axisLabel: { fontSize: 10, color: T.textTertiary } },
-        { type: 'value', name: 'RM', nameTextStyle: { color: T.textTertiary, fontSize: 10 }, splitLine: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary, formatter: (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v) } },
+        { type: 'value', name: '订单数', nameTextStyle: { color: T.textTertiary, fontSize: 10, padding: [0, 0, 6, 0] }, splitLine: { lineStyle: { color: '#F1F5F9' } }, axisLabel: { fontSize: 10, color: T.textTertiary, margin: 12 } },
+        { type: 'value', name: '销售额', nameTextStyle: { color: T.textTertiary, fontSize: 10, padding: [0, 0, 6, 0] }, splitLine: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary, margin: 12, formatter: (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v) } },
       ],
       series: [
         {
@@ -96,7 +95,12 @@ export default function Dashboard() {
   if (loading) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" tip="加载仪表盘数据..." /></div>;
   if (error || !data) return <Result status="error" title="加载失败" subTitle={error || '请刷新重试'} extra={<Button type="primary" icon={<ReloadOutlined />} onClick={fetchDashboard}>重新加载</Button>} />;
 
-  const trendSummary = `近${trendRange === '7d' ? 7 : 30}天 销售额 RM${orderTrendRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · 订单 ${trendData.reduce((s, d) => s + d.order_count, 0)} · 日均 ${Math.round(trendData.reduce((s, d) => s + d.order_count, 0) / trendRange.length)} 单`;
+  const trendSummary = (() => {
+    const days = trendRange === '7d' ? 7 : 30;
+    const totalOrders = trendData.reduce((s, d) => s + d.order_count, 0);
+    const totalRevenue = trendData.reduce((s, d) => s + d.revenue_myr, 0);
+    return `近${days}天 销售额 RM${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · 订单 ${totalOrders} · 日均 ${Math.round(totalOrders / Math.max(trendData.length, 1))} 单`;
+  })();
 
   return (
     <div style={{ fontFamily: '"PingFang SC", -apple-system, "Inter", sans-serif' }}>
