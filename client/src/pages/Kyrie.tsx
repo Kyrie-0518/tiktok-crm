@@ -188,8 +188,8 @@ export default function Kyrie() {
             <ThunderboltOutlined style={{ fontSize: 20, color: '#fff' }} />
           </div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: T.textPrimary, lineHeight: 1.2 }}>Bozone</div>
-            <div style={{ fontSize: 11, color: T.textTertiary, lineHeight: 1 }}>AI Workspace</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: T.textPrimary, lineHeight: 1.2 }}>Uncle Drew</div>
+            <div style={{ fontSize: 11, color: T.textTertiary, lineHeight: 1 }}>Agent Workspace</div>
           </div>
         </div>
 
