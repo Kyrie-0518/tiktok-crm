@@ -21,6 +21,8 @@ interface DashboardData {
     id: number; name: string; sku: string; image: string;
     sell_price: number; total_qty: number; total_sales_myr: number; order_times: number;
   }>;
+  order_status_counts: Record<string, number>;
+  product_health: { total: number; in_stock: number; out_of_stock: number; with_sales: number; without_sales: number };
 }
 
 const T = {
@@ -195,60 +197,118 @@ export default function Dashboard() {
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card
-            title={<Text strong style={{ fontSize: 15, color: T.textPrimary }}>店铺概况</Text>}
-            style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
-            bodyStyle={{ padding: '16px 20px' }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[
-                { label: '累计销售额', value: `RM ${data.cards.total_revenue_myr.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: <DollarOutlined />, color: '#4F6BFF' },
-                { label: '累计订单', value: data.cards.total_orders.toString(), icon: <ShoppingCartOutlined />, color: '#22C55E' },
-                { label: '商品数量', value: `${data.cards.total_products}`, icon: <AppstoreOutlined />, color: '#8B5CF6' },
-                { label: '达人数量', value: `${data.cards.total_influencers}`, icon: <UserOutlined />, color: '#F59E0B' },
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, fontSize: 13 }}>
-                      {item.icon}
-                    </div>
-                    <Text style={{ fontSize: 13, color: T.textSecondary }}>{item.label}</Text>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
+            {/* 店铺概况 */}
+            <Card
+              title={<Text strong style={{ fontSize: 14, color: T.textPrimary }}>店铺概况</Text>}
+              style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
+              bodyStyle={{ padding: '14px 18px' }}
+            >
+              <div style={{ marginBottom: 8 }}>
+                <Text style={{ fontSize: 11, color: T.textTertiary, display: 'block' }}>💰 累计销售额</Text>
+                <Text strong style={{ fontSize: 22, color: T.primary, fontFamily: '"Inter", sans-serif' }}>
+                  RM {data.cards.total_revenue_myr.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </Text>
+              </div>
+              <div style={{ display: 'flex', gap: 16, paddingTop: 8, borderTop: `1px dashed ${T.cardBorder}` }}>
+                <div><Text style={{ fontSize: 11, color: T.textTertiary }}>🛒 订单</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_orders}</Text></div></div>
+                <div><Text style={{ fontSize: 11, color: T.textTertiary }}>📦 商品</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_products}</Text></div></div>
+                <div><Text style={{ fontSize: 11, color: T.textTertiary }}>👤 达人</Text><div><Text strong style={{ fontSize: 14, color: T.textPrimary }}>{data.cards.total_influencers}</Text></div></div>
+              </div>
+            </Card>
+
+            {/* 订单状态 */}
+            <Card
+              title={<Text strong style={{ fontSize: 14, color: T.textPrimary }}>📦 订单状态</Text>}
+              style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow, flex: 1 }}
+              bodyStyle={{ padding: '14px 18px' }}
+            >
+              {(() => {
+                const s = data.order_status_counts || {};
+                const items: { key: string; label: string; color: string; bg: string; match: (k: string) => boolean }[] = [
+                  { key: 'pending', label: '待发货', color: '#F59E0B', bg: '#FFFBEB', match: k => k === 'pending' || k === 'to_pack' || k === 'awaiting_shipment' },
+                  { key: 'shipped', label: '运输中', color: '#4F6BFF', bg: '#EEF3FF', match: k => k === 'shipped' || k === 'in_transit' || k === 'to_confirm' },
+                  { key: 'completed', label: '已完成', color: '#22C55E', bg: '#F0FDF4', match: k => k === 'completed' || k === 'delivered' || k === 'done' || k === 'finished' },
+                  { key: 'cancelled', label: '异常', color: '#EF4444', bg: '#FEF2F2', match: k => k === 'cancelled' || k === 'refunded' || k === 'auto_cancelled' || k === 'exception' },
+                ];
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {items.map(item => {
+                      const count = Object.entries(s).filter(([k]) => item.match(k)).reduce((sum, [, v]) => sum + (v as number), 0);
+                      return (
+                        <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: 3, background: item.color }} />
+                            <Text style={{ fontSize: 13, color: T.textSecondary }}>{item.label}</Text>
+                          </div>
+                          <Text strong style={{ fontSize: 14, color: item.color, fontFamily: '"Inter", sans-serif' }}>{count}</Text>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <Text strong style={{ fontSize: 14, color: T.textPrimary }}>{item.value}</Text>
-                </div>
-              ))}
-            </div>
-          </Card>
+                );
+              })()}
+            </Card>
+
+            {/* 商品健康度 */}
+            <Card
+              title={<Text strong style={{ fontSize: 14, color: T.textPrimary }}>📊 商品健康度</Text>}
+              style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
+              bodyStyle={{ padding: '14px 18px' }}
+            >
+              {(() => {
+                const h = data.product_health || { total: 0, in_stock: 0, out_of_stock: 0, with_sales: 0, without_sales: 0 };
+                const items = [
+                  { label: '正常商品', count: h.in_stock, color: '#22C55E', bg: '#F0FDF4' },
+                  { label: '缺货', count: h.out_of_stock, color: '#EF4444', bg: '#FEF2F2' },
+                  { label: '未销售', count: h.without_sales, color: '#F59E0B', bg: '#FFFBEB' },
+                ];
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {items.map((item, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 8, background: item.bg }}>
+                        <Text style={{ fontSize: 12, color: T.textSecondary }}>{item.label}</Text>
+                        <Text strong style={{ fontSize: 14, color: item.color, fontFamily: '"Inter", sans-serif' }}>{item.count}</Text>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </Card>
+          </div>
         </Col>
       </Row>
 
       {/* ═══ Row 3: 商品销售表现 ═══ */}
       <Card
         title={
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: '#FFF7ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: '#FFF7ED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <TrophyOutlined style={{ color: '#F59E0B', fontSize: 16 }} />
               </div>
               <div>
-                <Text strong style={{ fontSize: 15, color: T.textPrimary, display: 'block', lineHeight: 1.3 }}>商品销售表现</Text>
-                <Text style={{ fontSize: 11, color: T.textTertiary }}>Top 商品 · 销售贡献</Text>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Text strong style={{ fontSize: 15, color: T.textPrimary, lineHeight: 1.3 }}>商品销售表现</Text>
+                  <Tag style={{ borderRadius: 6, border: 'none', background: T.primaryLight, color: T.primary, fontSize: 11, fontWeight: 600, margin: 0, lineHeight: '20px' }}>
+                    共 {data.top_products.length} 个
+                  </Tag>
+                </div>
+                <Text style={{ fontSize: 11, color: T.textTertiary, lineHeight: 1.3 }}>Top 商品 · 销售贡献</Text>
               </div>
-              <Tag style={{ borderRadius: 6, border: 'none', background: T.primaryLight, color: T.primary, fontSize: 11, fontWeight: 600, marginLeft: 4 }}>
-                共 {data.top_products.length} 个
-              </Tag>
             </div>
           </div>
         }
         style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
+        styles={{ header: { padding: '16px 24px', borderBottom: `1px solid ${T.cardBorder}` } }}
         bodyStyle={{ padding: 0 }}
       >
-        {/* ═══ TOP 4 Bento Cards ═══ */}
+        {/* ═══ TOP 3 Bento Cards ═══ */}
         {data.top_products.length > 0 && (
-          <div style={{ padding: '20px 24px 12px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-            {data.top_products.slice(0, 4).map((p, i) => {
-              const topColors = ['#F59E0B', '#94A3B8', '#F97316', T.primary];
-              const topLabels = ['TOP 1', 'TOP 2', 'TOP 3', 'TOP 4'];
+          <div style={{ padding: '20px 24px 12px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            {data.top_products.slice(0, 3).map((p, i) => {
+              const topColors = ['#F59E0B', '#94A3B8', '#F97316'];
+              const topLabels = ['TOP 1', 'TOP 2', 'TOP 3'];
               const pct = data.cards.total_revenue_myr > 0 ? ((p.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0;
               return (
                 <div key={p.id}

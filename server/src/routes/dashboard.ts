@@ -79,11 +79,39 @@ router.get('/', authMiddleware, (_req: Request, res: Response) => {
       `).all() as any[];
     } catch {}
 
+    // 订单状态分布（按 status 分组统计）
+    let orderStatusCounts: Record<string, number> = {};
+    try {
+      const rows = db.prepare(`SELECT status, COUNT(*) as c FROM orders GROUP BY status`).all() as any[];
+      for (const r of rows) orderStatusCounts[r.status || 'unknown'] = r.c;
+    } catch {}
+
+    // 商品健康度
+    let productHealth = { total: totalProducts, in_stock: 0, out_of_stock: 0, with_sales: 0, without_sales: 0 };
+    try {
+      const stockRow = db.prepare(`SELECT
+        SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END) as in_stock,
+        SUM(CASE WHEN stock <= 0 THEN 1 ELSE 0 END) as out_of_stock
+      FROM products`).get() as any;
+      productHealth.in_stock = stockRow?.in_stock || 0;
+      productHealth.out_of_stock = stockRow?.out_of_stock || 0;
+
+      const salesRow = db.prepare(`SELECT
+        COUNT(DISTINCT p.id) as with_sales
+      FROM products p
+      INNER JOIN order_items oi ON p.id = oi.product_id
+      INNER JOIN orders o ON oi.order_id = o.id AND o.status NOT IN ('cancelled','auto_cancelled','refunded')`).get() as any;
+      productHealth.with_sales = salesRow?.with_sales || 0;
+      productHealth.without_sales = Math.max(0, totalProducts - productHealth.with_sales);
+    } catch {}
+
     res.json({
       cards: { total_orders: totalOrders, today_orders: todayOrders, total_products: totalProducts, total_influencers: totalInfluencers, total_revenue_myr: Math.round((rev.r||0)*100)/100 },
       order_trend: trend.map((d:any) => ({ date: d.date, order_count: d.order_count, revenue_myr: Math.round(parseFloat(d.revenue)*100)/100 })),
       profit_overview: { total_profit_rmb: Math.round(profit.total_profit*100)/100, total_investment_rmb: Math.round(profit.total_investment*100)/100, overall_roi: profit.overall_roi, product_with_records: profit.product_count },
       top_products: top.map((p:any) => ({ id: p.id, name: p.name, sku: p.sku, image: p.image, sell_price: p.sell_price||0, total_qty: parseInt(p.total_qty)||0, total_sales_myr: Math.round(parseFloat(p.total_sales)*100)/100, order_times: parseInt(p.order_times)||0 })),
+      order_status_counts: orderStatusCounts,
+      product_health: productHealth,
     });
   } catch (err: any) {
     console.error('[Dashboard]', err.message);
