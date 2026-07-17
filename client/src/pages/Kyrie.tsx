@@ -6,7 +6,7 @@ import {
   SendOutlined, ThunderboltOutlined, BarChartOutlined,
   DollarOutlined, BookOutlined, UserOutlined,
   LoadingOutlined, ClockCircleOutlined, PlusOutlined,
-  DeleteOutlined, DeleteSweepOutlined, StarOutlined, StarFilled, CopyOutlined,
+  DeleteOutlined, ClearOutlined, StarOutlined, StarFilled, CopyOutlined,
   RobotOutlined, AppstoreOutlined, SettingOutlined,
   SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
   ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined,
@@ -227,7 +227,7 @@ export default function Kyrie() {
           <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={{ fontSize: 12, color: T.textTertiary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>最近对话</Text>
             <Space size={4}>
-              <Button type="text" size="small" title="清空所有" icon={<DeleteSweepOutlined style={{ fontSize: 13 }} />} onClick={() => { if (sessions.length) Modal.confirm({ title: `清空 ${sessions.length} 个对话？`, okType: 'danger', okText: '清空', onOk: () => setSessions([]) }); }} style={{ color: T.textTertiary }} />
+              <Button type="text" size="small" title="清空所有" icon={<ClearOutlined style={{ fontSize: 13 }} />} onClick={() => { if (sessions.length) Modal.confirm({ title: `清空 ${sessions.length} 个对话？`, okType: 'danger', okText: '清空', onOk: () => setSessions([]) }); }} style={{ color: T.textTertiary }} />
               <Button type="text" size="small" title="新建对话" icon={<PlusOutlined />} onClick={handleNewSession} style={{ color: T.textTertiary }} />
             </Space>
           </div>
