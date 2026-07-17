@@ -209,26 +209,57 @@ export default function Dashboard() {
         style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
         bodyStyle={{ padding: 0 }}
       >
-        {/* Top 5 Cards */}
+        {/* Top 4 Cards with product images */}
         {data.top_products.length > 0 && (
           <Row gutter={[12, 12]} style={{ padding: '20px 24px 8px' }}>
             {data.top_products.slice(0, 4).map((p, i) => (
               <Col xs={12} sm={6} key={p.id}>
                 <div style={{
-                  padding: '14px 16px', borderRadius: 16,
-                  background: i === 0 ? `linear-gradient(135deg, ${T.primaryLight || '#EEF3FF'}, #FFF)` : '#FAFBFC',
+                  display: 'flex', gap: 12, alignItems: 'center',
+                  padding: '12px 14px', borderRadius: 16,
+                  background: i === 0 ? `linear-gradient(135deg, ${T.primaryLight}, #FFF)` : '#FAFBFC',
                   border: `1px solid ${T.cardBorder}`, height: '100%',
-                }}>
-                  <Tag color={i === 0 ? 'gold' : 'default'} style={{ borderRadius: 6, marginBottom: 6 }}>#{i + 1}</Tag>
-                  <Text strong ellipsis style={{ fontSize: 13, color: T.textPrimary, display: 'block', marginBottom: 6 }}>{p.name}</Text>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <div>
-                      <Text style={{ fontSize: 10, color: T.textTertiary, display: 'block' }}>销量</Text>
-                      <Text strong style={{ fontSize: 14, color: T.textPrimary }}>{p.total_qty}</Text>
+                  transition: 'all 0.2s', cursor: 'pointer',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = T.primary; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.cardBorder; e.currentTarget.style.transform = 'none'; }}>
+                  {/* Product image with rank badge */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    {p.image ? (
+                      <img src={p.image} alt={p.name}
+                        style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', background: '#F1F5F9' }}
+                        onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                    ) : null}
+                    <div style={{
+                      display: p.image ? 'none' : 'flex',
+                      width: 56, height: 56, borderRadius: 12, background: '#F1F5F9',
+                      alignItems: 'center', justifyContent: 'center', color: T.textTertiary, fontSize: 22,
+                    }}>
+                      <AppstoreOutlined />
                     </div>
-                    <div>
-                      <Text style={{ fontSize: 10, color: T.textTertiary, display: 'block' }}>销售额</Text>
-                      <Text strong style={{ fontSize: 14, color: T.primary }}>RM{p.total_sales_myr?.toFixed(2)}</Text>
+                    <div style={{
+                      position: 'absolute', top: -6, left: -6,
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: i === 0 ? '#F59E0B' : i === 1 ? '#94A3B8' : i === 2 ? '#CD7F32' : T.primary,
+                      color: '#fff', fontSize: 11, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                    }}>{i + 1}</div>
+                  </div>
+                  {/* Product info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text strong ellipsis={{ tooltip: p.name }} style={{ fontSize: 13, color: T.textPrimary, display: 'block', marginBottom: 6, lineHeight: 1.4 }}>
+                      {p.name}
+                    </Text>
+                    <div style={{ display: 'flex', gap: 14 }}>
+                      <div>
+                        <Text style={{ fontSize: 10, color: T.textTertiary, display: 'block', lineHeight: 1.2 }}>销量</Text>
+                        <Text strong style={{ fontSize: 14, color: T.textPrimary }}>{p.total_qty}</Text>
+                      </div>
+                      <div>
+                        <Text style={{ fontSize: 10, color: T.textTertiary, display: 'block', lineHeight: 1.2 }}>销售额</Text>
+                        <Text strong style={{ fontSize: 14, color: T.primary }}>RM{p.total_sales_myr?.toFixed(2)}</Text>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -236,7 +267,7 @@ export default function Dashboard() {
             ))}
           </Row>
         )}
-        {/* Full Table */}
+        {/* Full Table with product images */}
         <Table
           dataSource={data.top_products}
           rowKey="id"
@@ -245,7 +276,20 @@ export default function Dashboard() {
           style={{ marginTop: data.top_products.length > 0 ? 0 : 0 }}
           columns={[
             { title: '排名', width: 60, render: (_: any, __: any, i: number) => <Tag color={i < 3 ? 'gold' : 'default'} style={{ borderRadius: 6 }}>{i + 1}</Tag> },
-            { title: '商品名称', dataIndex: 'name', ellipsis: true },
+            { title: '商品', dataIndex: 'name', width: 360, ellipsis: true,
+              render: (_: any, r: any) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {r.image ? (
+                    <img src={r.image} alt={r.name} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: '#F1F5F9' }} onError={(e: any) => { e.target.style.display = 'none'; }} />
+                  ) : (
+                    <div style={{ width: 40, height: 40, borderRadius: 8, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textTertiary, fontSize: 16, flexShrink: 0 }}>
+                      <AppstoreOutlined />
+                    </div>
+                  )}
+                  <Text ellipsis={{ tooltip: r.name }} style={{ fontSize: 13, color: T.textPrimary }}>{r.name}</Text>
+                </div>
+              ),
+            },
             { title: '售价', dataIndex: 'sell_price', width: 90, align: 'right' as const, render: (v: number) => v ? `RM${v.toFixed(2)}` : '-' },
             { title: '销量', dataIndex: 'total_qty', width: 70, align: 'right' as const },
             { title: '销售额', dataIndex: 'total_sales_myr', width: 110, align: 'right' as const, render: (v: number) => v ? <Text strong style={{ color: T.primary }}>RM{v.toFixed(2)}</Text> : '-' },
