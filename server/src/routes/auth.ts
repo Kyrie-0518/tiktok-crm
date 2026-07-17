@@ -34,6 +34,7 @@ router.post('/login', (req: Request, res: Response) => {
     display_name: user.display_name || user.username,
     email: user.email || '',
     role_id: user.role_id,
+    identity: user.identity || 'USER',
   });
 });
 
@@ -57,6 +58,7 @@ router.get('/me', authMiddleware, (req: Request, res: Response) => {
     role_name: row.role_name,
     role_id: row.role_id,
     role_key: row.role_key,
+    identity: row.identity || 'USER',
   });
 });
 

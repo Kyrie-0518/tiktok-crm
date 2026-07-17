@@ -20,10 +20,10 @@ export default function Login() {
         username: values.username,
         password: values.password,
       });
-      const { token, username, display_name, permissions, role_name, role_key, email } = res.data;
+      const { token, username, display_name, permissions, role_name, role_key, email, identity } = res.data;
       setAuth(token, username, permissions || {}, role_name || '', role_key || 'staff', undefined, display_name || username);
-      // 如果返回了 email，也存下来
       if (email) localStorage.setItem('erp_email', email);
+      if (identity) localStorage.setItem('erp_identity', identity);
       message.success('登录成功');
       const redirect = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
       navigate(redirect, { replace: true });

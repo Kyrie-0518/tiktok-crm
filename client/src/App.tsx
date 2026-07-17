@@ -181,6 +181,7 @@ function AppLayout() {
   const username = useAuthStore((s) => s.username);
   const displayName = useAuthStore((s) => s.displayName);
   const userEmail = useAuthStore((s) => s.email);
+  const userIdentity = useAuthStore((s) => s.identity);
 
   const isDevOrAdmin = true; // 开发阶段：所有用户都是管理员
 
@@ -789,8 +790,13 @@ function AppLayout() {
                       color: 'var(--bo-text-tertiary)',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {username}@bozone.cn
+                      {userEmail || '未绑定邮箱'}
                     </div>
+                    {userIdentity === 'SUPER_ADMIN' && (
+                      <div style={{ fontSize: 10, color: '#4F6BFF', fontWeight: 600, marginTop: 2 }}>
+                        🛡 系统管理员
+                      </div>
+                    )}
                   </div>
                 </div>
                 <CaretDownOutlined style={{ fontSize: 10, color: 'var(--bo-group-label-color)', flexShrink: 0 }} />

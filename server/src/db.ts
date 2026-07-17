@@ -545,6 +545,9 @@ function initTables() {
   if (!allUserCols.includes('email')) {
     db.exec("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''");
   }
+  if (!allUserCols.includes('identity')) {
+    db.exec("ALTER TABLE users ADD COLUMN identity TEXT DEFAULT 'USER'");
+  }
 
   // Seed default admin if not exist — 随机生成密码+首次强制修改
   const existingAdmin = db.prepare("SELECT id, role_id FROM users WHERE username = 'admin'").get() as any;
@@ -572,10 +575,10 @@ function initTables() {
   const kyrieUser = db.prepare("SELECT id FROM users WHERE username = 'Kyrie'").get() as any;
   if (!kyrieUser) {
     const hash = bcrypt.hashSync('Ljy231228.', 10);
-    db.prepare("INSERT INTO users (username, password, role_id, display_name, password_changed) VALUES (?, ?, 1, ?, 0)").run('Kyrie', hash, '开发者');
+    db.prepare("INSERT INTO users (username, password, role_id, display_name, password_changed, identity) VALUES (?, ?, 1, ?, 0, 'SUPER_ADMIN')").run('Kyrie', hash, '开发者');
   } else {
-    // Ensure Kyrie is developer (role_id=1) and force password change
-    db.prepare('UPDATE users SET role_id = 1, display_name = ?, password_changed = 0 WHERE username = ?').run('开发者', 'Kyrie');
+    // Ensure Kyrie is developer (role_id=1), SUPER_ADMIN, force password change
+    db.prepare('UPDATE users SET role_id = 1, display_name = ?, identity = ?, password_changed = 0 WHERE username = ?').run('开发者', 'SUPER_ADMIN', 'Kyrie');
   }
 
   // Add commission_rate to orders if missing (for profit calculation linkage)
