@@ -78,11 +78,10 @@ export function buildSignedRequest(
   // 从 endpoint 推断 API category（orders → order, products → product 等）
   const rawCategory = endpoint.split('/')[0] || endpoint;
   const category = CATEGORY_MAP[rawCategory] || rawCategory;
-  // 如果 endpoint 第一段是已知的分类前缀且包含子路径，去掉前缀（如 products/search → search）
-  let endpointWithoutCategory = endpoint;
-  if (rawCategory in CATEGORY_MAP && endpoint.includes('/')) {
-    endpointWithoutCategory = endpoint.slice(rawCategory.length + 1);
-  }
+  // 如果 endpoint 的 prefix 和 category 相同，去掉重复（如 affiliate_creator/profiles → profiles）
+  const endpointWithoutCategory = (rawCategory === category && endpoint.startsWith(rawCategory + '/'))
+    ? endpoint.slice(rawCategory.length + 1)
+    : endpoint;
   // 使用环境变量 TIKTOK_API_BASE，支持沙箱/生产环境切换
   // 官方 SDK basePath: https://open-api.tiktokglobalshop.com（不含 /api，详见 affiliateCreatorV202508Api.ts:24）
   const apiBase = (process.env.TIKTOK_API_BASE || 'https://open-api.tiktokglobalshop.com').replace(/\/$/, '');

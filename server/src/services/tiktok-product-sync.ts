@@ -48,7 +48,10 @@ export async function syncShopProducts(
   `).get(shopId) as any;
 
   if (!shop) {
-    return { created: 0, updated: 0, skipped: 0, errors: ['店铺未启用产品同步或无凭证'] };
+    // 诊断：检查店铺是否存在
+    const anyShop = db.prepare('SELECT id, name, product_sync_enabled, shop_cipher, api_version, status, sync_enabled FROM tiktok_shops WHERE id = ?').get(shopId) as any;
+    console.error(`[ProductSync] 店铺未启用: shopId=${shopId} actual=${JSON.stringify(anyShop)}`);
+    return { created: 0, updated: 0, skipped: 0, errors: [`店铺 id=${shopId} 未启用产品同步 (product_sync_enabled=${anyShop?.product_sync_enabled})`] };
   }
   let validToken: string;
   try { validToken = await getValidToken(shopId); } catch (e: any) { return { created: 0, updated: 0, skipped: 0, errors: [e.message] }; }
