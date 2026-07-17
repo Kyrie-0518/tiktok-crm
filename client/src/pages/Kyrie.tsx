@@ -6,7 +6,7 @@ import {
   SendOutlined, ThunderboltOutlined, BarChartOutlined,
   DollarOutlined, BookOutlined, UserOutlined,
   LoadingOutlined, ClockCircleOutlined, PlusOutlined,
-  DeleteOutlined, StarOutlined, StarFilled, CopyOutlined,
+  DeleteOutlined, DeleteSweepOutlined, StarOutlined, StarFilled, CopyOutlined,
   RobotOutlined, AppstoreOutlined, SettingOutlined,
   SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
   ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined,
@@ -223,10 +223,13 @@ export default function Kyrie() {
         </nav>
 
         {/* Session list — 紧贴设置下方 */}
-        <div style={{ borderTop: `1px solid ${T.cardBorder}`, marginTop: 12, paddingTop: 12, flexShrink: 0, maxHeight: 260, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '12px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ borderTop: `1px solid ${T.cardBorder}`, marginTop: 8, paddingTop: 8, flexShrink: 0, maxHeight: 260, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={{ fontSize: 12, color: T.textTertiary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>最近对话</Text>
-            <Button type="text" size="small" icon={<PlusOutlined />} onClick={handleNewSession} style={{ color: T.textTertiary, fontSize: 12 }} />
+            <Space size={4}>
+              <Button type="text" size="small" title="清空所有" icon={<DeleteSweepOutlined style={{ fontSize: 13 }} />} onClick={() => { if (sessions.length) Modal.confirm({ title: `清空 ${sessions.length} 个对话？`, okType: 'danger', okText: '清空', onOk: () => setSessions([]) }); }} style={{ color: T.textTertiary }} />
+              <Button type="text" size="small" title="新建对话" icon={<PlusOutlined />} onClick={handleNewSession} style={{ color: T.textTertiary }} />
+            </Space>
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: '0 12px 12px' }}>
             {filteredSessions.slice(0, 6).map(s => (
