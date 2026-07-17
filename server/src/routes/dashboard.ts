@@ -39,6 +39,12 @@ router.get('/', authMiddleware, (_req: Request, res: Response) => {
       FROM orders
     `).get() as any;
 
+    // 今日销售额
+    const todayRev = db.prepare(`
+      SELECT COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','auto_cancelled','refunded') THEN actual_amount ELSE 0 END),0) as r
+      FROM orders WHERE ${orderDateExpr} = date('now')
+    `).get() as any;
+
     // 趋势
     let trend: any[] = [];
     try {
@@ -106,7 +112,7 @@ router.get('/', authMiddleware, (_req: Request, res: Response) => {
     } catch {}
 
     res.json({
-      cards: { total_orders: totalOrders, today_orders: todayOrders, total_products: totalProducts, total_influencers: totalInfluencers, total_revenue_myr: Math.round((rev.r||0)*100)/100 },
+      cards: { total_orders: totalOrders, today_orders: todayOrders, total_products: totalProducts, total_influencers: totalInfluencers, total_revenue_myr: Math.round((rev.r||0)*100)/100, today_revenue_myr: Math.round((todayRev.r||0)*100)/100 },
       order_trend: trend.map((d:any) => ({ date: d.date, order_count: d.order_count, revenue_myr: Math.round(parseFloat(d.revenue)*100)/100 })),
       profit_overview: { total_profit_rmb: Math.round(profit.total_profit*100)/100, total_investment_rmb: Math.round(profit.total_investment*100)/100, overall_roi: profit.overall_roi, product_with_records: profit.product_count },
       top_products: top.map((p:any) => ({ id: p.id, name: p.name, sku: p.sku, image: p.image, sell_price: p.sell_price||0, total_qty: parseInt(p.total_qty)||0, total_sales_myr: Math.round(parseFloat(p.total_sales)*100)/100, order_times: parseInt(p.order_times)||0 })),

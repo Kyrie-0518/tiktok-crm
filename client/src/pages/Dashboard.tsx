@@ -13,7 +13,8 @@ const { Text, Title } = Typography;
 interface DashboardData {
   cards: {
     total_orders: number; today_orders: number;
-    total_products: number; total_influencers: number; total_revenue_myr: number;
+    total_products: number; total_influencers: number;
+    total_revenue_myr: number; today_revenue_myr: number;
   };
   order_trend: Array<{ date: string; order_count: number; revenue_myr: number }>;
   profit_overview: { total_profit_rmb: number; total_investment_rmb: number; overall_roi: number; product_with_records: number; };
@@ -125,8 +126,8 @@ export default function Dashboard() {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {[
           {
-            label: '今日销售额', value: `RM ${(data.cards.total_revenue_myr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-            change: data.cards.today_orders > 0 ? `今日 +${data.cards.today_orders} 单` : null,
+            label: '总销售额', value: `RM ${(data.cards.total_revenue_myr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            change: data.cards.today_revenue_myr > 0 ? `今日 +RM ${(data.cards.today_revenue_myr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '今日无销售',
             icon: <DollarOutlined />, color: '#4F6BFF', bg: '#EEF3FF',
           },
           {
