@@ -1,10 +1,9 @@
 import React from 'react';
 import { Button as AntButton } from 'antd';
-import type { ButtonProps as AntButtonProps } from 'antd';
 
-type StatusType = 'primary' | 'default' | 'danger';
+type StatusType = 'primary' | 'default' | 'danger' | 'link' | 'text';
 
-interface ButtonProps extends Omit<AntButtonProps, 'type'> {
+interface ButtonProps {
   /** 按钮类型 */
   variant?: StatusType;
   /** 是否加载中 */
@@ -13,47 +12,63 @@ interface ButtonProps extends Omit<AntButtonProps, 'type'> {
   disabled?: boolean;
   /** 按钮文本/内容 */
   children?: React.ReactNode;
+  /** 按钮图标 */
+  icon?: React.ReactNode;
+  /** 点击事件 */
+  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
+  /** 自定义样式 */
+  style?: React.CSSProperties;
+  /** size */
+  size?: 'small' | 'middle' | 'large';
+  /** 块级 */
+  block?: boolean;
+  /** htmlType */
+  htmlType?: 'button' | 'submit' | 'reset';
+  /** className */
+  className?: string;
+  /** title */
+  title?: string;
 }
-
-/** variant → antd type 映射 */
-const TYPE_MAP: Record<StatusType, AntButtonProps['type']> = {
-  primary: 'primary',
-  default: 'default',
-  danger: 'primary',   // Ant Design 没有 danger type，用 danger prop
-};
 
 /**
  * 统一按钮组件
- * 
+ *
  * 规范: 36px 高 | 8px 圆角 | #4568FF 主色
- * 
- * 用法:
- * ```tsx
- * <Button variant="primary" icon={<PlusOutlined />}>新增商品</Button>
- * <Button variant="default" icon={<UploadOutlined />}>导入</Button>
- * <Button variant="danger">删除</Button>
- * ```
  */
-export default function Button({ variant = 'default', children, loading, disabled, style, ...rest }: ButtonProps) {
+export default function Button({
+  variant = 'default',
+  children,
+  loading,
+  disabled,
+  style,
+  ...rest
+}: ButtonProps) {
   const isDanger = variant === 'danger';
+
+  // 合并样式
+  const finalStyle: React.CSSProperties = {
+    height: variant === 'default' || variant === 'primary' || variant === 'danger' ? 'var(--bo-btn-height)' : undefined,
+    padding: variant === 'default' || variant === 'primary' || variant === 'danger' ? `0 var(--bo-btn-padding-x)` : undefined,
+    borderRadius: 'var(--bo-btn-radius)',
+    fontWeight: 500,
+    fontSize: 14,
+    ...(variant === 'default' && { border: '1px solid #DCE3F0', color: 'var(--bo-text-primary)' }),
+    ...(variant === 'primary' && {
+      background: 'var(--bo-primary)',
+      borderColor: 'var(--bo-primary)',
+      boxShadow: '0 2px 4px rgba(69,104,255,0.2)',
+    }),
+    ...style,
+  };
 
   return (
     <AntButton
       {...rest}
-      type={isDanger ? 'primary' : TYPE_MAP[variant] as AntButtonProps['type']}
+      type={isDanger ? 'primary' : (variant as any)}
       danger={isDanger}
       loading={loading}
       disabled={disabled}
-      style={{
-        height: 'var(--bo-btn-height)',
-        padding: `0 var(--bo-btn-padding-x)`,
-        borderRadius: 'var(--bo-btn-radius)',
-        fontWeight: 500,
-        fontSize: 14,
-        ...(variant === 'default' && { border: '1px solid #DCE3F0', color: 'var(--bo-text-primary)' }),
-        ...(variant === 'primary' && { background: 'var(--bo-primary)', borderColor: 'var(--bo-primary)', boxShadow: '0 2px 4px rgba(69,104,255,0.2)' }),
-        ...style,
-      }}
+      style={finalStyle}
     >
       {children}
     </AntButton>
