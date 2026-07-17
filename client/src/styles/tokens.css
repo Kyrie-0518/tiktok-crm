@@ -1,0 +1,83 @@
+/* ═══════════════════════════════════════════════
+   Bozone ERP Design System — 基础 Token v1.0
+   用途: 全局 CSS 变量，所有页面统一引用
+   ═══════════════════════════════════════════════ */
+
+:root {
+  /* ── 品牌色 ── */
+  --bo-primary: #4568FF;
+  --bo-primary-hover: #3B56E5;
+  --bo-primary-light: #EDF0FF;
+
+  /* ── 状态色 ── */
+  --bo-success: #22C55E;
+  --bo-success-bg: #F0FDF4;
+  --bo-warning: #F59E0B;
+  --bo-warning-bg: #FFFBEB;
+  --bo-danger: #EF4444;
+  --bo-danger-bg: #FEF2F2;
+
+  /* ── 背景层级 ── */
+  --bo-page-bg: #F7F8FA;
+  --bo-card-bg: #FFFFFF;
+  --bo-sider-bg: #FFFFFF;
+  --bo-header-bg: #FFFFFF;
+
+  /* ── 边框 ── */
+  --bo-border: #EEF1F6;
+
+  /* ── 文字层级 ── */
+  --bo-text-title: #172033;       /* 页面标题 / Card 标题 */
+  --bo-text-primary: #334155;     /* 正文 */
+  --bo-text-secondary: #64748B;   /* 辅助说明 */
+  --bo-text-weak: #94A3B8;        /* 描述 / 占位 */
+
+  /* ── 圆角 ── */
+  --bo-radius-sm: 6px;            /* Tag / Badge */
+  --bo-radius-md: 8px;            /* Button / Input */
+  --bo-radius-lg: 12px;           /* Card / Modal */
+
+  /* ── 阴影 ── */
+  --bo-shadow-sm: 0 2px 8px rgba(15,23,42,0.04);  /* Card */
+  --bo-shadow-md: 0 4px 16px rgba(15,23,42,0.06); /* hover */
+
+  /* ── 排版 ── */
+  --bo-font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --bo-font-mono: "Inter", "SF Mono", "Menlo", monospace;
+
+  /* 页面标题 */
+  --bo-page-title-size: 24px;
+  --bo-page-title-weight: 700;
+  --bo-page-desc-size: 14px;
+
+  /* Card */
+  --bo-card-title-size: 16px;
+  --bo-card-title-weight: 600;
+  --bo-card-padding: 20px;
+
+  /* DataCard (KPI) */
+  --bo-datacard-value-size: 28px;
+  --bo-datacard-value-weight: 700;
+
+  /* Table */
+  --bo-table-header-bg: #FAFBFC;
+  --bo-table-header-size: 13px;
+  --bo-table-row-size: 14px;
+  --bo-table-row-height: 64px;
+
+  /* Button */
+  --bo-btn-height: 36px;
+  --bo-btn-padding-x: 16px;
+  --bo-btn-radius: 8px;
+
+  /* Layout */
+  --bo-sider-width: 208px;
+  --bo-header-height: 56px;
+
+  /* 间距 */
+  --bo-space-xs: 8px;
+  --bo-space-sm: 12px;
+  --bo-space-md: 16px;
+  --bo-space-lg: 24px;
+  --bo-space-xl: 32px;
+}

@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, message, Tooltip, Avatar, Dropdown, Badge } from 'antd';
+import './styles/tokens.css';
+import { TABLE_CSS } from './components/design-system';
 import {
   ShopOutlined, UserOutlined,
   SettingOutlined, LogoutOutlined, RobotOutlined,
@@ -480,6 +482,9 @@ function AppLayout() {
         color: #64748B;
         line-height: 1.3;
       }
+
+      /* ═══ Design System: Table ═══ */
+      ${TABLE_CSS}
     `}</style>
 
     <Layout style={{ minHeight: '100vh', background: 'var(--bo-bg)' }}>
