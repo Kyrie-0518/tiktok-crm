@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Row, Col, Typography, Spin, Tag, Result, Select, Tooltip, Button } from 'antd';
+import { Row, Col, Typography, Spin, Tag, Result, Select, Tooltip, Button, Space } from 'antd';
 import {
   ShoppingCartOutlined, DollarOutlined, AppstoreOutlined,
   ReloadOutlined, BarChartOutlined, TrophyOutlined, RiseOutlined,
@@ -100,7 +100,7 @@ export default function Dashboard() {
   }, [trendData]);
 
   if (loading) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" tip="加载仪表盘数据..." /></div>;
-  if (error || !data) return <Result status="error" title="加载失败" subTitle={error || '请刷新重试'} extra={<button onClick={fetchDashboard} style={{ padding: '4px 16px', borderRadius: 8, border: '1px solid #DCE3F0', background: '#fff', cursor: 'pointer' }}>重新加载</button>} />;
+  if (error || !data) return <Result status="error" title="加载失败" subTitle={error || '请刷新重试'} extra={<button onClick={() => { fetchDashboard(false); }} style={{ padding: '4px 16px', borderRadius: 8, border: '1px solid #DCE3F0', background: '#fff', cursor: 'pointer' }}>重新加载</button>} />;
 
   const trendSummary = (() => {
     const days = trendRange === '7d' ? 7 : 30;
@@ -117,7 +117,7 @@ export default function Dashboard() {
           <Text style={{ fontSize: 11, color: '#94A3B8' }}>
             更新于 {lastUpdated.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} · 每小时自动刷新
           </Text>
-          <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchDashboard()}>刷新</Button>
+          <Button size="small" icon={<ReloadOutlined />} onClick={() => { fetchDashboard(false); }}>刷新</Button>
         </Space>
       </div>
 
@@ -263,7 +263,7 @@ export default function Dashboard() {
             { title: '商品', dataIndex: 'name', render: (_: any, r: any) => (<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>{r.image ? <img src={r.image} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: '#F8FAFC' }} onError={(e: any) => { e.target.style.display = 'none'; }} /> : <div style={{ width: 36, height: 36, borderRadius: 8, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><AppstoreOutlined style={{ color: T.textTertiary, fontSize: 14 }} /></div>}<Text ellipsis={{ tooltip: r.name }} style={{ fontSize: 13, color: T.textPrimary, maxWidth: 260 }}>{r.name}</Text></div>) },
             { title: '销量', dataIndex: 'total_qty', width: 70, align: 'right' as const, render: (v: number) => <Text strong style={{ fontSize: 13, color: T.textPrimary }}>{v}</Text> },
             { title: '销售额', dataIndex: 'total_sales_myr', width: 110, align: 'right' as const, render: (v: number) => <Text strong style={{ fontSize: 13, color: T.primary, fontFamily: '"Inter", sans-serif' }}>RM{v?.toFixed(2)}</Text> },
-            { title: '占比', width: 65, align: 'right' as const, render: (_: any, r: any) => { const pct = topProductsTotalRevenue > 0 ? ((r.total_sales_myr / topProductsTotalRevenue) * 100) : 0; return (<Tooltip title={`该商品占 Top 10 销售额的 ${pct.toFixed(1)}%（Top 10 合计 RM ${topProductsTotalRevenue.toFixed(2)}）`}><div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#F1F5F9', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: 2, background: pct > 30 ? T.primary : pct > 10 ? '#6B8CFF' : '#CBD5E1', transition: 'width 0.3s' }} /></div><Text style={{ fontSize: 11, color: T.textTertiary, minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</Text></div></Tooltip>); } },
+            { title: '占比', width: 65, align: 'right' as const, render: (_: any, r: any) => { const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0; return (<Tooltip title={`该商品占全店总营收的 ${pct.toFixed(2)}% — RM ${(r.total_sales_myr || 0).toFixed(2)} / 全店总营收 RM ${(data.cards.total_revenue_myr || 0).toFixed(2)}`}><div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#F1F5F9', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: 2, background: pct > 30 ? T.primary : pct > 10 ? '#6B8CFF' : '#CBD5E1', transition: 'width 0.3s' }} /></div><Text style={{ fontSize: 11, color: T.textTertiary, minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</Text></div></Tooltip>); } },
             { title: '趋势', width: 60, align: 'right' as const, render: (_: any, r: any, i: number) => { const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0; if (i < 2 || pct > 20) return <RiseOutlined style={{ color: '#22C55E', fontSize: 14 }} />; return <Text style={{ fontSize: 11, color: T.textTertiary }}>—</Text>; } },
             { title: '状态', width: 80, render: (_: any, r: any) => { const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0; if (pct > 30) return <Tag color="gold" style={{ borderRadius: 6, margin: 0, fontSize: 10, fontWeight: 600 }}>🔥 核心商品</Tag>; if (pct > 10) return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#F0FDF4', color: '#22C55E', border: 'none', fontWeight: 600 }}>📈 热销</Tag>; if (pct < 3) return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', fontWeight: 600 }}>⚠️ 慢销</Tag>; return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#F1F5F9', color: T.textTertiary, border: 'none' }}>正常</Tag>; } },
           ]}
