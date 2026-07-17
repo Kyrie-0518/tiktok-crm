@@ -179,7 +179,6 @@ export default function Products() {
         产品状态: STAT_LABEL[p.status] || p.status || '',
         重量: p.weight ? `${p.weight}g` : '',
         总库存: p.stock || 0,
-        总库存: p.stock || 0,
         SKU数量: p.skus?.length || 0,
         SKU明细: p.skus?.map((s: any) => `${s.spec_name}(${s.sku_code}) RM${s.sell_price} 库存${s.stock}`).join('; ') || '',
         供应商: p.supplier_name || '',
