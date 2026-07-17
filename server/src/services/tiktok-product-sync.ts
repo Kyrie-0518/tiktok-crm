@@ -29,13 +29,15 @@ interface SyncResult {
  * 同步指定店铺的产品
  * @param shopId 店铺 ID
  * @param options.syncDetails 是否同步每条产品的详情（默认 true）
+ * @param options.forceFull 强制全量同步（不传 update_time_from），默认 true（手动同步场景）
  * @returns 同步统计
  */
 export async function syncShopProducts(
   shopId: number,
-  options?: { syncDetails?: boolean },
+  options?: { syncDetails?: boolean; forceFull?: boolean },
 ): Promise<SyncResult> {
   const syncDetails = options?.syncDetails ?? true;
+  const forceFull = options?.forceFull ?? true; // 手动同步默认全量
   const db = getDb();
   const errors: string[] = [];
   let created = 0;
@@ -81,8 +83,8 @@ export async function syncShopProducts(
       };
       if (pageToken) params.page_token = pageToken;
 
-      // 增量：只拉更新过的
-      if (shop.last_synced_at) {
+      // 增量：只拉更新过的（手动同步默认 forceFull=true 不传 update_time_from）
+      if (!forceFull && shop.last_synced_at) {
         params.update_time_from = Math.floor(new Date(shop.last_synced_at).getTime() / 1000);
       }
 
@@ -91,7 +93,7 @@ export async function syncShopProducts(
       const totalFromApi = resp?.data?.total || productList.length;
 
       // 诊断日志：每次分页请求都打印（首次同步诊断问题用）
-      console.log(`[ProductSync] shop=${shopId}(${shop.name}) page=${page} last_synced_at=${shop.last_synced_at || 'NULL(全量)'} params=${JSON.stringify(params)} -> resp.data_keys=${resp?.data ? Object.keys(resp.data) : 'null'} products=${productList.length} total=${totalFromApi}`);
+      console.log(`[ProductSync] shop=${shopId}(${shop.name}) page=${page} forceFull=${forceFull} last_synced_at=${shop.last_synced_at || 'NULL'} params=${JSON.stringify(params)} -> resp.data_keys=${resp?.data ? Object.keys(resp.data) : 'null'} products=${productList.length} total=${totalFromApi}`);
       if (resp?.code && resp.code !== 0) {
         console.error(`[ProductSync] API 错误: code=${resp.code} message=${resp.message} request_id=${resp.request_id}`);
       }

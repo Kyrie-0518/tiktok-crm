@@ -270,9 +270,11 @@ router.post('/:id/resync-items', authMiddleware, async (req: Request, res: Respo
 });
 
 // POST /api/shops/:id/sync-products — 从 TikTok API 同步产品
+// body: { forceFull?: boolean } — 默认 true（手动同步默认全量）
 router.post('/:id/sync-products', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const result = await syncShopProducts(Number(req.params.id));
+    const forceFull = req.body?.forceFull !== false; // 默认全量
+    const result = await syncShopProducts(Number(req.params.id), { forceFull });
     res.json({
       success: result.errors.length === 0,
       ...result,
