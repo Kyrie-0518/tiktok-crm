@@ -516,20 +516,15 @@ function AppLayout() {
           borderBottom: `1px solid ${isDarkMode ? '#1e293b' : 'rgba(0,0,0,0.04)'}`,
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <img src="/logo-icon.png" alt="MERA"
-              style={{ width: 32, height: 32, flexShrink: 0 }}
+              style={{ width: 44, height: 44, flexShrink: 0 }}
             />
             {!siderCollapsed && (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{
-                  fontSize: 16, fontWeight: 700,
-                  color: 'var(--bo-logo-color)', lineHeight: 1.2,
-                }}>MERA</span>
-                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--bo-text-tertiary)', lineHeight: 1.2 }}>
-                  ERP
-                </span>
-              </div>
+              <span style={{
+                fontSize: 22, fontWeight: 800, letterSpacing: '0.5px',
+                color: 'var(--bo-logo-color)', lineHeight: 1,
+              }}>MERA</span>
             )}
           </div>
 
