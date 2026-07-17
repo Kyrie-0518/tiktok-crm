@@ -153,6 +153,7 @@ function AppLayout() {
   const isInAIStudio = location.pathname.startsWith('/ai-studio');
   const isInAdmin = location.pathname.startsWith('/admin');
   const isInInfluencerLayout = location.pathname.startsWith('/influencers');
+  const isInKyrie = location.pathname === '/kyrie';
   const [searchParams] = React.useMemo(() => {
     // 简单解析 URL search params
     const params = new URLSearchParams(location.search);
@@ -471,7 +472,7 @@ function AppLayout() {
         width={220}
         collapsedWidth={56}
         collapsible
-        collapsed={siderCollapsed || isInAIStudio || isInAdmin || isInInfluencerLayout}
+        collapsed={siderCollapsed || isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie}
         trigger={null}
         style={{
           background: 'var(--bo-sider-bg)',
@@ -481,8 +482,8 @@ function AppLayout() {
           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           display: 'flex', flexDirection: 'column',
           // AI工作室 / 管理后台页面隐藏主侧边栏
-          visibility: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 'hidden' : 'visible',
-          pointerEvents: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 'none' : 'auto',
+          visibility: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'hidden' : 'visible',
+          pointerEvents: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'none' : 'auto',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -782,13 +783,13 @@ function AppLayout() {
 
       {/* ═══ 主内容区（无 Header） ═══ */}
       <Layout style={{
-        marginLeft: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 0 : (siderCollapsed ? 56 : 220),
-        background: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 'transparent' : 'var(--bo-content-bg)',
+        marginLeft: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 0 : (siderCollapsed ? 56 : 220),
+        background: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 'transparent' : 'var(--bo-content-bg)',
         transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <Content style={{
-          padding: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? 0 : '20px',
-          height: (isInAIStudio || isInAdmin || isInInfluencerLayout) ? '100%' : '100vh', overflow: 'auto',
+          padding: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? 0 : '20px',
+          height: (isInAIStudio || isInAdmin || isInInfluencerLayout || isInKyrie) ? '100%' : '100vh', overflow: 'auto',
           background: 'transparent',
         }}>
           <Routes>
