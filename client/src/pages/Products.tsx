@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   Table, Button, Input, Select, Space, Modal, Form, InputNumber, Popconfirm, message, Dropdown, Divider, Tag, Spin
 } from 'antd';
@@ -37,6 +37,7 @@ export default function Products() {
   const store = useProductStore();
   const [keyword, setKeyword] = useState('');
   const [shopFilter, setShopFilter] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState<string | undefined>();
   // Product modal
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
@@ -172,9 +173,12 @@ export default function Products() {
     try {
       const { data } = await (await import('../api')).default.get('/products/export');
       const XLSX = await import('xlsx');
+      const STAT_LABEL: Record<string, string> = { active: '在售', inactive: '已下架', frozen: '已下架', deleted: '已删除', draft: '草稿', pending: '审核中', rejected: '未通过' };
       const ws = XLSX.utils.json_to_sheet(data.map((p: any) => ({
         产品名称: p.name,
+        产品状态: STAT_LABEL[p.status] || p.status || '',
         重量: p.weight ? `${p.weight}g` : '',
+        总库存: p.stock || 0,
         总库存: p.stock || 0,
         SKU数量: p.skus?.length || 0,
         SKU明细: p.skus?.map((s: any) => `${s.spec_name}(${s.sku_code}) RM${s.sell_price} 库存${s.stock}`).join('; ') || '',
@@ -301,6 +305,23 @@ export default function Products() {
       },
     },
     {
+      title: '产品状态', width: 90, align: 'center' as const,
+      render: (_: any, r: any) => {
+        const s = r.status || 'active';
+        const map: Record<string, { label: string; color: string }> = {
+          active: { label: '在售', color: '#22C55E' },
+          inactive: { label: '已下架', color: '#F59E0B' },
+          frozen: { label: '已下架', color: '#F59E0B' },
+          deleted: { label: '已删除', color: '#EF4444' },
+          draft: { label: '草稿', color: '#94A3B8' },
+          pending: { label: '审核中', color: '#4F6BFF' },
+          rejected: { label: '未通过', color: '#EF4444' },
+        };
+        const m = map[s] || { label: s, color: '#94A3B8' };
+        return <Tag style={{ borderRadius: 6, border: 'none', background: `${m.color}18`, color: m.color, fontSize: 11, fontWeight: 600, margin: 0 }}>{m.label}</Tag>;
+      },
+    },
+    {
       title: '售价', dataIndex: 'sell_price', width: 100, align: 'right' as const,
       render: (v: number) => v ? <span style={{ color: T.textPrimary, fontSize: 14, fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>RM {v.toFixed(2)}</span> : <span style={{ color: T.textTertiary }}>—</span>,
     },
@@ -344,6 +365,11 @@ export default function Products() {
       ),
     },
   ];
+
+  const filteredProducts = useMemo(() => {
+    if (!statusFilter) return store.products;
+    return store.products.filter(p => p.status === statusFilter);
+  }, [store.products, statusFilter]);
 
   return (
     <div style={{ padding: '20px 24px', background: 'var(--bo-page-bg)', minHeight: '100%' }}>
@@ -403,6 +429,22 @@ export default function Products() {
             allowClear
             options={store.shopList.map(s => ({ value: s, label: s }))}
           />
+          <Select
+            placeholder="产品状态"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            style={{ width: 120, borderRadius: 8 }}
+            allowClear
+            options={[
+              { value: 'active', label: '在售' },
+              { value: 'inactive', label: '已下架' },
+              { value: 'frozen', label: '已下架' },
+              { value: 'deleted', label: '已删除' },
+              { value: 'draft', label: '草稿' },
+              { value: 'pending', label: '审核中' },
+              { value: 'rejected', label: '未通过' },
+            ]}
+          />
           <Button onClick={handleSearch} style={{ borderRadius: 8 }}>搜索</Button>
         </Space>
         <Space>
@@ -419,7 +461,7 @@ export default function Products() {
 
       {/* ========== Product Table ========== */}
       <DataTable
-        dataSource={store.products}
+        dataSource={filteredProducts}
         columns={productColumns}
         loading={store.loading}
         scroll={{ x: 900 }}

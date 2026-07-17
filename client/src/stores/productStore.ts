@@ -69,6 +69,8 @@ export interface Product {
   box_height: number;
   box_remark: string;
   commission: number;
+  status?: string;
+  tiktok_status?: string;
   created_at?: string;
 }
 

@@ -1048,6 +1048,7 @@ function initTables() {
     ['original_price', "ALTER TABLE products ADD COLUMN original_price REAL DEFAULT 0"],
     ['description', "ALTER TABLE products ADD COLUMN description TEXT DEFAULT ''"],
     ['status', "ALTER TABLE products ADD COLUMN status TEXT DEFAULT 'active'"],
+    ['tiktok_status', "ALTER TABLE products ADD COLUMN tiktok_status TEXT DEFAULT ''"],
     ['category_name', "ALTER TABLE products ADD COLUMN category_name TEXT DEFAULT ''"],
     ['extra_data', "ALTER TABLE products ADD COLUMN extra_data TEXT DEFAULT '{}'"],
     ['last_synced_at', "ALTER TABLE products ADD COLUMN last_synced_at DATETIME"],

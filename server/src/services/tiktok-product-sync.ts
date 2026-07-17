@@ -7,15 +7,22 @@ import getDb from '../db';
 import { TikTokAPI } from './tiktok-api';
 import { getValidToken } from './tiktok-oauth';
 
-/** 产品状态映射 */
+/** 产品状态映射 — TikTok API → 系统内部
+ * TikTok 官方文档 status 枚举 (Get Product API):
+ *   ACTIVATE / SELLER_DEACTIVATED / PLATFORM_DEACTIVATED / FREEZE / DELETED / DRAFT / PENDING / FAILED / SCHEDULED
+ * 系统内部映射为 3 个运营状态：
+ *   在售 / 已下架 / 已删除 / 草稿 / 审核中 / 审核失败
+ */
 const PRODUCT_STATUS_MAP: Record<string, string> = {
-  DRAFT: 'draft',
-  ACTIVATED: 'active',
-  AUDIT: 'pending',
-  FAILED_AUDIT: 'rejected',
-  DEACTIVATED: 'inactive',
-  FROZEN: 'frozen',
-  DELETED: 'deleted',
+  ACTIVATE: 'active',                         // 在售
+  SELLER_DEACTIVATED: 'inactive',             // 已下架(卖家)
+  PLATFORM_DEACTIVATED: 'inactive',           // 已下架(平台)
+  FREEZE: 'frozen',                           // 已下架(冻结)
+  DELETED: 'deleted',                         // 已删除
+  DRAFT: 'draft',                             // 草稿
+  PENDING: 'pending',                         // 待审核
+  FAILED: 'rejected',                         // 审核失败
+  SCHEDULED: 'pending',                       // 定时上架
 };
 
 interface SyncResult {
@@ -323,6 +330,7 @@ function saveProduct(
   if (!name) return 'skipped';
 
   const status = PRODUCT_STATUS_MAP[product.status] || 'active';
+  const tiktokStatus = product.status || '';
   const sellPrice = parseFloat(product.skus?.[0]?.price?.sale_price || product.price?.sale_price || product.sale_price || '0') || 0;
   const originalPrice = parseFloat(product.price?.original_price || product.original_price || String(sellPrice)) || sellPrice;
   const stock = (product.stock_info?.stock_num ?? product.stock_info?.available_stock ?? product.inventory?.quantity ?? product.stock ?? 0);
@@ -359,13 +367,13 @@ function saveProduct(
       UPDATE products SET
         name = ?, sell_price = ?, original_price = ?,
         stock = ?, weight = ?, image = IIF(? != '', ?, image),
-        description = ?, status = ?, category_name = ?,
+        description = ?, status = ?, tiktok_status = ?, category_name = ?,
         extra_data = ?, last_synced_at = datetime('now'), updated_at = datetime('now')
       WHERE id = ?
     `).run(
       name, sellPrice, originalPrice,
       stock, weight, image, image,
-      description, status, categoryName,
+      description, status, tiktokStatus, categoryName,
       extraData,
       existing.id,
     );
@@ -377,13 +385,13 @@ function saveProduct(
     const result = db.prepare(`
       INSERT INTO products (
         name, sku, sell_price, original_price, stock, weight,
-        image, description, status, category_name,
+        image, description, status, tiktok_status, category_name,
         source_platform, source_product_id, extra_data,
         last_synced_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
     `).run(
       name, sourcePid, sellPrice, originalPrice, stock, weight,
-      image, description, status, categoryName,
+      image, description, status, tiktokStatus, categoryName,
       platform, sourcePid, extraData,
     );
 
