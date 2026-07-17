@@ -55,8 +55,8 @@ export default function Dashboard() {
       backgroundColor: 'transparent',
       tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: T.cardBorder, textStyle: { color: '#333', fontSize: 12 }, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
       legend: { bottom: 4, textStyle: { fontSize: 11, color: T.textTertiary }, itemWidth: 14, itemHeight: 8, itemGap: 16 },
-      grid: { left: 50, right: 60, top: 20, bottom: 56 },
-      xAxis: { type: 'category', data: trendData.map(d => d.date.slice(5)), axisLine: { lineStyle: { color: T.cardBorder } }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary, margin: 14 } },
+      grid: { left: 50, right: 60, top: 16, bottom: 48 },
+      xAxis: { type: 'category', data: trendData.map(d => d.date.slice(5)), axisLine: { lineStyle: { color: T.cardBorder } }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary, margin: 14, interval: trendData.length > 10 ? Math.floor(trendData.length / 7) - 1 : 0 } },
       yAxis: [
         { type: 'value', name: '订单数', nameTextStyle: { color: T.textTertiary, fontSize: 10, padding: [0, 0, 6, 0] }, splitLine: { lineStyle: { color: '#F1F5F9' } }, axisLabel: { fontSize: 10, color: T.textTertiary, margin: 12 } },
         { type: 'value', name: '销售额', nameTextStyle: { color: T.textTertiary, fontSize: 10, padding: [0, 0, 6, 0] }, splitLine: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary, margin: 12, formatter: (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v) } },
@@ -103,7 +103,7 @@ export default function Dashboard() {
             bodyStyle={{ padding: '12px 24px 20px' }}
           >
             <div style={{ marginBottom: 8 }}><Text style={{ fontSize: 12, color: T.textSecondary }}>{trendSummary}</Text></div>
-            <div id="dashboard-trend" style={{ width: '100%', height: 300 }} />
+            <div id="dashboard-trend" style={{ width: '100%', height: 280 }} />
           </Card>
         </Col>
         <Col xs={24} lg={8}>
