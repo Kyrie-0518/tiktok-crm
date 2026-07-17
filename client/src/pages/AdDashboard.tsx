@@ -8,7 +8,7 @@ import dayjs from 'dayjs';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
-const PRIMARY = '#2563eb';
+const PRIMARY = '#4568FF';
 
 const ACCOUNTS_KEY = 'ad_reports_accounts_v3';
 const reportKey = (advId: string, start: string, end: string) => `ad_report_${advId}_${start}_${end}`;
@@ -90,7 +90,7 @@ const AdDashboard: React.FC = () => {
   const totalClicks = list.reduce((s: number, r: any) => s + (Number(r.metrics?.clicks) || 0), 0);
 
   const kpiCards: { key: 'cost' | 'orders' | 'cpo' | 'impressions' | 'clicks'; label: string; value: string; icon: React.ReactNode; color: string; bg: string }[] = [
-    { key: 'cost', label: '花费', value: `$${totalSpend.toFixed(2)}`, icon: <DollarOutlined />, color: '#3b82f6', bg: '#eff6ff' },
+    { key: 'cost', label: '花费', value: `$${totalSpend.toFixed(2)}`, icon: <DollarOutlined />, color: '#6B8CFF', bg: '#EDF0FF' },
     { key: 'orders', label: '订单', value: totalOrders.toString(), icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff' },
     { key: 'cpo', label: 'CPO', value: cpo === '-' ? '-' : `$${cpo}`, icon: <RiseOutlined />, color: '#f59e0b', bg: '#fffbeb' },
     { key: 'impressions', label: '展现量', value: totalImpressions.toLocaleString(), icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5' },
@@ -104,7 +104,7 @@ const AdDashboard: React.FC = () => {
     return r.dimensions?.campaign_id || `Day ${i + 1}`;
   });
   const metricConfig: { key: 'cost' | 'orders' | 'cpo' | 'impressions' | 'clicks'; label: string; color: string; extractor: (r: any) => number }[] = [
-    { key: 'cost', label: '花费', color: '#3b82f6', extractor: (r: any) => Number(r.metrics?.spend || 0) },
+    { key: 'cost', label: '花费', color: '#6B8CFF', extractor: (r: any) => Number(r.metrics?.spend || 0) },
     { key: 'orders', label: '订单', color: '#8b5cf6', extractor: (r: any) => Number(r.metrics?.conversions || 0) },
     { key: 'cpo', label: 'CPO', color: '#f59e0b', extractor: (r: any) => {
         const o = Number(r.metrics?.conversions || 0);
@@ -179,14 +179,14 @@ const AdDashboard: React.FC = () => {
           <BarChartOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
         <div>
-          <Text strong style={{ fontSize: 18, color: '#1e293b', display: 'block', lineHeight: 1.2 }}>数据报表</Text>
+          <Text strong style={{ fontSize: 18, color: '#172033', display: 'block', lineHeight: 1.2 }}>数据报表</Text>
           <Text style={{ fontSize: 12, color: '#94a3b8' }}>查看推广计划数据表现、趋势分析，下钻商品与创意详情</Text>
         </div>
       </div>
 
       {/* 筛选栏 */}
       <Card
-        style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
+        style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
         bodyStyle={{ padding: '14px 20px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -222,7 +222,7 @@ const AdDashboard: React.FC = () => {
             key={k.key}
             style={{
               borderRadius: 12,
-              border: '1px solid #e8e5e0',
+              border: '1px solid #EEF1F6',
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
               background: visibleMetrics[k.key] ? '#fff' : '#fafafa',
               transition: 'all 0.2s',
@@ -236,7 +236,7 @@ const AdDashboard: React.FC = () => {
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2, whiteSpace: 'nowrap' }}>{k.label}</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.value}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#172033', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.value}</div>
                 </div>
               </div>
               <input
@@ -252,12 +252,12 @@ const AdDashboard: React.FC = () => {
 
       {/* 趋势图卡 */}
       <Card
-        style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
+        style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
         bodyStyle={{ padding: '16px 20px' }}
       >
         {/* 头部：标题 + 激活指标的 legend + 同步按钮 */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>趋势</Text>
+          <Text strong style={{ fontSize: 15, color: '#172033' }}>趋势</Text>
           <div style={{ flex: 1, marginLeft: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
             {activeSeries.length === 0 ? (
               <Text type="secondary" style={{ fontSize: 12 }}>请勾选上方卡片以显示指标</Text>
@@ -295,11 +295,11 @@ const AdDashboard: React.FC = () => {
 
       {/* 数据明细表 */}
       <Card
-        style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+        style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
         bodyStyle={{ padding: '16px 20px' }}
       >
         <div style={{ marginBottom: 12 }}>
-          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>数据明细</Text>
+          <Text strong style={{ fontSize: 15, color: '#172033' }}>数据明细</Text>
         </div>
         <Table
           columns={columns}

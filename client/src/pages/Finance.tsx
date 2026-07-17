@@ -18,7 +18,7 @@ import { useHasPerm } from '../stores/authStore';
 import DataTable from '../components/DataTable';
 import ExportButton from '../components/ExportButton';
 
-const BRAND = '#2563eb';
+const BRAND = '#4568FF';
 const { RangePicker } = DatePicker;
 
 export default function Finance() {
@@ -113,7 +113,7 @@ export default function Finance() {
       ],
       series: [
         { name: '净利润(RMB)', type: 'line', smooth: true, data: trendData.data.map((d: any) => d.profit_rmb), itemStyle: { color: '#059669' }, areaStyle: { opacity: 0.15 } },
-        { name: 'ROI', type: 'line', smooth: true, yAxisIndex: 1, data: trendData.data.map((d: any) => d.roi), itemStyle: { color: '#2563eb' } },
+        { name: 'ROI', type: 'line', smooth: true, yAxisIndex: 1, data: trendData.data.map((d: any) => d.roi), itemStyle: { color: '#4568FF' } },
       ],
     });
     const resizeObserver = new ResizeObserver(() => chart.resize());
@@ -676,9 +676,9 @@ export default function Finance() {
       {/* ========== 4 Module Cards ========== */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
-          <Card size="small" style={{ borderTop: '3px solid #2563eb' }}>
+          <Card size="small" style={{ borderTop: '3px solid #4568FF' }}>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>模块1：成交价总额</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#2563eb' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#4568FF' }}>
               RM {(summary?.module1?.value_myr || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
@@ -781,19 +781,19 @@ export default function Finance() {
   );
 
   return (
-    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', background: '#F7F8FA', minHeight: '100%' }}>
       {/* 页面标题 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+          background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontSize: 18,
         }}>
           <DollarOutlined />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>财务核算</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>财务核算</h2>
           <span style={{ fontSize: 12, color: '#999' }}>利润核算 · 成本公式 · 趋势分析</span>
         </div>
       </div>

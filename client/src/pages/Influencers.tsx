@@ -16,7 +16,7 @@ import { useHasPerm } from '../stores/authStore';
 import DataTable from '../components/DataTable';
 import ExportButton from '../components/ExportButton';
 
-const BRAND_COLOR = '#2563eb';
+const BRAND_COLOR = '#4568FF';
 
 const COOPERATION_TYPES = [
   { value: '纯佣', label: '纯佣' },
@@ -35,7 +35,7 @@ const CONTACT_CHANNELS = [
 // 建联进度选项
 const PROGRESS_OPTIONS = [
   { value: '未回复', label: '未回复', color: '#faad14', bgColor: '#fffbe6' },
-  { value: '已回复', label: '已回复', color: '#2563eb', bgColor: '#e6f4ff' },
+  { value: '已回复', label: '已回复', color: '#4568FF', bgColor: '#e6f4ff' },
   { value: '待寄样', label: '待寄样', color: '#722ed1', bgColor: '#f9f0ff' },
   { value: '待签收', label: '待签收', color: '#13c2c2', bgColor: '#e6fffb' },
   { value: '待拍摄', label: '待拍摄', color: '#eb2f96', bgColor: '#fff0f6' },
@@ -50,7 +50,7 @@ const getProgressStyle = (value: string) => {
 
 // 店铺配色方案
 const SHOP_COLORS: Record<string, { color: string; bg: string; border: string }> = {
-  'HomeLife Co':   { color: '#2563eb', bg: '#e6f4ff', border: '#91caff' },
+  'HomeLife Co':   { color: '#4568FF', bg: '#e6f4ff', border: '#91caff' },
   'FreshGuard':    { color: '#722ed1', bg: '#f9f0ff', border: '#b37feb' },
 };
 
@@ -648,14 +648,14 @@ export default function Influencers() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+          background: 'linear-gradient(135deg, #4568FF, #3b82f6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontSize: 18,
         }}>
           <UserOutlined />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>达人BD</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>达人BD</h2>
           <span style={{ fontSize: 12, color: '#999' }}>达人信息管理 · 建联跟进 · 日报/周报汇报</span>
         </div>
       </div>
@@ -664,9 +664,9 @@ export default function Influencers() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Space size="small">
           <Button icon={<FileTextOutlined />} onClick={() => openReportModal('daily')}
-            style={{ borderColor: '#2563eb', color: '#2563eb' }}>提交日报</Button>
+            style={{ borderColor: '#4568FF', color: '#4568FF' }}>提交日报</Button>
           <Button icon={<FileTextOutlined />} onClick={() => openReportModal('weekly')}
-            style={{ borderColor: '#2563eb', color: '#2563eb' }}>提交周报</Button>
+            style={{ borderColor: '#4568FF', color: '#4568FF' }}>提交周报</Button>
           <Button icon={<HistoryOutlined />} onClick={openReportHistory}
             style={{ borderColor: '#999', color: '#666' }}>汇报历史</Button>
         </Space>

@@ -17,7 +17,7 @@ const { Sider, Content } = Layout;
 const { Text } = Typography;
 
 const ROLE_COLOR: Record<string, string> = {
-  developer: '#2563eb',
+  developer: '#4568FF',
   manager: '#d97706',
   staff: '#059669',
   viewer: '#6b7280',
@@ -76,12 +76,12 @@ export default function AdminLayout() {
     <>
       <style>{`
         :root {
-          --admin-primary: #2563eb;
-          --admin-primary-light: #3b82f6;
-          --admin-bg: #f5f3f0;
+          --admin-primary: #4568FF;
+          --admin-primary-light: #6B8CFF;
+          --admin-bg: #F7F8FA;
           --admin-sider-bg: #ffffff;
-          --admin-border: #e8e5e0;
-          --admin-text: #1e293b;
+          --admin-border: #EEF1F6;
+          --admin-text: #172033;
           --admin-text-secondary: #475569;
           --admin-text-tertiary: #94a3b8;
           --admin-selected-bg: rgba(37,99,235,0.08);
@@ -90,7 +90,7 @@ export default function AdminLayout() {
           --admin-bottom-item-color: #64748b;
           --admin-bottom-item-hover-bg: rgba(37,99,235,0.04);
           --admin-bottom-item-active-bg: rgba(37,99,235,0.08);
-          --admin-bottom-item-active-color: #2563eb;
+          --admin-bottom-item-active-color: #4568FF;
         }
         [data-theme='dark'] {
           --admin-bg: #0f1117;
@@ -200,7 +200,7 @@ export default function AdminLayout() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: 10,
-              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 2px 10px rgba(37,99,235,0.25)',
               flexShrink: 0,
@@ -300,7 +300,7 @@ export default function AdminLayout() {
               style={{
                 padding: '20px',
                 minHeight: `calc(100vh - ${HEADER_H}px)`,
-                background: '#f5f3f0',
+                background: '#F7F8FA',
               }}
             >
               <ActiveComponent />

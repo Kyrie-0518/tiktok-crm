@@ -4,7 +4,7 @@ import { EditOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useProductStore, ProductShop } from '../stores/productStore';
 import { useParams, useNavigate } from 'react-router-dom';
 
-const BRAND = '#2563eb';
+const BRAND = '#4568FF';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();

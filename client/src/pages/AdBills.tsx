@@ -192,7 +192,7 @@ export default function AdBills() {
           <PayCircleOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>广告账款</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>广告账款</h2>
           <Text type="secondary" style={{ fontSize: 13 }}>TikTok 广告费用账单与付款追踪</Text>
         </div>
       </div>

@@ -281,19 +281,19 @@ ${JSON.stringify(data, null, 2)}
   const hasAIConfig = !!useAIStore.getState().apiKey;
 
   return (
-    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', background: '#F7F8FA', minHeight: '100%' }}>
       {/* 页面标题 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+          background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontSize: 18,
         }}>
           <RobotOutlined />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>AI 智能分析</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>AI 智能分析</h2>
           <span style={{ fontSize: 12, color: '#999' }}>数据问答 · 报表解读 · 自动处理</span>
         </div>
         {!hasAIConfig && (
@@ -370,7 +370,7 @@ ${JSON.stringify(data, null, 2)}
                       {interpretResult.warnings || '暂无数据'}
                     </Paragraph>
                   </Card>
-                  <Card size="small" title="TOP5排行" style={{ borderLeft: '3px solid #2563eb' }}>
+                  <Card size="small" title="TOP5排行" style={{ borderLeft: '3px solid #4568FF' }}>
                     <Paragraph style={{ whiteSpace: 'pre-wrap', marginBottom: 0, fontSize: 13 }}>
                       {interpretResult.ranking || '暂无数据'}
                     </Paragraph>

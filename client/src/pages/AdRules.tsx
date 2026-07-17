@@ -13,7 +13,7 @@ import api from '../api';
 
 const { Text } = Typography;
 const { Option } = Select;
-const PRIMARY = '#2563eb';
+const PRIMARY = '#4568FF';
 const ACCOUNTS_KEY = 'ad_rules_accounts_v1';
 
 interface AdAccount { advertiser_id: string; advertiser_name: string; enabled?: boolean; }
@@ -348,7 +348,7 @@ const AdRules: React.FC = () => {
           <ControlOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
         <div>
-          <Text strong style={{ fontSize: 18, color: '#1e293b', display: 'block', lineHeight: 1.2 }}>智能规则</Text>
+          <Text strong style={{ fontSize: 18, color: '#172033', display: 'block', lineHeight: 1.2 }}>智能规则</Text>
           <Text style={{ fontSize: 12, color: '#94a3b8' }}>自动化投放规则 · 条件触发 · 7×24 执行</Text>
         </div>
       </div>
@@ -356,11 +356,11 @@ const AdRules: React.FC = () => {
       {/* 统计卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          { label: '总规则数', value: stat.total, color: '#3b82f6', bg: '#eff6ff', icon: <ControlOutlined /> },
+          { label: '总规则数', value: stat.total, color: '#6B8CFF', bg: '#eff6ff', icon: <ControlOutlined /> },
           { label: '运行中', value: stat.on, color: '#059669', bg: '#ecfdf5', icon: <CheckCircleOutlined /> },
           { label: '已暂停', value: stat.off, color: '#d97706', bg: '#fffbeb', icon: <CloseCircleOutlined /> },
         ].map(k => (
-          <Card key={k.label} style={{ borderRadius: 12, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+          <Card key={k.label} style={{ borderRadius: 12, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
             bodyStyle={{ padding: '14px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: k.bg, color: k.color, fontSize: 15 }}>
@@ -368,7 +368,7 @@ const AdRules: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: 12, color: '#64748b' }}>{k.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#1e293b' }}>{k.value}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#172033' }}>{k.value}</div>
               </div>
             </div>
           </Card>
@@ -376,7 +376,7 @@ const AdRules: React.FC = () => {
       </div>
 
       {/* 筛选栏 */}
-      <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
+      <Card style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
         bodyStyle={{ padding: '14px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <select value={selectedAdv} onChange={e => setSelectedAdv(e.target.value)}
@@ -403,10 +403,10 @@ const AdRules: React.FC = () => {
       </Card>
 
       {/* 规则列表 */}
-      <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+      <Card style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
         bodyStyle={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>规则列表</Text>
+          <Text strong style={{ fontSize: 15, color: '#172033' }}>规则列表</Text>
           <Text type="secondary" style={{ fontSize: 12 }}>共 {rules.length} 条</Text>
         </div>
         <Table
@@ -428,7 +428,7 @@ const AdRules: React.FC = () => {
           <Form.Item name="name" label="规则名称" rules={[{ required: true, message: '请输入规则名称' }]}>
             <Input placeholder="如：花费超过预算自动暂停" style={{ borderRadius: 6 }} />
           </Form.Item>
-          <Text strong style={{ fontSize: 13, color: '#1e293b', display: 'block', marginBottom: 8 }}>触发条件</Text>
+          <Text strong style={{ fontSize: 13, color: '#172033', display: 'block', marginBottom: 8 }}>触发条件</Text>
           <Row gutter={8}>
             <Col span={8}>
               <Form.Item name="condition_subject" label="指标">
@@ -455,7 +455,7 @@ const AdRules: React.FC = () => {
           <Form.Item name="condition_value" label="阈值">
             <InputNumber style={{ width: '100%', borderRadius: 6 }} placeholder="触发条件的值" />
           </Form.Item>
-          <Text strong style={{ fontSize: 13, color: '#1e293b', display: 'block', marginBottom: 8, marginTop: 12 }}>执行动作</Text>
+          <Text strong style={{ fontSize: 13, color: '#172033', display: 'block', marginBottom: 8, marginTop: 12 }}>执行动作</Text>
           <Row gutter={8}>
             <Col span={12}>
               <Form.Item name="action_subject" label="动作类型">
@@ -493,7 +493,7 @@ const AdRules: React.FC = () => {
               );
             }}
           </Form.Item>
-          <Text strong style={{ fontSize: 13, color: '#1e293b', display: 'block', marginBottom: 8, marginTop: 12 }}>执行计划</Text>
+          <Text strong style={{ fontSize: 13, color: '#172033', display: 'block', marginBottom: 8, marginTop: 12 }}>执行计划</Text>
           <Row gutter={8}>
             <Col span={14}>
               <Form.Item name="exec_time_type" label="执行频率">
@@ -534,7 +534,7 @@ const AdRules: React.FC = () => {
           </div>,
           <Button key="cancel" onClick={() => setAutoGenOpen(false)}>取消</Button>,
           <Button key="ok" type="primary" loading={autoGenLoading} onClick={handleAutoGen}
-            style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)' }}>确认生成</Button>,
+            style={{ background: 'linear-gradient(135deg, #4568FF, #6366f1)' }}>确认生成</Button>,
         ]}
       >
         <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
@@ -590,7 +590,7 @@ const AdRules: React.FC = () => {
           <Form.Item name="cpaHighThreshold" label="每天初始投放设置多少" extra="CPA 过高阈值">
             <InputNumber style={{ width: '100%', borderRadius: 6 }} min={0} />
           </Form.Item>
-          <Text strong style={{ fontSize: 13, color: '#1e293b', display: 'block', marginBottom: 8 }}>素材管理策略阈值</Text>
+          <Text strong style={{ fontSize: 13, color: '#172033', display: 'block', marginBottom: 8 }}>素材管理策略阈值</Text>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="materialSpendLimit" label="素材花费上限（重复）" tooltip="同上（用于强调）">

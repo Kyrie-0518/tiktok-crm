@@ -43,7 +43,7 @@ const CARDS: AdminCard[] = [
     title: '系统配置',
     desc: '站点参数、API密钥、通知模板',
     icon: <SettingOutlined />,
-    color: '#2563eb',
+    color: '#4568FF',
     bgColor: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(37,99,235,0.04))',
     borderColor: 'rgba(37,99,235,0.15)',
     path: '/system-settings?tab=config',
@@ -147,7 +147,7 @@ export default function AdminDashboard({ embedded = false }: { embedded?: boolea
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
             <div style={{
               width: 40, height: 40, borderRadius: 12,
-              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#fff', fontSize: 20,
               boxShadow: '0 4px 14px rgba(37,99,235,0.25)',
@@ -172,7 +172,7 @@ export default function AdminDashboard({ embedded = false }: { embedded?: boolea
           marginBottom: 24,
           background: '#fff',
           borderRadius: 14,
-          border: '1px solid #e8e5e0',
+          border: '1px solid #EEF1F6',
           boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           overflow: 'hidden',
         }}>
@@ -180,19 +180,19 @@ export default function AdminDashboard({ embedded = false }: { embedded?: boolea
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '14px 20px',
-            borderBottom: onlineData.data.length > 0 ? '1px solid #e8e5e0' : 'none',
+            borderBottom: onlineData.data.length > 0 ? '1px solid #EEF1F6' : 'none',
             background: 'linear-gradient(135deg, rgba(37,99,235,0.04), rgba(59,130,246,0.02))',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
                 width: 32, height: 32, borderRadius: 8,
-                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#fff', fontSize: 14,
               }}>
                 <DesktopOutlined />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>实时在线</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#172033' }}>实时在线</span>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 minWidth: 28, height: 22, borderRadius: 6,
@@ -386,7 +386,7 @@ export default function AdminDashboard({ embedded = false }: { embedded?: boolea
 // 共享表格样式
 const thStyle: React.CSSProperties = {
   textAlign: 'left', padding: '10px 14px', fontSize: 12, fontWeight: 600,
-  color: '#64748b', borderBottom: '1px solid #e8e5e0', whiteSpace: 'nowrap',
+  color: '#64748b', borderBottom: '1px solid #EEF1F6', whiteSpace: 'nowrap',
 };
 const tdStyle: React.CSSProperties = {
   padding: '10px 14px', whiteSpace: 'nowrap',

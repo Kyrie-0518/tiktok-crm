@@ -226,19 +226,19 @@ export default function RawMaterials() {
   ];
 
   return (
-    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', background: '#F7F8FA', minHeight: '100%' }}>
       {/* 页面标题 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+          background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontSize: 18,
         }}>
           <InboxOutlined />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>原料库</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>原料库</h2>
           <span style={{ fontSize: 12, color: '#999' }}>原始素材 · 文件管理 · 搜索预览</span>
         </div>
       </div>

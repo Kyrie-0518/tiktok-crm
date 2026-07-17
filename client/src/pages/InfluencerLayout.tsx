@@ -20,7 +20,7 @@ const PRIMARY = '#059669';
 const PRIMARY_LIGHT = '#34d399';
 
 const ROLE_COLOR: Record<string, string> = {
-  developer: '#2563eb',
+  developer: '#4568FF',
   manager: '#d97706',
   staff: '#059669',
   viewer: '#6b7280',
@@ -109,10 +109,10 @@ export default function InfluencerLayout() {
         :root {
           --inf-primary: ${PRIMARY};
           --inf-primary-light: ${PRIMARY_LIGHT};
-          --inf-bg: #f5f3f0;
+          --inf-bg: #F7F8FA;
           --inf-sider-bg: #ffffff;
           --inf-border: #e8e5e0;
-          --inf-text: #1e293b;
+          --inf-text: #172033;
           --inf-text-secondary: #475569;
           --inf-text-tertiary: #94a3b8;
           --inf-selected-bg: rgba(5,150,105,0.08);

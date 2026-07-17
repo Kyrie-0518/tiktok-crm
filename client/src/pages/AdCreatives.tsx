@@ -6,7 +6,7 @@ import api from '../api';
 
 const { Text, Title } = Typography;
 const { Option } = Select;
-const PRIMARY = '#2563eb';
+const PRIMARY = '#4568FF';
 
 interface Creative {
   creative_id: string;
@@ -87,7 +87,7 @@ const AdCreatives: React.FC = () => {
     { title: '展示量', dataIndex: 'impressions', key: 'impressions', width: 110, render: (v: number) => v.toLocaleString() },
     { title: '点击数', dataIndex: 'clicks', key: 'clicks', width: 90, render: (v: number) => v.toLocaleString() },
     { title: 'CTR', dataIndex: 'ctr', key: 'ctr', width: 90, sorter: (a: any, b: any) => (a.ctr ?? 0) - (b.ctr ?? 0),
-      render: (v: number) => <Text strong style={{ color: (v ?? 0) > 2 ? '#059669' : '#1e293b' }}>{(v ?? 0).toFixed(2)}%</Text> },
+      render: (v: number) => <Text strong style={{ color: (v ?? 0) > 2 ? '#059669' : '#172033' }}>{(v ?? 0).toFixed(2)}%</Text> },
     { title: '转化', dataIndex: 'conversions', key: 'conversions', width: 80, render: (v: number) => <Tag color="green">{v}</Tag> },
     { title: '消耗', dataIndex: 'spend', key: 'spend', width: 110, render: (v: number) => `$${v.toFixed(2)}` },
   ];
@@ -100,7 +100,7 @@ const AdCreatives: React.FC = () => {
             <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${PRIMARY}, #6366f1)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <PictureOutlined style={{ color: '#fff', fontSize: 16 }} />
             </div>
-            <Title level={4} style={{ margin: 0, color: '#1e293b' }}>素材分析</Title>
+            <Title level={4} style={{ margin: 0, color: '#172033' }}>素材分析</Title>
           </div>
           <Text type="secondary">广告素材表现数据，按 CTR/CVR/消耗 维度分析</Text>
         </div>
@@ -148,7 +148,7 @@ const AdCreatives: React.FC = () => {
             <Col xs={8}>
               <Card size="small" style={{ borderRadius: 10, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                 <Text type="secondary" style={{ fontSize: 11 }}>总消耗</Text>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b' }}>${totalSpend.toFixed(2)}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#172033' }}>${totalSpend.toFixed(2)}</div>
               </Card>
             </Col>
           </Row>

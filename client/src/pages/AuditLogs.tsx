@@ -116,20 +116,20 @@ export default function AuditLogs() {
   ];
 
   return (
-    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', background: '#F7F8FA', minHeight: '100%' }}>
       {/* 标题 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+            background: 'linear-gradient(135deg, #4568FF, #3b82f6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontSize: 18,
           }}>
             <HistoryOutlined />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>操作日志</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>操作日志</h2>
             <span style={{ fontSize: 12, color: '#999' }}>API 请求记录 · 30天自动清理</span>
           </div>
         </div>

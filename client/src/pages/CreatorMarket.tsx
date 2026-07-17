@@ -156,7 +156,7 @@ export default function CreatorMarket() {
 
   const getStatusColor = (status: string) => {
     const map: Record<string, string> = {
-      '未回复': '#faad14', '已回复': '#2563eb', '待寄样': '#722ed1',
+      '未回复': '#faad14', '已回复': '#4568FF', '待寄样': '#722ed1',
       '待签收': '#13c2c2', '待拍摄': '#eb2f96', '已完成': '#059669',
     };
     return map[status] || '#8c8c8c';
@@ -174,7 +174,7 @@ export default function CreatorMarket() {
           <SearchOutlined style={{ color: '#fff', fontSize: 16 }} />
         </div>
         <div style={{ flex: 1 }}>
-          <Title level={4} style={{ margin: 0, color: '#1e293b' }}>达人广场</Title>
+          <Title level={4} style={{ margin: 0, color: '#172033' }}>达人广场</Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
             浏览所有达人信息，支持搜索、筛选、查看详情
           </Text>
@@ -205,7 +205,7 @@ export default function CreatorMarket() {
         </Col>
         <Col xs={8} sm={4}>
           <Card size="small" style={{ borderRadius: 8, border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }} bodyStyle={{ padding: '12px 10px' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#2563eb' }}>{creators.filter(c => c.status === '已完成').length}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#4568FF' }}>{creators.filter(c => c.status === '已完成').length}</div>
             <Text type="secondary" style={{ fontSize: 11 }}>已合作</Text>
           </Card>
         </Col>
@@ -318,7 +318,7 @@ export default function CreatorMarket() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <TeamOutlined style={{ color: '#94a3b8', fontSize: 12 }} />
                           <div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#172033' }}>
                               {creator.parsed.marketplace?.follower_count
                                 ? (creator.parsed.marketplace.follower_count >= 1000000
                                   ? (creator.parsed.marketplace.follower_count / 1000000).toFixed(1) + 'M'

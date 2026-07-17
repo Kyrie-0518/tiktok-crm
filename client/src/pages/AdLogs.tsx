@@ -5,7 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
 
 const { Text, Title } = Typography;
-const PRIMARY = '#2563eb';
+const PRIMARY = '#4568FF';
 
 interface RuleLog {
   rule_log_id: string;
@@ -111,7 +111,7 @@ const AdLogs: React.FC = () => {
             <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${PRIMARY}, #6366f1)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileTextOutlined style={{ color: '#fff', fontSize: 16 }} />
             </div>
-            <Title level={4} style={{ margin: 0, color: '#1e293b' }}>执行日志</Title>
+            <Title level={4} style={{ margin: 0, color: '#172033' }}>执行日志</Title>
           </div>
           <Text type="secondary">自动化规则执行记录与变更历史</Text>
         </div>

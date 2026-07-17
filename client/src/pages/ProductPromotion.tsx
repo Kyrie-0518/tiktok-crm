@@ -32,7 +32,7 @@ interface PromotionProduct {
 }
 
 const PROMOTION_TYPES = [
-  { value: 'affiliate', label: '联盟带货', icon: <ShoppingOutlined />, color: '#3b82f6' },
+  { value: 'affiliate', label: '联盟带货', icon: <ShoppingOutlined />, color: '#6B8CFF' },
   { value: 'boost', label: '加热推广', icon: <ThunderboltOutlined />, color: '#f59e0b' },
   { value: 'discount', label: '折扣促销', icon: <FireOutlined />, color: '#ef4444' },
 ];
@@ -208,14 +208,14 @@ export default function ProductPromotion() {
           <SendOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>商品推广</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>商品推广</h2>
           <Text type="secondary" style={{ fontSize: 13 }}>TikTok 商品联盟带货与加热推广管理</Text>
         </div>
       </div>
 
       {/* 统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 18 }}>
-        {[{title:'推广中', value:stats.total_active, color:'#3b82f6', prefix:<ThunderboltOutlined />},
+        {[{title:'推广中', value:stats.total_active, color:'#6B8CFF', prefix:<ThunderboltOutlined />},
           {title:'总点击', value:stats.total_clicks, color:'#059669', prefix:<EyeOutlined />},
           {title:'总转化', value:stats.total_conversions, color:'#8b5cf6', prefix:<CheckCircleOutlined />},
           {title:'佣金总额', value:stats.total_commission, color:'#d97706', prefix:'RM$', precision:2},

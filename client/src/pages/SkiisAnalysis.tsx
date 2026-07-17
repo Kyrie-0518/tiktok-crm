@@ -316,14 +316,14 @@ export default function SkiisAnalysis() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+            background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontSize: 18,
           }}>
             <BarChartOutlined />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>SKIIS 数据分析</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>SKIIS 数据分析</h2>
             <span style={{ fontSize: 12, color: '#999' }}>每日工作 · 数据文件分析 · 周报汇总</span>
           </div>
         </div>

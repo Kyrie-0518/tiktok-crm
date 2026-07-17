@@ -10,7 +10,7 @@ import ReactECharts from 'echarts-for-react';
 import api from '../api';
 
 const { Text } = Typography;
-const PRIMARY = '#2563eb';
+const PRIMARY = '#4568FF';
 
 const ACCOUNTS_KEY = 'ad_campaigns_accounts_v2';
 
@@ -254,7 +254,7 @@ const AdCampaigns: React.FC = () => {
   // 趋势图可控的 KPI（cost/orders/revenue/roi 这 4 个），CPO 是派生指标不显示 checkbox
   const trendControlledKeys = new Set(['cost', 'orders', 'revenue', 'roi']);
   const kpiCards = [
-    { key: 'cost' as const, label: '成本', value: `$${totalCost.toFixed(2)}`, icon: <DollarOutlined />, color: '#3b82f6', bg: '#eff6ff', controlled: true },
+    { key: 'cost' as const, label: '成本', value: `$${totalCost.toFixed(2)}`, icon: <DollarOutlined />, color: '#6B8CFF', bg: '#eff6ff', controlled: true },
     { key: 'orders' as const, label: '订单数', value: totalOrders.toString(), icon: <ShoppingOutlined />, color: '#8b5cf6', bg: '#f5f3ff', controlled: true },
     { key: 'cpo' as const, label: 'CPO', value: totalOrders > 0 ? `$${cpo}` : '-', icon: <TrophyOutlined />, color: '#dc2626', bg: '#fef2f2', controlled: false },
     { key: 'revenue' as const, label: '总收入', value: `$${totalRevenue.toFixed(2)}`, icon: <WalletOutlined />, color: '#059669', bg: '#ecfdf5', controlled: true },
@@ -263,7 +263,7 @@ const AdCampaigns: React.FC = () => {
 
   // 趋势图激活的 series（用于显示 legend 文字）
   const trendLegendItems = [
-    { key: 'cost', label: '成本', color: '#3b82f6' },
+    { key: 'cost', label: '成本', color: '#6B8CFF' },
     { key: 'orders', label: '订单数', color: '#8b5cf6' },
     { key: 'revenue', label: '收入', color: '#059669' },
     { key: 'roi', label: 'ROI', color: '#7c3aed' },
@@ -287,8 +287,8 @@ const AdCampaigns: React.FC = () => {
         symbol: 'circle',
         symbolSize: 4,
         showSymbol: false,
-        lineStyle: { color: '#3b82f6', width: 2 },
-        itemStyle: { color: '#3b82f6' },
+        lineStyle: { color: '#6B8CFF', width: 2 },
+        itemStyle: { color: '#6B8CFF' },
         areaStyle: {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
@@ -379,7 +379,7 @@ const AdCampaigns: React.FC = () => {
           type: 'value' as const,
           name: '成本($)',
           position: 'left' as const,
-          nameTextStyle: { color: '#3b82f6', fontSize: 11 },
+          nameTextStyle: { color: '#6B8CFF', fontSize: 11 },
           axisLine: { show: false },
           axisLabel: { color: '#64748b', fontSize: 11, formatter: (v: number) => `$${v}` },
           splitLine: { lineStyle: { color: '#f1f5f9' } },
@@ -481,13 +481,13 @@ const AdCampaigns: React.FC = () => {
           <AppstoreOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
         <div>
-          <Text strong style={{ fontSize: 18, color: '#1e293b', display: 'block', lineHeight: 1.2 }}>计划列表</Text>
+          <Text strong style={{ fontSize: 18, color: '#172033', display: 'block', lineHeight: 1.2 }}>计划列表</Text>
           <Text style={{ fontSize: 12, color: '#94a3b8' }}>GMV Max 计划列表 · 商品/直播推广 · 最近 7 天数据表现</Text>
         </div>
       </div>
 
       {/* 筛选栏：账户 + GMV 类型 + 搜索 + 刷新 */}
-      <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
+      <Card style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
         bodyStyle={{ padding: '14px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <select value={selectedAdv} onChange={e => setSelectedAdv(e.target.value)}
@@ -538,7 +538,7 @@ const AdCampaigns: React.FC = () => {
             hoverable={k.controlled}
             onClick={k.controlled ? () => setVisibleMetrics({ ...visibleMetrics, [k.key]: !visibleMetrics[k.key] }) : undefined}
             style={{
-              borderRadius: 12, border: k.controlled && visibleMetrics[k.key] ? `1px solid ${k.color}` : '1px solid #e8e5e0',
+              borderRadius: 12, border: k.controlled && visibleMetrics[k.key] ? `1px solid ${k.color}` : '1px solid #EEF1F6',
               boxShadow: k.controlled && visibleMetrics[k.key] ? `0 2px 8px ${k.color}20` : '0 1px 3px rgba(0,0,0,0.04)',
               background: k.controlled ? (visibleMetrics[k.key] ? '#fff' : '#fafafa') : '#fff',
               cursor: k.controlled ? 'pointer' : 'default',
@@ -556,7 +556,7 @@ const AdCampaigns: React.FC = () => {
                     {k.label}
                     {!k.controlled && <span style={{ fontSize: 10, color: '#cbd5e1' }}>·派生</span>}
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.value}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#172033', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.value}</div>
                 </div>
               </div>
               {k.controlled ? (
@@ -575,10 +575,10 @@ const AdCampaigns: React.FC = () => {
       </div>
 
       {/* 趋势图 */}
-      <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
+      <Card style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}
         bodyStyle={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>趋势（按天）</Text>
+          <Text strong style={{ fontSize: 15, color: '#172033' }}>趋势（按天）</Text>
           <Text type="secondary" style={{ fontSize: 12, marginLeft: 12 }}>勾选上方卡片切换显示指标</Text>
         </div>
         <div style={{ width: '100%', minHeight: 280 }}>
@@ -600,10 +600,10 @@ const AdCampaigns: React.FC = () => {
       </Card>
 
       {/* 计划列表 */}
-      <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+      <Card style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
         bodyStyle={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text strong style={{ fontSize: 15, color: '#1e293b' }}>计划列表</Text>
+          <Text strong style={{ fontSize: 15, color: '#172033' }}>计划列表</Text>
           <Text type="secondary" style={{ fontSize: 12 }}>共 {filtered.length} 个计划</Text>
         </div>
         <Table columns={columns} dataSource={filtered} rowKey="campaign_id" size="middle"

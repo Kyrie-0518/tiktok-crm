@@ -199,7 +199,7 @@ export default function ProblemOrders() {
           <ExclamationCircleOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>问题订单</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>问题订单</h2>
           <Text type="secondary" style={{ fontSize: 13 }}>异常订单追踪与处理（退款/退货/丢件等）</Text>
         </div>
       </div>

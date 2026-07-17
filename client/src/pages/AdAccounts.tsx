@@ -5,7 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import api from '../api';
 
 const { Text, Title } = Typography;
-const PRIMARY = '#2563eb';
+const PRIMARY = '#4568FF';
 
 interface AdAccount {
   advertiser_id: string;
@@ -234,12 +234,12 @@ const AdAccounts: React.FC = () => {
     <div style={{ padding: '24px 28px' }}>
       {/* ── 页面标题 ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #2563eb, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #4568FF, #6B8CFF)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
           <SafetyOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
-        <Title level={4} style={{ margin: 0, color: '#1e293b', lineHeight: 1 }}>账户授权管理</Title>
+        <Title level={4} style={{ margin: 0, color: '#172033', lineHeight: 1 }}>账户授权管理</Title>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#64748b', background: '#f1f5f9', padding: '2px 10px', borderRadius: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6' }} /> TikTok Ads
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6B8CFF' }} /> TikTok Ads
         </span>
       </div>
 
@@ -247,7 +247,7 @@ const AdAccounts: React.FC = () => {
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '18px 22px', marginBottom: 16, marginTop: 16,
-        background: '#fff', borderRadius: 14, border: '1px solid #e8e5e0',
+        background: '#fff', borderRadius: 14, border: '1px solid #EEF1F6',
         boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -255,7 +255,7 @@ const AdAccounts: React.FC = () => {
             {isAuthorized ? <CheckCircleOutlined style={{ color: '#fff', fontSize: 18 }} /> : <WarningOutlined style={{ color: '#fff', fontSize: 18 }} />}
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#1e293b' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#172033' }}>
               {isAuthorized ? (
                 <>已授权 <span style={{ color: PRIMARY, fontWeight: 700 }}>{authorizedCount}</span> 账号</>
               ) : (
@@ -274,11 +274,11 @@ const AdAccounts: React.FC = () => {
       </div>
 
       {/* ── 账户列表 ── */}
-      <Card style={{ borderRadius: 14, border: '1px solid #e8e5e0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}>
+      <Card style={{ borderRadius: 14, border: '1px solid #EEF1F6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}>
         {/* 表格头部 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div>
-            <Text strong style={{ fontSize: 15, color: '#1e293b' }}>广告账户列表</Text>
+            <Text strong style={{ fontSize: 15, color: '#172033' }}>广告账户列表</Text>
             <Text style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>选择您想要连接的 TikTok 广告账户</Text>
           </div>
         </div>

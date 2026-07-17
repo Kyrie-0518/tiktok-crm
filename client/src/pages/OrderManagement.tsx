@@ -19,7 +19,7 @@ import DataTable from '../components/DataTable';
 const { Dragger } = Upload;
 const { Text } = Typography;
 
-const BRAND_COLOR = '#2563eb';
+const BRAND_COLOR = '#4568FF';
 
 const ORDER_STATUS: Record<string, { label: string; color: string }> = {
   all:              { label: '全部',     color: 'default'  },
@@ -798,14 +798,14 @@ export default function OrderManagement() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+          background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontSize: 18,
         }}>
           <UnorderedListOutlined />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>订单管理</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>订单管理</h2>
           <span style={{ fontSize: 12, color: '#999' }}>订单追踪 · 状态管理 · AI智能导入</span>
         </div>
       </div>
@@ -813,7 +813,7 @@ export default function OrderManagement() {
       {/* Top Stats */}
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         {[
-          { label: '今日待发货', key: 'pending_ship', color: '#2563eb' },
+          { label: '今日待发货', key: 'pending_ship', color: '#4568FF' },
           { label: '申请取消', key: 'cancel_requested', color: '#faad14' },
           { label: '退货/退款', key: 'refund_requested', color: '#ff4d4f' },
           { label: '自动取消', key: 'auto_cancelled', color: '#999' },
