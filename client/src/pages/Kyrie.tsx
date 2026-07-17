@@ -300,7 +300,7 @@ export default function Kyrie() {
         </header>
 
         {/* ── MAIN AREA (DASHBOARD or CHAT) ── */}
-        <div style={{ flex: 1, overflow: 'auto', padding: `${T.spacing.lg}px`, paddingBottom: T.chatBarHeight + 16 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: `${T.spacing.lg}px`, paddingBottom: activeNav === 'chat' ? T.chatBarHeight + 16 : T.spacing.lg }}>
           <div style={{ maxWidth: 1180, margin: '0 auto' }}>
 
             {activeNav === 'dashboard' && (
@@ -606,7 +606,8 @@ export default function Kyrie() {
           </div>
         </div>
 
-        {/* ═══════════════════ BOTTOM COMMAND BAR 72px ═══════════════════ */}
+        {/* ═══════════════════ BOTTOM COMMAND BAR — 仅在 AI 对话菜单显示 ═══════════════════ */}
+        {activeNav === 'chat' && (
         <div style={{
           flexShrink: 0, background: T.cardBg, borderTop: `1px solid ${T.cardBorder}`,
           padding: '10px 32px', height: T.chatBarHeight, display: 'flex', alignItems: 'center',
@@ -643,6 +644,7 @@ export default function Kyrie() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* ═══════ Markdown Styles ═══════ */}
