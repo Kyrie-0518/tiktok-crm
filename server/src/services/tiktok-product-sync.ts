@@ -85,6 +85,13 @@ export async function syncShopProducts(
 
       const resp = await api.searchProducts(params);
       const productList = resp?.data?.products || resp?.data?.product_list || [];
+      const totalFromApi = resp?.data?.total || productList.length;
+
+      // 诊断日志：每次分页请求都打印（首次同步诊断问题用）
+      console.log(`[ProductSync] shop=${shopId}(${shop.name}) page=${page} last_synced_at=${shop.last_synced_at || 'NULL(全量)'} params=${JSON.stringify(params)} -> resp.data_keys=${resp?.data ? Object.keys(resp.data) : 'null'} products=${productList.length} total=${totalFromApi}`);
+      if (resp?.code && resp.code !== 0) {
+        console.error(`[ProductSync] API 错误: code=${resp.code} message=${resp.message} request_id=${resp.request_id}`);
+      }
 
       // DEBUG: 打印第一个产品的关键字段结构，用于排查字段名
       if (productList.length > 0 && page === 0) {
