@@ -218,8 +218,8 @@ export default function Kyrie() {
           </Space>
         </nav>
 
-        {/* Session list */}
-        <div style={{ borderTop: `1px solid ${T.cardBorder}`, flexShrink: 0, maxHeight: 260, display: 'flex', flexDirection: 'column' }}>
+        {/* Session list — 紧贴设置下方 */}
+        <div style={{ borderTop: `1px solid ${T.cardBorder}`, marginTop: 12, paddingTop: 12, flexShrink: 0, maxHeight: 260, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '12px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={{ fontSize: 12, color: T.textTertiary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>最近对话</Text>
             <Button type="text" size="small" icon={<PlusOutlined />} onClick={handleNewSession} style={{ color: T.textTertiary, fontSize: 12 }} />
