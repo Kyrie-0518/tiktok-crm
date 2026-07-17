@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Table, Typography, Spin, Tag, Button, Result } from 'antd';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Card, Row, Col, Table, Typography, Spin, Tag, Button, Result, Select } from 'antd';
 import {
   ShoppingCartOutlined, DollarOutlined, AppstoreOutlined, UserOutlined,
   ReloadOutlined, BarChartOutlined, TrophyOutlined, RiseOutlined,
@@ -49,9 +49,17 @@ export default function Dashboard() {
   const orderTrendRevenue = data?.order_trend.reduce((s, d) => s + d.revenue_myr, 0) || 0;
   const topProductName = data?.top_products?.[0]?.name || '—';
 
+  // 趋势图时间范围（近7天/近30天）
+  const [trendRange, setTrendRange] = useState<'7d' | '30d'>('30d');
+  const trendData = useMemo(() => {
+    if (!data?.order_trend) return [];
+    if (trendRange === '7d') return data.order_trend.slice(-7);
+    return data.order_trend;
+  }, [data, trendRange]);
+
   // ── ECharts 趋势图 ──
   useEffect(() => {
-    if (!data?.order_trend) return;
+    if (!trendData.length) return;
     const dom = document.getElementById('dashboard-trend');
     if (!dom) return;
     const chart = echarts.init(dom);
@@ -60,34 +68,34 @@ export default function Dashboard() {
       tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: T.cardBorder, textStyle: { color: '#333', fontSize: 12 }, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
       legend: { bottom: 0, textStyle: { fontSize: 11, color: T.textTertiary }, itemWidth: 12, itemHeight: 8 },
       grid: { left: '3%', right: '5%', top: '8%', bottom: '12%' },
-      xAxis: { type: 'category', data: data.order_trend.map(d => d.date.slice(5)), axisLine: { lineStyle: { color: T.cardBorder } }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary } },
+      xAxis: { type: 'category', data: trendData.map(d => d.date.slice(5)), axisLine: { lineStyle: { color: T.cardBorder } }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary } },
       yAxis: [
-        { type: 'value', name: '单', nameTextStyle: { color: T.textTertiary, fontSize: 10 }, splitLine: { lineStyle: { color: '#F1F5F9', type: 'dashed' } }, axisLabel: { fontSize: 10, color: T.textTertiary } },
+        { type: 'value', name: '单', nameTextStyle: { color: T.textTertiary, fontSize: 10 }, splitLine: { lineStyle: { color: '#F1F5F9' } }, axisLabel: { fontSize: 10, color: T.textTertiary } },
         { type: 'value', name: 'RM', nameTextStyle: { color: T.textTertiary, fontSize: 10 }, splitLine: { show: false }, axisLabel: { fontSize: 10, color: T.textTertiary, formatter: (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v) } },
       ],
       series: [
         {
           name: '销售额(MYR)', type: 'line', yAxisIndex: 1, smooth: true,
-          data: data.order_trend.map(d => d.revenue_myr),
+          data: trendData.map(d => d.revenue_myr),
           lineStyle: { color: '#4F6BFF', width: 2.5 },
           itemStyle: { color: '#4F6BFF' }, symbol: 'circle', symbolSize: 5,
           areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(79,107,255,0.15)' }, { offset: 1, color: 'rgba(79,107,255,0)' }]) },
         },
         {
           name: '订单数', type: 'line', yAxisIndex: 0, smooth: true,
-          data: data.order_trend.map(d => d.order_count),
-          lineStyle: { color: '#22C55E', width: 2, type: 'dashed' },
+          data: trendData.map(d => d.order_count),
+          lineStyle: { color: '#22C55E', width: 2 },
           itemStyle: { color: '#22C55E' }, symbol: 'circle', symbolSize: 4,
         },
       ],
     });
     return () => chart.dispose();
-  }, [data]);
+  }, [trendData]);
 
   if (loading) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" tip="加载仪表盘数据..." /></div>;
   if (error || !data) return <Result status="error" title="加载失败" subTitle={error || '请刷新重试'} extra={<Button type="primary" icon={<ReloadOutlined />} onClick={fetchDashboard}>重新加载</Button>} />;
 
-  const trendSummary = `近30天 销售额 RM${orderTrendRevenue.toLocaleString()} · 订单 ${data.cards.total_orders} · 日均 ${Math.round(data.cards.total_orders / 30)} 单`;
+  const trendSummary = `近${trendRange === '7d' ? 7 : 30}天 销售额 RM${orderTrendRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · 订单 ${trendData.reduce((s, d) => s + d.order_count, 0)} · 日均 ${Math.round(trendData.reduce((s, d) => s + d.order_count, 0) / trendRange.length)} 单`;
 
   return (
     <div style={{ fontFamily: '"PingFang SC", -apple-system, "Inter", sans-serif' }}>
@@ -167,7 +175,18 @@ export default function Dashboard() {
             title={<Text strong style={{ fontSize: 15, color: T.textPrimary }}>销售趋势</Text>}
             style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
             bodyStyle={{ padding: '20px 24px' }}
-            extra={<Text style={{ fontSize: 12, color: T.textTertiary }}>近30天</Text>}
+            extra={
+              <Select
+                size="small"
+                value={trendRange}
+                onChange={v => setTrendRange(v)}
+                style={{ width: 110, borderRadius: 6 }}
+                options={[
+                  { value: '7d', label: '近 7 天' },
+                  { value: '30d', label: '近 30 天' },
+                ]}
+              />
+            }
           >
             <div style={{ marginBottom: 8 }}>
               <Text style={{ fontSize: 12, color: T.textSecondary }}>{trendSummary}</Text>
@@ -205,7 +224,7 @@ export default function Dashboard() {
 
       {/* ═══ Row 3: 热销商品 ═══ */}
       <Card
-        title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><TrophyOutlined style={{ color: '#F59E0B' }} /><Text strong style={{ fontSize: 15, color: T.textPrimary }}>热销商品排行</Text></div>}
+        title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><TrophyOutlined style={{ color: '#F59E0B' }} /><Text strong style={{ fontSize: 15, color: T.textPrimary }}>商品主图展示</Text><Tag color="blue" style={{ marginLeft: 4, fontSize: 10, borderRadius: 4 }}>nodejs_sdk</Tag></div>}
         style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
         bodyStyle={{ padding: 0 }}
       >
