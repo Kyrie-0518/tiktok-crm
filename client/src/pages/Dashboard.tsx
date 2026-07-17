@@ -222,100 +222,162 @@ export default function Dashboard() {
         </Col>
       </Row>
 
-      {/* ═══ Row 3: 热销商品 ═══ */}
+      {/* ═══ Row 3: 商品销售表现 ═══ */}
       <Card
-        title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><TrophyOutlined style={{ color: '#F59E0B' }} /><Text strong style={{ fontSize: 15, color: T.textPrimary }}>商品主图展示</Text><Tag color="blue" style={{ marginLeft: 4, fontSize: 10, borderRadius: 4 }}>nodejs_sdk</Tag></div>}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: '#FFF7ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <TrophyOutlined style={{ color: '#F59E0B', fontSize: 16 }} />
+              </div>
+              <div>
+                <Text strong style={{ fontSize: 15, color: T.textPrimary, display: 'block', lineHeight: 1.3 }}>商品销售表现</Text>
+                <Text style={{ fontSize: 11, color: T.textTertiary }}>Top 商品 · 销售贡献</Text>
+              </div>
+              <Tag style={{ borderRadius: 6, border: 'none', background: T.primaryLight, color: T.primary, fontSize: 11, fontWeight: 600, marginLeft: 4 }}>
+                共 {data.top_products.length} 个
+              </Tag>
+            </div>
+          </div>
+        }
         style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
         bodyStyle={{ padding: 0 }}
       >
-        {/* Top 4 Cards with product images */}
+        {/* ═══ TOP 4 Bento Cards ═══ */}
         {data.top_products.length > 0 && (
-          <Row gutter={[12, 12]} style={{ padding: '20px 24px 8px' }}>
-            {data.top_products.slice(0, 4).map((p, i) => (
-              <Col xs={12} sm={6} key={p.id}>
-                <div style={{
-                  display: 'flex', gap: 12, alignItems: 'center',
-                  padding: '12px 14px', borderRadius: 16,
-                  background: i === 0 ? `linear-gradient(135deg, ${T.primaryLight}, #FFF)` : '#FAFBFC',
-                  border: `1px solid ${T.cardBorder}`, height: '100%',
-                  transition: 'all 0.2s', cursor: 'pointer',
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = T.primary; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.cardBorder; e.currentTarget.style.transform = 'none'; }}>
-                  {/* Product image with rank badge */}
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    {p.image ? (
-                      <img src={p.image} alt={p.name}
-                        style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', background: '#F1F5F9' }}
-                        onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
-                    ) : null}
+          <div style={{ padding: '20px 24px 12px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+            {data.top_products.slice(0, 4).map((p, i) => {
+              const topColors = ['#F59E0B', '#94A3B8', '#F97316', T.primary];
+              const topLabels = ['TOP 1', 'TOP 2', 'TOP 3', 'TOP 4'];
+              const pct = data.cards.total_revenue_myr > 0 ? ((p.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0;
+              return (
+                <div key={p.id}
+                  style={{
+                    background: i === 0 ? `linear-gradient(135deg, #FFFBF0, #FFFFFF)` : '#FFFFFF',
+                    border: `1px solid ${T.cardBorder}`, borderRadius: 16,
+                    padding: '14px 16px', height: 120, display: 'flex', flexDirection: 'column',
+                    transition: 'all 0.2s', cursor: 'pointer', position: 'relative', overflow: 'hidden',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = topColors[i]; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(15,23,42,0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.cardBorder; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  {/* Top badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <div style={{
-                      display: p.image ? 'none' : 'flex',
-                      width: 56, height: 56, borderRadius: 12, background: '#F1F5F9',
-                      alignItems: 'center', justifyContent: 'center', color: T.textTertiary, fontSize: 22,
-                    }}>
-                      <AppstoreOutlined />
-                    </div>
-                    <div style={{
-                      position: 'absolute', top: -6, left: -6,
-                      width: 22, height: 22, borderRadius: '50%',
-                      background: i === 0 ? '#F59E0B' : i === 1 ? '#94A3B8' : i === 2 ? '#CD7F32' : T.primary,
-                      color: '#fff', fontSize: 11, fontWeight: 700,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                    }}>{i + 1}</div>
+                      width: 40, height: 18, borderRadius: 6,
+                      background: `${topColors[i]}15`, color: topColors[i],
+                      fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      letterSpacing: 0.5,
+                    }}>{topLabels[i]}</div>
+                    <div style={{ flex: 1, height: 1, background: '#F1F5F9' }} />
                   </div>
-                  {/* Product info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <Text strong ellipsis={{ tooltip: p.name }} style={{ fontSize: 13, color: T.textPrimary, display: 'block', marginBottom: 6, lineHeight: 1.4 }}>
-                      {p.name}
-                    </Text>
-                    <div style={{ display: 'flex', gap: 14 }}>
-                      <div>
-                        <Text style={{ fontSize: 10, color: T.textTertiary, display: 'block', lineHeight: 1.2 }}>销量</Text>
-                        <Text strong style={{ fontSize: 14, color: T.textPrimary }}>{p.total_qty}</Text>
+
+                  <div style={{ display: 'flex', gap: 12, flex: 1, alignItems: 'center' }}>
+                    {/* Product image */}
+                    <div style={{ flexShrink: 0 }}>
+                      {p.image ? (
+                        <img src={p.image} alt={p.name}
+                          style={{ width: 60, height: 60, borderRadius: 12, objectFit: 'cover', background: '#F8FAFC' }}
+                          onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                      ) : null}
+                      <div style={{
+                        display: p.image ? 'none' : 'flex',
+                        width: 60, height: 60, borderRadius: 12, background: '#F8FAFC',
+                        alignItems: 'center', justifyContent: 'center', color: T.textTertiary, fontSize: 24,
+                      }}>
+                        <AppstoreOutlined />
                       </div>
-                      <div>
-                        <Text style={{ fontSize: 10, color: T.textTertiary, display: 'block', lineHeight: 1.2 }}>销售额</Text>
-                        <Text strong style={{ fontSize: 14, color: T.primary }}>RM{p.total_sales_myr?.toFixed(2)}</Text>
+                    </div>
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Text ellipsis={{ tooltip: p.name }}
+                        style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary, display: 'block', lineHeight: 1.35, marginBottom: 6, maxHeight: 32, overflow: 'hidden' }}>
+                        {p.name}
+                      </Text>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <Text style={{ fontSize: 18, fontWeight: 700, color: T.primary, fontFamily: '"Inter", sans-serif' }}>
+                          RM{p.total_sales_myr?.toFixed(0)}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: T.textTertiary, whiteSpace: 'nowrap' }}>{p.total_qty}件</Text>
                       </div>
+                      <Text style={{ fontSize: 10, color: T.textTertiary }}>占 {pct.toFixed(1)}%</Text>
                     </div>
                   </div>
                 </div>
-              </Col>
-            ))}
-          </Row>
+              );
+            })}
+          </div>
         )}
-        {/* Full Table with product images */}
+
+        {/* ═══ 商品排行榜 Table ═══ */}
         <Table
           dataSource={data.top_products}
           rowKey="id"
           pagination={false}
-          size="small"
-          style={{ marginTop: data.top_products.length > 0 ? 0 : 0 }}
+          size="middle"
           columns={[
-            { title: '排名', width: 60, render: (_: any, __: any, i: number) => <Tag color={i < 3 ? 'gold' : 'default'} style={{ borderRadius: 6 }}>{i + 1}</Tag> },
-            { title: '商品', dataIndex: 'name', width: 360, ellipsis: true,
+            {
+              title: '排名', width: 60, align: 'center' as const,
+              render: (_: any, __: any, i: number) => {
+                const medals = ['🥇', '🥈', '🥉'];
+                return <Text style={{ fontSize: 16 }}>{medals[i] || <Text style={{ fontSize: 12, color: T.textTertiary, fontWeight: 600 }}>{i + 1}</Text>}</Text>;
+              },
+            },
+            {
+              title: '商品', dataIndex: 'name',
               render: (_: any, r: any) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   {r.image ? (
-                    <img src={r.image} alt={r.name} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: '#F1F5F9' }} onError={(e: any) => { e.target.style.display = 'none'; }} />
+                    <img src={r.image} alt={r.name}
+                      style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: '#F8FAFC' }}
+                      onError={(e: any) => { e.target.style.display = 'none'; }} />
                   ) : (
-                    <div style={{ width: 40, height: 40, borderRadius: 8, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textTertiary, fontSize: 16, flexShrink: 0 }}>
-                      <AppstoreOutlined />
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <AppstoreOutlined style={{ color: T.textTertiary, fontSize: 14 }} />
                     </div>
                   )}
-                  <Text ellipsis={{ tooltip: r.name }} style={{ fontSize: 13, color: T.textPrimary }}>{r.name}</Text>
+                  <Text ellipsis={{ tooltip: r.name }} style={{ fontSize: 13, color: T.textPrimary, maxWidth: 260 }}>{r.name}</Text>
                 </div>
               ),
             },
-            { title: '售价', dataIndex: 'sell_price', width: 90, align: 'right' as const, render: (v: number) => v ? `RM${v.toFixed(2)}` : '-' },
-            { title: '销量', dataIndex: 'total_qty', width: 70, align: 'right' as const },
-            { title: '销售额', dataIndex: 'total_sales_myr', width: 110, align: 'right' as const, render: (v: number) => v ? <Text strong style={{ color: T.primary }}>RM{v.toFixed(2)}</Text> : '-' },
-            { title: '占比', width: 70, align: 'right' as const,
+            { title: '销量', dataIndex: 'total_qty', width: 70, align: 'right' as const, render: (v: number) => <Text strong style={{ fontSize: 13, color: T.textPrimary }}>{v}</Text> },
+            {
+              title: '销售额', dataIndex: 'total_sales_myr', width: 110, align: 'right' as const,
+              render: (v: number) => <Text strong style={{ fontSize: 13, color: T.primary, fontFamily: '"Inter", sans-serif' }}>RM{v?.toFixed(2)}</Text>,
+            },
+            {
+              title: '占比', width: 65, align: 'right' as const,
               render: (_: any, r: any) => {
                 const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0;
-                return <Text style={{ fontSize: 12, color: T.textTertiary }}>{pct.toFixed(1)}%</Text>;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                    <div style={{ width: 36, height: 4, borderRadius: 2, background: '#F1F5F9', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: 2, background: pct > 30 ? T.primary : pct > 10 ? '#6B8CFF' : '#CBD5E1', transition: 'width 0.3s' }} />
+                    </div>
+                    <Text style={{ fontSize: 11, color: T.textTertiary, minWidth: 36, textAlign: 'right' }}>{pct.toFixed(1)}%</Text>
+                  </div>
+                );
+              },
+            },
+            {
+              title: '趋势', width: 60, align: 'right' as const,
+              render: (_: any, r: any, i: number) => {
+                const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0;
+                const isTop = i < 2 || pct > 20;
+                if (isTop) {
+                  return <RiseOutlined style={{ color: '#22C55E', fontSize: 14 }} />;
+                }
+                return <Text style={{ fontSize: 11, color: T.textTertiary }}>—</Text>;
+              },
+            },
+            {
+              title: '状态', width: 80,
+              render: (_: any, r: any) => {
+                const pct = data.cards.total_revenue_myr > 0 ? ((r.total_sales_myr / data.cards.total_revenue_myr) * 100) : 0;
+                if (pct > 30) return <Tag color="gold" style={{ borderRadius: 6, margin: 0, fontSize: 10, fontWeight: 600 }}>🔥 核心商品</Tag>;
+                if (pct > 10) return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#F0FDF4', color: '#22C55E', border: 'none', fontWeight: 600 }}>📈 热销</Tag>;
+                if (pct < 3) return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', fontWeight: 600 }}>⚠️ 慢销</Tag>;
+                return <Tag style={{ borderRadius: 6, margin: 0, fontSize: 10, background: '#F1F5F9', color: T.textTertiary, border: 'none' }}>正常</Tag>;
               },
             },
           ]}
