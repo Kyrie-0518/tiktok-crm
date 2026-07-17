@@ -67,21 +67,17 @@ export default function Dashboard() {
       ],
       series: [
         {
-          name: '订单数', type: 'bar', yAxisIndex: 0, barWidth: 14,
-          data: data.order_trend.map(d => d.order_count),
-          itemStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#6B8CFF' }, { offset: 1, color: T.primary },
-            ]),
-            borderRadius: [4, 4, 0, 0],
-          },
-        },
-        {
           name: '销售额(MYR)', type: 'line', yAxisIndex: 1, smooth: true,
           data: data.order_trend.map(d => d.revenue_myr),
-          lineStyle: { color: '#F59E0B', width: 2 },
-          itemStyle: { color: '#F59E0B' }, symbol: 'circle', symbolSize: 4,
-          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(245,158,11,0.12)' }, { offset: 1, color: 'rgba(245,158,11,0)' }]) },
+          lineStyle: { color: '#4F6BFF', width: 2.5 },
+          itemStyle: { color: '#4F6BFF' }, symbol: 'circle', symbolSize: 5,
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(79,107,255,0.15)' }, { offset: 1, color: 'rgba(79,107,255,0)' }]) },
+        },
+        {
+          name: '订单数', type: 'line', yAxisIndex: 0, smooth: true,
+          data: data.order_trend.map(d => d.order_count),
+          lineStyle: { color: '#22C55E', width: 2, type: 'dashed' },
+          itemStyle: { color: '#22C55E' }, symbol: 'circle', symbolSize: 4,
         },
       ],
     });
@@ -121,7 +117,7 @@ export default function Dashboard() {
             icon: <DollarOutlined />, color: '#4F6BFF', bg: '#EEF3FF',
           },
           {
-            label: '今日订单', value: data.cards.total_orders.toString(),
+            label: '总订单', value: data.cards.total_orders.toString(),
             change: data.cards.today_orders > 0 ? `今日 +${data.cards.today_orders}` : null,
             icon: <ShoppingCartOutlined />, color: '#22C55E', bg: '#F0FDF4',
           },
