@@ -175,7 +175,7 @@ export default function Dashboard() {
       </Row>
 
       {/* ═══ Row 2: 趋势图 + 经营概况 ═══ */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: 24 }}>
         <Col xs={24} lg={16}>
           <Card
             title={<Text strong style={{ fontSize: 15, color: T.textPrimary }}>销售趋势</Text>}
