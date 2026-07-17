@@ -66,7 +66,17 @@ export default function Dashboard() {
         { name: '订单数', type: 'line', yAxisIndex: 0, smooth: true, data: trendData.map(d => d.order_count), lineStyle: { color: '#22C55E', width: 2 }, itemStyle: { color: '#22C55E' }, symbol: 'circle', symbolSize: 4 },
       ],
     });
-    return () => chart.dispose();
+    // 自适应窗口尺寸 + 路由切换后回到页面时重新计算
+    const handleResize = () => chart.resize();
+    window.addEventListener('resize', handleResize);
+    // 延迟再次 resize，避免路由切换后容器宽度尚未就绪
+    const t1 = setTimeout(chart.resize, 50);
+    const t2 = setTimeout(chart.resize, 300);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(t1); clearTimeout(t2);
+      chart.dispose();
+    };
   }, [trendData]);
 
   if (loading) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" tip="加载仪表盘数据..." /></div>;

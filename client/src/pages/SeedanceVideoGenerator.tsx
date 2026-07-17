@@ -6,7 +6,6 @@ import {
 import {
   VideoCameraOutlined,
   ReloadOutlined, EditOutlined,
-  LockOutlined,
   SoundOutlined,
   CloseOutlined,
   ExpandOutlined, AudioOutlined,
@@ -739,22 +738,8 @@ export default function SeedanceVideoGenerator() {
     }
   };
 
-  // 无权限页面
-  if (permissionError) {
-    return (
-      <div style={{
-        textAlign: 'center',
-        padding: '100px 20px',
-        background: theme.bg,
-        minHeight: 'calc(100vh - 120px)',
-        borderRadius: 16,
-      }}>
-        <LockOutlined style={{ fontSize: 64, color: theme.textTertiary, marginBottom: 24 }} />
-        <h2 style={{ color: theme.text, marginBottom: 16 }}>{permissionError}</h2>
-        <Text style={{ color: theme.textSecondary }}>请进入「模型API配置」页面完成 API 地址和密钥的配置，测试通过后启用</Text>
-      </div>
-    );
-  }
+  // 无权限不再锁定页面（移除 LockOutlined 锁定页）
+  // 用户进入后可直接使用，如果没配模型会在生成时报错
 
   return (
     <div style={{
