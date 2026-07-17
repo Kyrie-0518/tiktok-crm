@@ -837,10 +837,10 @@ function AppLayout() {
             <Route path="/ad-logs" element={<AdLogs />} />
             <Route path="/ad-creatives" element={<AdCreatives />} />
             <Route path="/system-settings" element={<SystemSettings />} />
-            <Route path="/admin/*" element={<AdminLayout />} />
-<Route path="/kyrie" element={<Kyrie />} />
-<Route path="/m/kyrie" element={<MobileKyrie />} />
-<Route path="/ai-studio/*" element={<AIStudioLayout />} />
+            <Route path="/admin/*" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>} />
+<Route path="/kyrie" element={<ProtectedRoute><Kyrie /></ProtectedRoute>} />
+<Route path="/m/kyrie" element={<ProtectedRoute><MobileKyrie /></ProtectedRoute>} />
+<Route path="/ai-studio/*" element={<ProtectedRoute><AIStudioLayout /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
