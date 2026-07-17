@@ -46,7 +46,7 @@ const AGENT_REQUEST_TIMEOUT_MS = 180_000;
 // ════════════════════════════════════════
 const NAV_ITEMS = [
   { key: 'dashboard', icon: <ThunderboltOutlined />, label: '工作台' },
-  { key: 'chat', icon: <RobotOutlined />, label: 'AI 对话' },
+  { key: 'chat', icon: <RobotOutlined />, label: '欧文' },
   { key: 'knowledge', icon: <BookOutlined />, label: '知识库' },
   { key: 'settings', icon: <SettingOutlined />, label: '设置' },
 ];
@@ -97,7 +97,11 @@ export default function Kyrie() {
 
   // ── 聊天状态（保留核心逻辑） ──
   const [messages, setMessages] = useState<ChatMessage[]>([makeWelcomeMsg()]);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<Session[]>(() => {
+    try { return JSON.parse(localStorage.getItem('erp_kyrie_sessions') || '[]'); } catch { return []; }
+  });
+  // 持久化：每次 sessions 变化自动存入 localStorage
+  useEffect(() => { localStorage.setItem('erp_kyrie_sessions', JSON.stringify(sessions)); }, [sessions]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
