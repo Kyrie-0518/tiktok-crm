@@ -542,6 +542,9 @@ function initTables() {
   if (!allUserCols.includes('last_user_agent')) {
     db.exec("ALTER TABLE users ADD COLUMN last_user_agent TEXT DEFAULT ''");
   }
+  if (!allUserCols.includes('email')) {
+    db.exec("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''");
+  }
 
   // Seed default admin if not exist — 随机生成密码+首次强制修改
   const existingAdmin = db.prepare("SELECT id, role_id FROM users WHERE username = 'admin'").get() as any;

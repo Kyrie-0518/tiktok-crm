@@ -52,14 +52,42 @@ export function signToken(payload: JwtPayload): string {
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  // 开发阶段：直接放行，不验证 token，固定为 Kyrie
-  req.user = { userId: 1, username: 'Kyrie' };
-  next();
+  const mode = process.env.AUTH_MODE;
+  // 本地开发：AUTH_MODE=dev → 固定 Kyrie 用户（不改 .env 就跑这个分支）
+  if (mode !== 'jwt') {
+    req.user = { userId: 1, username: 'Kyrie' };
+    return next();
+  }
+
+  // 生产：AUTH_MODE=jwt → 正式 JWT 验证
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: '未登录，请先登录' });
+  }
+  try {
+    const payload = jwt.verify(header.slice(7), getJwtSecretSync()) as JwtPayload;
+    req.user = payload;
+    next();
+  } catch (e: any) {
+    const msg = e.name === 'TokenExpiredError' ? 'Token 已过期，请重新登录' : 'Token 无效';
+    return res.status(401).json({ error: msg });
+  }
 }
 
 export function optionalAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  // 开发阶段：直接放行，不验证 token，固定为 Kyrie
-  req.user = { userId: 1, username: 'Kyrie' };
+  const mode = process.env.AUTH_MODE;
+  if (mode !== 'jwt') {
+    req.user = { userId: 1, username: 'Kyrie' };
+    return next();
+  }
+
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    try {
+      const payload = jwt.verify(header.slice(7), getJwtSecretSync()) as JwtPayload;
+      req.user = payload;
+    } catch { /* ignore invalid token for optional auth */ }
+  }
   next();
 }
 

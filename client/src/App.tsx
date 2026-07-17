@@ -131,8 +131,23 @@ function hasPerm(_permissions: Record<string, string>, _permKey: string, _parent
   return true;
 }
 
+const PUBLIC_ROUTES = ['/login'];
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  // 开发阶段：不做 token 验证，直接放行
+  const location = useLocation();
+  const token = useAuthStore((s) => s.token);
+
+  // 登录页永远放行
+  if (PUBLIC_ROUTES.includes(location.pathname)) {
+    return <>{children}</>;
+  }
+
+  // 未登录 → 重定向到 /login，带上回跳地址
+  if (!token) {
+    const redirect = location.pathname !== '/' ? `?redirect=${encodeURIComponent(location.pathname + location.search)}` : '';
+    return <Navigate to={`/login${redirect}`} replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -165,6 +180,7 @@ function AppLayout() {
   const roleKey = useAuthStore((s) => s.roleKey);
   const username = useAuthStore((s) => s.username);
   const displayName = useAuthStore((s) => s.displayName);
+  const userEmail = useAuthStore((s) => s.email);
 
   const isDevOrAdmin = true; // 开发阶段：所有用户都是管理员
 
@@ -649,7 +665,7 @@ function AppLayout() {
                         {username || 'User'}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--bo-text-tertiary)', marginTop: 2 }}>
-                        {username}@bozone.cn
+                        {userEmail || '未绑定邮箱'}
                       </div>
                     </div>
                   </div>
@@ -715,7 +731,7 @@ function AppLayout() {
                         {username || 'User'}
                       </div>
                       <div style={{ fontSize: 12.5, color: 'var(--bo-text-tertiary)', marginTop: 3 }}>
-                        {username}@bozone.cn
+                        {userEmail || '未绑定邮箱'}
                       </div>
                     </div>
                   </div>

@@ -3,6 +3,7 @@ import { Form, Input, Button, Card, message } from 'antd';
 import { UserOutlined, LockOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import api from '../api';
 
 export default function Login() {
   const [form] = Form.useForm();
@@ -14,12 +15,24 @@ export default function Login() {
     if (submitting) return;
     setSubmitting(true);
 
-    // 开发阶段：不做任何验证，直接登录
-    const fakeToken = 'dev-token-' + Date.now();
-    setAuth(fakeToken, values.username, {}, '', 'staff', undefined, values.username);
-    message.success('登录成功');
-    navigate('/dashboard', { replace: true });
-    setSubmitting(false);
+    try {
+      const res = await api.post('/auth/login', {
+        username: values.username,
+        password: values.password,
+      });
+      const { token, username, display_name, permissions, role_name, role_key, email } = res.data;
+      setAuth(token, username, permissions || {}, role_name || '', role_key || 'staff', undefined, display_name || username);
+      // 如果返回了 email，也存下来
+      if (email) localStorage.setItem('erp_email', email);
+      message.success('登录成功');
+      const redirect = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
+      navigate(redirect, { replace: true });
+    } catch (e: any) {
+      const msg = e.response?.data?.error || '登录失败，请检查网络连接';
+      message.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

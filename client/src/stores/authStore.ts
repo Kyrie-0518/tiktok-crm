@@ -9,6 +9,7 @@ interface AuthState {
   token: string | null;
   username: string | null;
   displayName: string | null;
+  email: string | null;
   permissions: Record<string, string>;
   roleName: string | null;
   roleKey: RoleKey | null;
@@ -42,6 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: localStorage.getItem('erp_token'),
   username: localStorage.getItem('erp_username'),
   displayName: localStorage.getItem('erp_display_name'),
+  email: localStorage.getItem('erp_email'),
   permissions: JSON.parse(localStorage.getItem('erp_permissions') || '{}'),
   roleName: localStorage.getItem('erp_role_name'),
   roleKey: (localStorage.getItem('erp_role_key') as RoleKey) || null,
@@ -59,17 +61,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.setItem('erp_role_name', roleName);
     localStorage.setItem('erp_role_key', roleKey);
     if (expireAt) localStorage.setItem('erp_token_expire_at', expireAt.toString());
-    set({ token, username, displayName: displayName || null, permissions, roleName, roleKey: roleKey as RoleKey, tokenExpireAt: expireAt });
+    set({ token, username, displayName: displayName || null, email: localStorage.getItem('erp_email') || null, permissions, roleName, roleKey: roleKey as RoleKey, tokenExpireAt: expireAt });
   },
 
   logout: () => {
     localStorage.clear();
-    set({ token: null, username: null, displayName: null, permissions: {}, roleName: null, roleKey: null, tokenExpireAt: null });
+    set({ token: null, username: null, displayName: null, email: null, permissions: {}, roleName: null, roleKey: null, tokenExpireAt: null });
   },
 
   isTokenValid: () => {
-    // 开发阶段：token 永远有效
-    return true;
+    const { token } = get();
+    return checkTokenValid(token);
   },
 }));
 

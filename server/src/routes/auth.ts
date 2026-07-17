@@ -32,6 +32,8 @@ router.post('/login', (req: Request, res: Response) => {
     token,
     username: user.username,
     display_name: user.display_name || user.username,
+    email: user.email || '',
+    role_id: user.role_id,
   });
 });
 
@@ -40,7 +42,7 @@ router.get('/me', authMiddleware, (req: Request, res: Response) => {
   const db = getDb();
   const user = req.user as JwtPayload;
   const row = db.prepare(`
-    SELECT u.id, u.username, u.display_name, u.role_id, u.created_at,
+    SELECT u.id, u.username, u.display_name, u.email, u.role_id, u.created_at,
            r.name as role_name, r.role_key as role_key, r.permissions as permissions
     FROM users u
     LEFT JOIN roles r ON u.role_id = r.id
@@ -50,6 +52,7 @@ router.get('/me', authMiddleware, (req: Request, res: Response) => {
   res.json({
     username: row.username,
     display_name: row.display_name,
+    email: row.email || '',
     permissions: JSON.parse(row.permissions || '{}'),
     role_name: row.role_name,
     role_id: row.role_id,
