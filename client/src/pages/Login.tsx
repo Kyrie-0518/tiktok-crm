@@ -64,9 +64,7 @@ export default function Login() {
           zIndex: 2, position: 'relative',
         }} bordered={false}>
           <div style={{ textAlign: 'center', marginBottom: 28, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <img src="/logo-icon.png" alt="" style={{ width: 64, height: 64, objectFit: 'contain', display: 'block' }} />
-            <img src="/logo-title.png" alt="MERA" style={{ width: 240, height: 'auto', marginTop: 8, display: 'block' }} />
-            <p style={{ color: '#999', fontSize: 12, margin: '6px 0 0', letterSpacing: 2 }}>全域跨境经营管理系统</p>
+            <img src="/logo-title.png" alt="MERA" style={{ width: 220, height: 'auto', display: 'block' }} />
           </div>
 
           <Form form={form} onFinish={handleSubmit} layout="vertical" size="large">
