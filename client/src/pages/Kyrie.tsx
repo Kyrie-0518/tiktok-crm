@@ -502,6 +502,30 @@ export default function Kyrie() {
                 <div ref={msgEndRef} />
               </div>
             )}
+
+            {/*── Placeholder Views (knowledge / settings) ──*/}
+            {(activeNav === 'knowledge' || activeNav === 'settings') && (
+              <Card style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow, maxWidth: 560, margin: '0 auto', marginTop: 48 }}
+                bodyStyle={{ padding: '48px 40px', textAlign: 'center' }}>
+                <div style={{ width: 64, height: 64, borderRadius: 20, background: T.primaryLight, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                  {activeNav === 'knowledge'
+                    ? <BookOutlined style={{ fontSize: 28, color: T.primary }} />
+                    : <SettingOutlined style={{ fontSize: 28, color: T.primary }} />}
+                </div>
+                <Text style={{ fontSize: 18, fontWeight: 600, color: T.textPrimary, display: 'block', marginBottom: 8 }}>
+                  {activeNav === 'knowledge' ? '知识库' : '设置'}
+                </Text>
+                <Text style={{ fontSize: 14, color: T.textTertiary, lineHeight: 1.6 }}>
+                  {activeNav === 'knowledge'
+                    ? '跨境电商知识库检索功能开发中\n完成后可通过 AI助手直接引用知识库内容回答业务问题'
+                    : 'AI 偏好与个性化设置开发中\n将支持：默认货币、报告语言、对话风格、快捷指令自定义等'}
+                </Text>
+                <Button type="default" onClick={() => setActiveNav('dashboard')}
+                  style={{ marginTop: 20, borderRadius: 10, border: `1px solid ${T.cardBorder}` }}>
+                  返回工作台
+                </Button>
+              </Card>
+            )}
           </div>
         </div>
 
