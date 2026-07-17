@@ -32,11 +32,13 @@ function parseTokenExpireAt(token: string): number | null {
   }
 }
 
-// 检查 Token 是否有效
+// 检查 Token 是否有效（仅接受合法 JWT 格式）
 function checkTokenValid(token: string | null): boolean {
   if (!token) return false;
+  // 必须是三段式 JWT（header.payload.signature）
+  if (token.split('.').length !== 3) return false;
   const expireAt = parseTokenExpireAt(token);
-  if (!expireAt) return true;
+  if (!expireAt) return false;
   return Date.now() < expireAt;
 }
 

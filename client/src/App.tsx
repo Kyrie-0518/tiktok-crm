@@ -138,14 +138,17 @@ const PUBLIC_ROUTES = ['/login'];
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const token = useAuthStore((s) => s.token);
+  const isTokenValid = useAuthStore((s) => s.isTokenValid);
+  const logout = useAuthStore((s) => s.logout);
 
   // 登录页永远放行
   if (PUBLIC_ROUTES.includes(location.pathname)) {
     return <>{children}</>;
   }
 
-  // 未登录 → 重定向到 /login，带上回跳地址
-  if (!token) {
+  // 无 token 或 token 无效 → 踢到登录页
+  if (!token || !isTokenValid()) {
+    logout();
     const redirect = location.pathname !== '/' ? `?redirect=${encodeURIComponent(location.pathname + location.search)}` : '';
     return <Navigate to={`/login${redirect}`} replace />;
   }
