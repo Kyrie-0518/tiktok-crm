@@ -13,6 +13,11 @@ export class TikTokAPI {
     this.auth = auth;
   }
 
+  /** 动态更新 access_token（token 自动刷新后调用） */
+  setAccessToken(token: string): void {
+    this.auth.access_token = token;
+  }
+
   get apiVersion(): string {
     return this.auth.api_version || '202309';
   }

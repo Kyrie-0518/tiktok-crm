@@ -4,6 +4,7 @@
  */
 import getDb from '../db';
 import { TikTokAPI } from './tiktok-api';
+import { getValidToken } from './tiktok-oauth';
 
 // 订单状态映射：TikTok API → 本地
 const STATUS_MAP: Record<string, string> = {
@@ -50,17 +51,25 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
   if (!shop) {
     return { created: 0, updated: 0, errors: ['店铺未启用同步或无凭证'] };
   }
-  // 2. 初始化 API 客户端（优先使用店铺凭证，fallback 到环境变量）
+  // 2. 初始化 API 客户端（优先使用店铺凭证 + 自动刷新 token）
   const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
   const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
-  if (!appKey || !appSecret || !shop.access_token) {
-    return { created: 0, updated: 0, errors: ['缺少 API 凭证 (app_key/app_secret/access_token)，请重新授权或配置环境变量'] };
+  if (!appKey || !appSecret) {
+    return { created: 0, updated: 0, errors: ['缺少 API 凭证 (app_key/app_secret)，请确认环境变量配置'] };
+  }
+
+  // 自动刷新 token
+  let validToken: string;
+  try {
+    validToken = await getValidToken(shopId);
+  } catch (e: any) {
+    return { created: 0, updated: 0, errors: [`Token 无效: ${e.message}`] };
   }
 
   const api = new TikTokAPI({
     app_key: appKey,
     app_secret: appSecret,
-    access_token: shop.access_token,
+    access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
   });
@@ -362,19 +371,28 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
   const db = getDb();
   const shop = db.prepare('SELECT * FROM tiktok_shops WHERE id = ?').get(shopId) as any;
 
-  if (!shop || !shop.access_token) {
-    return { success: false, message: '缺少 access_token，请重新授权店铺' };
+  if (!shop) {
+    return { success: false, message: '店铺不存在' };
   }
   if (!shop.app_key && !process.env.TIKTOK_APP_KEY) {
     return { success: false, message: '缺少 App Key，请在环境变量中配置 TIKTOK_APP_KEY' };
   }
 
+  // 自动刷新 token
+  let validToken: string;
+  try {
+    validToken = await getValidToken(shopId);
+    console.log('[testApiConnection] ✅ token 有效');
+  } catch (e: any) {
+    return { success: false, message: `Token 无效: ${e.message}` };
+  }
+
   // 如果数据库没有 shop_cipher，尝试自动补全
-  if (!shop.shop_cipher && shop.access_token) {
+  if (!shop.shop_cipher) {
     console.log('[testApiConnection] shop_cipher 为空，尝试从 TikTok API 获取...');
     try {
       const { getAuthorizedShops } = require('../services/tiktok-oauth');
-      const shops = await getAuthorizedShops(shop.access_token);
+      const shops = await getAuthorizedShops(validToken);
       if (shops.length > 0 && shops[0].cipher) {
         shop.shop_cipher = shops[0].cipher;
         db.prepare('UPDATE tiktok_shops SET shop_cipher = ? WHERE id = ?').run(shop.shop_cipher, shopId);
@@ -390,7 +408,7 @@ export async function testApiConnection(shopId: number): Promise<{ success: bool
   const api = new TikTokAPI({
     app_key: appKey,
     app_secret: appSecret,
-    access_token: shop.access_token,
+    access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
   });
@@ -445,14 +463,20 @@ export async function resyncAllOrderItems(shopId: number): Promise<{ processed: 
   }
   const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
   const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
-  if (!appKey || !appSecret || !shop.access_token) {
+  if (!appKey || !appSecret) {
     return { processed: 0, errors: ['缺少 API 凭证'] };
+  }
+  let validToken: string;
+  try {
+    validToken = await getValidToken(shopId);
+  } catch (e: any) {
+    return { processed: 0, errors: [`Token 无效: ${e.message}`] };
   }
 
   const api = new TikTokAPI({
     app_key: appKey,
     app_secret: appSecret,
-    access_token: shop.access_token,
+    access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
   });

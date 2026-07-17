@@ -4,6 +4,7 @@
  * Ref: https://partner.tiktokshop.com/docv2/page/67c83e0799a75104986ae498
  */
 import crypto from 'node:crypto';
+import getDb from '../db';
 
 // ── 环境变量读取 ──
 function env(key: string, fallback = ''): string {
@@ -245,6 +246,57 @@ export async function refreshToken(refreshTokenStr: string): Promise<{
     refresh_token: d.refresh_token || refreshTokenStr,
     expires_in: expiresIn,
   };
+}
+
+// ── 自动刷新 Token（所有 API 调用的统一入口） ──
+/**
+ * 获取店铺的有效 access_token（自动检测过期并静默刷新）
+ * @param shopId 店铺 ID
+ * @returns 有效的 access_token
+ */
+export async function getValidToken(shopId: number): Promise<string> {
+  const db = getDb();
+  const shop = db.prepare('SELECT id, access_token, refresh_token, token_expires_at FROM tiktok_shops WHERE id = ?').get(shopId) as any;
+
+  if (!shop?.access_token) {
+    throw new Error('店铺未授权，请先完成 TikTok Shop 授权');
+  }
+
+  // token 还没过期（预留 5 分钟 buffer）→ 直接返回
+  const now = Date.now();
+  const expiresAt = shop.token_expires_at ? new Date(shop.token_expires_at).getTime() : 0;
+  if (expiresAt > now + 5 * 60 * 1000) {
+    return shop.access_token;
+  }
+
+  // token 已过期或即将过期 → 用 refresh_token 刷新
+  if (!shop.refresh_token) {
+    // 无 refresh_token 但有 access_token 且还没完全过期 → 用最后一次
+    if (expiresAt > now) {
+      console.warn(`[getValidToken] shop ${shopId} token 即将过期但无 refresh_token，用现有 token 尝试`);
+      return shop.access_token;
+    }
+    throw new Error('Token 已过期且缺少 refresh_token，请重新授权店铺');
+  }
+
+  console.log(`[getValidToken] shop ${shopId} token 已过期，自动刷新中...`);
+  try {
+    const newToken = await refreshToken(shop.refresh_token);
+    const newExpiresAt = new Date(Date.now() + newToken.expires_in * 1000).toISOString();
+    db.prepare(`
+      UPDATE tiktok_shops SET access_token = ?, refresh_token = ?, token_expires_at = ? WHERE id = ?
+    `).run(newToken.access_token, newToken.refresh_token, newExpiresAt, shopId);
+    console.log(`[getValidToken] shop ${shopId} ✅ token 自动刷新成功`);
+    return newToken.access_token;
+  } catch (e: any) {
+    console.error(`[getValidToken] shop ${shopId} ❌ token 刷新失败:`, e.message);
+    // 如果旧 token 还没完全过期，尝试用旧的
+    if (expiresAt > now) {
+      console.warn(`[getValidToken] shop ${shopId} 刷新失败但旧 token 仍有效，继续使用`);
+      return shop.access_token;
+    }
+    throw new Error(`Token 刷新失败: ${e.message}，请重新授权`);
+  }
 }
 
 // ── 获取已授权的店铺列表 ──

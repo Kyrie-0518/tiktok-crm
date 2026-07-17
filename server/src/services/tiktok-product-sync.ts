@@ -5,6 +5,7 @@
  */
 import getDb from '../db';
 import { TikTokAPI } from './tiktok-api';
+import { getValidToken } from './tiktok-oauth';
 
 /** 产品状态映射 */
 const PRODUCT_STATUS_MAP: Record<string, string> = {
@@ -49,16 +50,15 @@ export async function syncShopProducts(
   if (!shop) {
     return { created: 0, updated: 0, skipped: 0, errors: ['店铺未启用产品同步或无凭证'] };
   }
-  if (!shop.access_token) {
-    return { created: 0, updated: 0, skipped: 0, errors: ['缺少 access_token，请重新授权'] };
-  }
+  let validToken: string;
+  try { validToken = await getValidToken(shopId); } catch (e: any) { return { created: 0, updated: 0, skipped: 0, errors: [e.message] }; }
 
   const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
   const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
   const api = new TikTokAPI({
     app_key: appKey,
     app_secret: appSecret,
-    access_token: shop.access_token,
+    access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
   });
@@ -151,14 +151,15 @@ export async function syncSingleProduct(
 ): Promise<{ success: boolean; error?: string }> {
   const db = getDb();
   const shop = db.prepare('SELECT * FROM tiktok_shops WHERE id = ?').get(shopId) as any;
-  if (!shop?.access_token) return { success: false, error: '店铺无有效凭证' };
+  let validToken: string;
+  try { validToken = await getValidToken(shopId); } catch (e: any) { return { success: false, error: e.message }; }
 
   const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
   const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
   const api = new TikTokAPI({
     app_key: appKey,
     app_secret: appSecret,
-    access_token: shop.access_token,
+    access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: shop.api_version || '202309',
   });
@@ -188,13 +189,14 @@ export async function syncBrands(
 ): Promise<{ count: number; error?: string }> {
   const db = getDb();
   const shop = db.prepare('SELECT * FROM tiktok_shops WHERE id = ?').get(shopId) as any;
-  if (!shop?.access_token) return { count: 0, error: '店铺无有效凭证' };
+  let validToken: string;
+  try { validToken = await getValidToken(shopId); } catch (e: any) { return { count: 0, error: e.message }; }
 
   const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
   const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
   const api = new TikTokAPI({
     app_key: appKey, app_secret: appSecret,
-    access_token: shop.access_token,
+    access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: '202309',
   });
@@ -221,13 +223,14 @@ export async function syncCategories(
 ): Promise<{ count: number; error?: string }> {
   const db = getDb();
   const shop = db.prepare('SELECT * FROM tiktok_shops WHERE id = ?').get(shopId) as any;
-  if (!shop?.access_token) return { count: 0, error: '店铺无有效凭证' };
+  let validToken: string;
+  try { validToken = await getValidToken(shopId); } catch (e: any) { return { count: 0, error: e.message }; }
 
   const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
   const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
   const api = new TikTokAPI({
     app_key: appKey, app_secret: appSecret,
-    access_token: shop.access_token,
+    access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: '202309',
   });
@@ -253,13 +256,14 @@ export async function syncProductDiagnostics(
 ): Promise<{ diagnoses?: any; seoWords?: any; suggestions?: any; error?: string }> {
   const db = getDb();
   const shop = db.prepare('SELECT * FROM tiktok_shops WHERE id = ?').get(shopId) as any;
-  if (!shop?.access_token) return { error: '店铺无有效凭证' };
+  let validToken: string;
+  try { validToken = await getValidToken(shopId); } catch (e: any) { return { error: e.message }; }
 
   const appKey = shop.app_key || process.env.TIKTOK_APP_KEY || '';
   const appSecret = shop.app_secret || process.env.TIKTOK_APP_SECRET || '';
   const api = new TikTokAPI({
     app_key: appKey, app_secret: appSecret,
-    access_token: shop.access_token,
+    access_token: validToken,
     shop_cipher: shop.shop_cipher || '',
     api_version: '202405',
   });
