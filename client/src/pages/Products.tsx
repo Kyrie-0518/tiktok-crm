@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  Table, Button, Input, Select, Space, Modal, Form, InputNumber, Popconfirm, message, Divider, Tag, Tooltip, Spin
+  Table, Button, Input, Select, Space, Modal, Form, InputNumber, Popconfirm, message, Dropdown, Divider, Tag, Spin
 } from 'antd';
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, UploadOutlined, CloseOutlined, UnorderedListOutlined, AppstoreOutlined, CloudDownloadOutlined, SyncOutlined, CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, UploadOutlined, CloseOutlined, UnorderedListOutlined, AppstoreOutlined, CloudDownloadOutlined, SyncOutlined, CheckCircleFilled, CloseCircleFilled, LoadingOutlined, MoreOutlined, EllipsisOutlined } from '@ant-design/icons';
 import { useProductStore, ProductShop, ProductSku } from '../stores/productStore';
 import { useHasPerm } from '../stores/authStore';
 import type { ColumnsType } from 'antd/es/table';
 import DataTable from '../components/DataTable';
 import ExportButton from '../components/ExportButton';
 
-const BRAND = '#2563eb';
+const T = { primary: '#4F6BFF', primaryLight: '#EEF3FF', cardBorder: '#E8ECF5', cardRadius: 16, textPrimary: '#1E293B', textSecondary: '#64748B', textTertiary: '#94A3B8', success: '#22C55E', warning: '#F59E0B', danger: '#EF4444' };
 
 /** Sync result statistic card */
 function ResultCard({ icon, color, bg, label, value }: {
@@ -249,129 +249,162 @@ export default function Products() {
 
   // ============ Table Columns ============
 
+  const stockStatus = (stock: number) => {
+    if (stock <= 0) return { color: T.danger, bg: '#FEF2F2', label: '缺货', dot: T.danger };
+    if (stock <= 20) return { color: T.warning, bg: '#FFFBEB', label: '库存偏低', dot: T.warning };
+    return { color: T.success, bg: '#F0FDF4', label: '库存充足', dot: T.success };
+  };
+
   const productColumns: ColumnsType<any> = [
     {
-      title: '产品图片',
-      dataIndex: 'image',
-      width: 80,
-      render: (img: string) => (
-        <div style={{
-          width: 60, height: 60, borderRadius: 6, overflow: 'hidden',
-          background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1px solid #e8e8e8',
-        }}>
-          {img ? (
-            <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <span style={{ fontSize: 28 }}>📦</span>
-          )}
+      title: '商品', width: 340,
+      render: (_: any, r: any) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 60, height: 60, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
+            background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: `1px solid ${T.cardBorder}`,
+          }}>
+            {r.image ? (
+              <img src={r.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+            ) : null}
+            <div style={{ display: r.image ? 'none' : 'flex', fontSize: 26, color: T.textTertiary }}><AppstoreOutlined /></div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <a onClick={() => openDetail(r)}
+              style={{ color: T.textPrimary, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'block', lineHeight: 1.4 }}
+              onMouseEnter={e => { e.currentTarget.style.color = T.primary; }}
+              onMouseLeave={e => { e.currentTarget.style.color = T.textPrimary; }}>
+              {r.name}
+            </a>
+            <div style={{ fontSize: 11, color: T.textTertiary, marginTop: 3 }}>SKU: {r.sku || `FG${String(r.id || '').padStart(3, '0')}`}</div>
+          </div>
         </div>
       ),
     },
     {
-      title: '店铺归属',
-      width: 140,
-      render: (_: any, record: any) => {
-        const shops = record.shops;
-        if (!shops || shops.length === 0) return <span style={{ color: '#999' }}>-</span>;
+      title: '店铺', width: 120,
+      render: (_: any, r: any) => {
+        const shops = r.shops;
+        if (!shops || shops.length === 0) return <span style={{ color: T.textTertiary, fontSize: 12 }}>—</span>;
         return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
             {shops.map((s: any, i: number) => (
-              <Tag key={i} color="blue">{s.shop_name}</Tag>
+              <Tag key={i} style={{ borderRadius: 6, border: 'none', background: T.primaryLight, color: T.primary, fontSize: 11, fontWeight: 600, padding: '2px 8px', margin: 0 }}>
+                {s.shop_name}
+              </Tag>
             ))}
           </div>
         );
       },
     },
     {
-      title: '产品名称',
-      dataIndex: 'name',
-      width: 180,
-      render: (name: string, record: any) => (
-        <a onClick={() => openDetail(record)} style={{ color: BRAND, fontWeight: 500, cursor: 'pointer' }}>
-          {name}
-        </a>
-      ),
+      title: '售价', dataIndex: 'sell_price', width: 100, align: 'right' as const,
+      render: (v: number) => v ? <span style={{ color: T.textPrimary, fontSize: 14, fontWeight: 700, fontFamily: '"Inter", sans-serif' }}>RM {v.toFixed(2)}</span> : <span style={{ color: T.textTertiary }}>—</span>,
     },
     {
-      title: '价格',
-      dataIndex: 'sell_price',
-      width: 110,
-      render: (price: number) => {
-        if (!price) return <span style={{ color: '#999' }}>-</span>;
-        return <span style={{ color: '#333', fontSize: 14, fontWeight: 600 }}>RM {price.toFixed(2)}</span>;
+      title: 'SKU', width: 80, align: 'center' as const,
+      render: (_: any, r: any) => {
+        const count = r.skus?.length || 0;
+        return <span style={{ color: T.primary, fontWeight: 600, fontSize: 13, background: T.primaryLight, padding: '2px 10px', borderRadius: 6 }}>{count}</span>;
       },
     },
     {
-      title: 'SKU数量',
-      width: 90,
-      render: (_: any, record: any) => {
-        const count = record.skus?.length || 0;
-        return <span style={{ color: BRAND, fontWeight: 600 }}>{count} 个</span>;
-      },
-    },
-    {
-      title: '库存',
-      width: 120,
-      render: (_: any, record: any) => {
-        const stock = record.stock || 0;
-        const color = stock <= 10 ? '#ff4d4f' : stock <= 50 ? '#fa8c16' : '#2563eb';
+      title: '库存状态', width: 130,
+      render: (_: any, r: any) => {
+        const s = stockStatus(r.stock || 0);
         return (
           <div>
-            <div style={{ color, fontWeight: 600, fontSize: 15 }}>{stock}</div>
-            <div style={{ color: '#999', fontSize: 11 }}>总库存</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
+              <span style={{ fontSize: 15, fontWeight: 700, color: T.textPrimary, fontFamily: '"Inter", sans-serif' }}>{r.stock || 0}</span>
+            </div>
+            <div style={{ fontSize: 11, color: s.color, fontWeight: 500, marginTop: 2, paddingLeft: 12 }}>{s.label}</div>
           </div>
         );
       },
     },
     {
-      title: '操作',
-      width: 200,
-      render: (_: any, record: any) => (
-        <Space>
-          <Button type="link" icon={<UnorderedListOutlined />} onClick={() => openSkuModal(record)} style={{ color: BRAND }}>查看SKU</Button>
-          {canEdit ? (
-            <Button type="link" icon={<EditOutlined />} onClick={() => openProductModal(record)} style={{ color: BRAND }}>编辑</Button>
-          ) : (
-            <Button type="link" onClick={() => openDetail(record)}>查看</Button>
-          )}
-          {canEdit && (
-            <Popconfirm title="确定删除此产品？" onConfirm={() => store.deleteProduct(record.id)}>
-              <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
-            </Popconfirm>
-          )}
-        </Space>
+      title: '操作', width: 60, align: 'center' as const,
+      render: (_: any, r: any) => (
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            items: [
+              { key: 'sku', icon: <UnorderedListOutlined />, label: '查看 SKU', onClick: () => openSkuModal(r) },
+              ...(canEdit ? [{ key: 'edit', icon: <EditOutlined />, label: '编辑商品', onClick: () => openProductModal(r) }] : []),
+              ...(!canEdit ? [{ key: 'view', icon: <SearchOutlined />, label: '查看详情', onClick: () => openDetail(r) }] : []),
+              ...(canEdit ? [{ key: 'delete', icon: <DeleteOutlined />, label: '删除商品', danger: true, onClick: () => { Modal.confirm({ title: '确认删除此产品？', okType: 'danger', okText: '删除', onOk: () => store.deleteProduct(r.id) }); } }] : []),
+            ],
+          }}>
+          <Button type="text" icon={<MoreOutlined />} style={{ color: T.textTertiary, borderRadius: 8, fontSize: 16 }} />
+        </Dropdown>
       ),
     },
   ];
 
   return (
     <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
-      {/* 页面标题 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+      {/* ═══ Header ═══ */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+          width: 40, height: 40, borderRadius: 12,
+          background: 'linear-gradient(135deg, #6B8CFF, #4F6BFF)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 18,
+          boxShadow: '0 2px 10px rgba(79,107,255,0.25)',
         }}>
-          <AppstoreOutlined />
+          <AppstoreOutlined style={{ color: '#fff', fontSize: 18 }} />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>商品管理</h2>
-          <span style={{ fontSize: 12, color: '#999' }}>产品信息 · SKU管理 · 库存追踪</span>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1E293B', lineHeight: 1.3 }}>商品管理</h2>
+          <div style={{ fontSize: 12, color: '#94A3B8' }}>产品信息 · SKU管理 · 库存追踪</div>
         </div>
       </div>
 
-      {/* ========== Filter Bar ========== */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* ═══ Stats Summary ═══ */}
+      {(() => {
+        const prods = store.products;
+        const total = prods.length;
+        const normal = prods.filter(p => (p.stock || 0) > 20).length;
+        const low = prods.filter(p => { const s = p.stock || 0; return s > 0 && s <= 20; }).length;
+        const out = prods.filter(p => (p.stock || 0) === 0).length;
+        const stats = [
+          { label: '全部商品', value: total, color: T.primary, bg: T.primaryLight },
+          { label: '库存充足', value: normal, color: T.success, bg: '#F0FDF4' },
+          { label: '库存偏低', value: low, color: T.warning, bg: '#FFFBEB' },
+          { label: '缺货', value: out, color: T.danger, bg: '#FEF2F2' },
+        ];
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+            {stats.map(s => (
+              <div key={s.label} style={{
+                background: '#fff', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
+                padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+              }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: s.color, fontFamily: '"Inter", sans-serif', flexShrink: 0 }}>
+                  {s.value}
+                </div>
+                <div style={{ fontSize: 12, color: T.textSecondary, fontWeight: 500 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* ═══ Filter Bar ═══ */}
+      <div style={{
+        marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '12px 16px', background: '#fff', borderRadius: 12,
+        border: `1px solid ${T.cardBorder}`,
+      }}>
         <Space>
           <Input
             placeholder="搜索产品名称/SKU编码"
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             prefix={<SearchOutlined />}
-            style={{ width: 240 }}
+            style={{ width: 240, borderRadius: 8 }}
             allowClear
             onPressEnter={handleSearch}
           />
@@ -379,25 +412,21 @@ export default function Products() {
             placeholder="按店铺筛选"
             value={shopFilter}
             onChange={(v) => { setShopFilter(v); store.fetchProducts(keyword, v); }}
-            style={{ width: 160 }}
+            style={{ width: 160, borderRadius: 8 }}
             allowClear
             options={store.shopList.map(s => ({ value: s, label: s }))}
           />
-          <Button type="primary" onClick={handleSearch}>搜索</Button>
+          <Button onClick={handleSearch} style={{ borderRadius: 8 }}>搜索</Button>
         </Space>
         <Space>
-          {canEdit && <Button icon={<UploadOutlined />} onClick={() => message.info('导入功能：请准备Excel数据后使用')}>导入</Button>}
+          {canEdit && <Button icon={<UploadOutlined />} onClick={() => message.info('导入功能：请准备Excel数据后使用')} style={{ borderRadius: 8 }}>导入</Button>}
           <ExportButton onExport={handleExport}>导出Excel</ExportButton>
           {canEdit && (
-            <Button
-              icon={<CloudDownloadOutlined />}
-              onClick={handleOpenSyncModal}
-              style={{ borderColor: BRAND, color: BRAND }}
-            >
+            <Button icon={<CloudDownloadOutlined />} onClick={handleOpenSyncModal} style={{ borderColor: T.primary, color: T.primary, borderRadius: 8 }}>
               同步TikTok产品
             </Button>
           )}
-          {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => openProductModal()}>新增产品</Button>}
+          {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => openProductModal()} style={{ borderRadius: 10, background: T.primary }}>新增产品</Button>}
         </Space>
       </div>
 
@@ -423,7 +452,7 @@ export default function Products() {
           color: #333;
           margin-bottom: 12px;
           padding-left: 8px;
-          border-left: 3px solid ${BRAND};
+          border-left: 3px solid ${T.primary};
         }
         .xzg-shop-row {
           display: flex;
@@ -460,7 +489,7 @@ export default function Products() {
         onOk={() => productForm.submit()}
         okText="提交"
         cancelText="取消"
-        okButtonProps={{ style: { background: BRAND, borderColor: BRAND } }}
+        okButtonProps={{ style: { background: T.primary, borderColor: T.primary } }}
         footer={canEdit ? undefined : <Button onClick={() => setProductModalOpen(false)}>关闭</Button>}
       >
         <Form form={productForm} layout="vertical" onFinish={handleProductSubmit}>
@@ -688,7 +717,7 @@ export default function Products() {
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#333', marginBottom: 4 }}>{detailProduct.name}</div>
                 <div style={{ color: '#999', fontSize: 13, marginBottom: 8 }}>SKU数量：{detailProduct.skus?.length || 0} 个</div>
-                <div style={{ color: '#999', fontSize: 13 }}>总库存：<span style={{ color: BRAND, fontWeight: 600 }}>{detailProduct.stock || 0}</span></div>
+                <div style={{ color: '#999', fontSize: 13 }}>总库存：<span style={{ color: T.primary, fontWeight: 600 }}>{detailProduct.stock || 0}</span></div>
               </div>
             </div>
 
@@ -714,7 +743,7 @@ export default function Products() {
           { title: '规格名称', dataIndex: 'spec_name', width: 140 },
           { title: 'SKU编码', dataIndex: 'sku_code', width: 140 },
           { title: '采购成本', dataIndex: 'cost_price', width: 100, render: (v: number) => `¥${(v || 0).toFixed(2)}` },
-          { title: '售价', dataIndex: 'sell_price', width: 100, render: (v: number) => <span style={{ color: BRAND, fontWeight: 600 }}>RM{(v || 0).toFixed(2)}</span> },
+          { title: '售价', dataIndex: 'sell_price', width: 100, render: (v: number) => <span style={{ color: T.primary, fontWeight: 600 }}>RM{(v || 0).toFixed(2)}</span> },
           { title: '库存', dataIndex: 'stock', width: 80 },
         ]}
         pagination={false}
@@ -811,7 +840,7 @@ export default function Products() {
                 title: '售价',
                 dataIndex: 'sell_price',
                 width: 120,
-                render: (v: number) => <span style={{ color: BRAND, fontWeight: 600 }}>RM{(v || 0).toFixed(2)}</span>,
+                render: (v: number) => <span style={{ color: T.primary, fontWeight: 600 }}>RM{(v || 0).toFixed(2)}</span>,
               },
               {
                 title: '库存',
@@ -833,7 +862,7 @@ export default function Products() {
                       <span style={{ fontWeight: 600 }}>合计</span>
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={4}>
-                      <span style={{ fontWeight: 700, color: BRAND }}>{totalStock}</span>
+                      <span style={{ fontWeight: 700, color: T.primary }}>{totalStock}</span>
                     </Table.Summary.Cell>
                   </Table.Summary.Row>
                 </Table.Summary>
@@ -849,7 +878,7 @@ export default function Products() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
-              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              background: `linear-gradient(135deg, #6B8CFF, ${T.primary})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#fff', fontSize: 16,
             }}>
@@ -879,7 +908,7 @@ export default function Products() {
               onClick={handleSyncStart}
               loading={store.syncing}
               disabled={!selectedShopId}
-              style={{ background: BRAND, borderColor: BRAND }}
+              style={{ background: T.primary, borderColor: T.primary }}
             >
               开始同步
             </Button>
@@ -908,7 +937,7 @@ export default function Products() {
                 notFoundContent={
                   <div style={{ padding: 12, color: '#999', textAlign: 'center' }}>
                     暂无可同步的 TikTok 店铺，请先到
-                    <a href="/shops" style={{ color: BRAND, marginLeft: 4 }}>店铺管理</a>
+                    <a href="/shops" style={{ color: T.primary, marginLeft: 4 }}>店铺管理</a>
                     {' '}完成授权
                   </div>
                 }
@@ -965,7 +994,7 @@ export default function Products() {
             }}>
               <ResultCard
                 icon={<PlusOutlined />}
-                color="#2563eb"
+                color={T.primary}
                 bg="#eff6ff"
                 label="新增产品"
                 value={syncResult.created}
