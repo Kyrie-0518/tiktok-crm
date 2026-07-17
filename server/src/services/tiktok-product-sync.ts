@@ -111,11 +111,10 @@ export async function syncShopProducts(
         console.log('[ProductSync] 首个产品字段:', {
           id: first.product_id || first.id,
           title: first.title || first.product_name,
-          price_keys: first.price ? Object.keys(first.price) : null,
-          stock_keys: first.stock_info ? Object.keys(first.stock_info) : null,
-          image_keys: first.main_image ? Object.keys(first.main_image) : (Array.isArray(first.images) ? 'images[]' : null),
-          has_image_list: Array.isArray(first.image_list),
-          sku_count: Array.isArray(first.skus) ? first.skus.length : 0,
+          status: first.status,
+          listing_status: first.listing_status,
+          product_status: first.product_status,
+          status_keys: Object.keys(first).filter(k => k.toLowerCase().includes('status')),
         });
       }
 
@@ -456,6 +455,7 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
   // 重量：从 package_weight 中取
   const weight = parseFloat(detail.package_weight?.value || detail.package_weight || '0') || 0;
   const status = PRODUCT_STATUS_MAP[detail.status] || 'active';
+  const tiktokStatus = detail.status || '';
 
   // 更新主表字段（图片、价格、库存、描述、类目、重量、状态）
   db.prepare(`
@@ -468,9 +468,10 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
       category_name = COALESCE(NULLIF(?, ''), category_name),
       weight = COALESCE(NULLIF(?, 0), weight),
       status = COALESCE(NULLIF(?, ''), status),
+      tiktok_status = COALESCE(NULLIF(?, ''), tiktok_status),
       updated_at = datetime('now')
     WHERE id = ?
-  `).run(sellPrice, originalPrice, stock, image, description, categoryName, weight, status, existing.id);
+  `).run(sellPrice, originalPrice, stock, image, description, categoryName, weight, status, tiktokStatus, existing.id);
 
   // 合并详情数据到 extra_data
   let extra: any = {};

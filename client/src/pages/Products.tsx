@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
-  Table, Button, Input, Select, Space, Modal, Form, InputNumber, Popconfirm, message, Dropdown, Divider, Tag, Spin
+  Table, Button, Input, Select, Space, Modal, Form, InputNumber, Popconfirm, message, Dropdown, Divider, Tag, Spin, Tooltip
 } from 'antd';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, UploadOutlined, CloseOutlined, UnorderedListOutlined, AppstoreOutlined, CloudDownloadOutlined, SyncOutlined, CheckCircleFilled, CloseCircleFilled, LoadingOutlined, MoreOutlined, EllipsisOutlined } from '@ant-design/icons';
 import { useProductStore, ProductShop, ProductSku } from '../stores/productStore';
@@ -317,7 +317,11 @@ export default function Products() {
           rejected: { label: '未通过', color: '#EF4444' },
         };
         const m = map[s] || { label: s, color: '#94A3B8' };
-        return <Tag style={{ borderRadius: 6, border: 'none', background: `${m.color}18`, color: m.color, fontSize: 11, fontWeight: 600, margin: 0 }}>{m.label}</Tag>;
+        return (
+          <Tooltip title={r.tiktok_status ? `TikTok 原始: ${r.tiktok_status}` : '无原始值'}>
+            <Tag style={{ borderRadius: 6, border: 'none', background: `${m.color}18`, color: m.color, fontSize: 11, fontWeight: 600, margin: 0, cursor: 'help' }}>{m.label}</Tag>
+          </Tooltip>
+        );
       },
     },
     {
@@ -428,22 +432,35 @@ export default function Products() {
             allowClear
             options={store.shopList.map(s => ({ value: s, label: s }))}
           />
-          <Select
-            placeholder="产品状态"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            style={{ width: 120, borderRadius: 8 }}
-            allowClear
-            options={[
-              { value: 'active', label: '在售' },
-              { value: 'inactive', label: '已下架' },
-              { value: 'frozen', label: '已下架' },
-              { value: 'deleted', label: '已删除' },
-              { value: 'draft', label: '草稿' },
-              { value: 'pending', label: '审核中' },
-              { value: 'rejected', label: '未通过' },
-            ]}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 8, background: '#F8FAFC' }}>
+            {[
+              { v: undefined, l: '全部', c: T.textSecondary },
+              { v: 'active', l: '在售', c: '#22C55E' },
+              { v: 'inactive', l: '已下架', c: '#F59E0B' },
+              { v: 'frozen', l: '已下架', c: '#F59E0B' },
+              { v: 'deleted', l: '已删除', c: '#EF4444' },
+              { v: 'pending', l: '审核中', c: '#4F6BFF' },
+              { v: 'draft', l: '草稿', c: '#94A3B8' },
+              { v: 'rejected', l: '未通过', c: '#EF4444' },
+            ].map(o => {
+              const active = statusFilter === o.v;
+              return (
+                <Button
+                  key={o.l}
+                  size="small"
+                  onClick={() => setStatusFilter(o.v)}
+                  style={{
+                    borderRadius: 6, fontSize: 12, fontWeight: 600,
+                    border: active ? 'none' : '1px solid transparent',
+                    background: active ? o.c : 'transparent',
+                    color: active ? '#fff' : o.c,
+                    padding: '0 10px', height: 26,
+                  }}>
+                  {o.l}
+                </Button>
+              );
+            })}
+          </div>
           <Button onClick={handleSearch} style={{ borderRadius: 8 }}>搜索</Button>
         </Space>
         <Space>
