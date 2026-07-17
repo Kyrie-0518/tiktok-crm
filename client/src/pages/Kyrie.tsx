@@ -1,19 +1,16 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  Input, Button, Typography, Space, Tag, message, Tooltip, Card, Modal, Badge, Avatar, Dropdown,
+  Input, Button, Typography, Space, Tag, message, Card, Modal, Badge,
 } from 'antd';
 import {
   SendOutlined, ThunderboltOutlined, BarChartOutlined,
   DollarOutlined, BookOutlined, UserOutlined,
-  ClearOutlined, LoadingOutlined,
-  ClockCircleOutlined, PlusOutlined, DeleteOutlined,
-  StarOutlined, StarFilled, CopyOutlined,
-  SearchOutlined,
-  HomeOutlined, RobotOutlined, RiseOutlined,
-  AppstoreOutlined, SettingOutlined,
-  SyncOutlined, CheckCircleOutlined,
-  BellOutlined, ArrowUpOutlined, ArrowDownOutlined,
-  PictureOutlined, ShoppingOutlined, ArrowLeftOutlined,
+  LoadingOutlined, ClockCircleOutlined, PlusOutlined,
+  DeleteOutlined, StarOutlined, StarFilled, CopyOutlined,
+  RobotOutlined, AppstoreOutlined, SettingOutlined,
+  SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
+  ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined,
+  ArrowLeftOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -25,10 +22,10 @@ const { Text, Title } = Typography;
 //  DESIGN TOKENS
 // ════════════════════════════════════════
 const T = {
-  bg: '#F6F8FC',
+  bg: '#F7F9FC',
   cardBg: '#FFFFFF',
-  cardShadow: '0 6px 24px rgba(15,23,42,.06)',
-  cardBorder: '#EAEDF5',
+  cardShadow: '0 8px 30px rgba(30,60,120,0.06)',
+  cardBorder: '#E8ECF5',
   cardRadius: 24,
   primary: '#4F6BFF',
   primaryHover: '#3F5AF5',
@@ -38,7 +35,7 @@ const T = {
   textTertiary: '#94A3B8',
   sidebarWidth: 260,
   headerHeight: 72,
-  chatBarHeight: 88,
+  chatBarHeight: 72,
   spacing: { xs: 8, sm: 16, md: 24, lg: 32, xl: 48 },
 };
 
@@ -48,7 +45,7 @@ const AGENT_REQUEST_TIMEOUT_MS = 180_000;
 //  SIDEBAR NAV（精简到 4 项 — 其它模块去主 App 访问）
 // ════════════════════════════════════════
 const NAV_ITEMS = [
-  { key: 'dashboard', icon: <HomeOutlined />, label: '工作台' },
+  { key: 'dashboard', icon: <ThunderboltOutlined />, label: '工作台' },
   { key: 'chat', icon: <RobotOutlined />, label: 'AI助手' },
   { key: 'knowledge', icon: <BookOutlined />, label: '知识库' },
   { key: 'settings', icon: <SettingOutlined />, label: '设置' },
@@ -66,11 +63,6 @@ interface Session {
   id: string; name: string; messages: ChatMessage[];
   createdAt: number; favorite: boolean;
 }
-interface KpiCard {
-  label: string; value: string; change: string;
-  changeUp: boolean; icon: React.ReactNode;
-  bg: string; color: string;
-}
 interface AgentTask {
   time: string; title: string; status: 'done' | 'running' | 'waiting';
 }
@@ -82,13 +74,6 @@ const TOOL_LABELS: Record<string, string> = {
   search_knowledge: '知识库', get_exchange_rate: '汇率',
   get_tiktok_ad_data: 'TikTok广告',
 };
-
-const AI_SUGGESTIONS = [
-  { text: '今日利润同比下降 12%，建议检查广告花费', color: '#EF4444' },
-  { text: '3 个 SKU 库存低于安全水位，需要补货', color: '#F59E0B' },
-  { text: '达人 @alex_beauty 昨日带货转化率 +23%', color: '#22C55E' },
-  { text: '物流异常：2 个订单超时未发货', color: '#EF4444' },
-];
 
 const MOCK_TASKS: AgentTask[] = [
   { time: '09:12', title: '利润分析', status: 'done' },
@@ -187,16 +172,6 @@ export default function Kyrie() {
   const sortedSessions = useMemo(() => [...sessions].sort((a, b) => b.createdAt - a.createdAt), [sessions]);
   const filteredSessions = sortedSessions.filter(s => !sessionSearch || s.name.toLowerCase().includes(sessionSearch.toLowerCase()));
 
-  // ── KPI 数据 ──
-  const kpiCards: KpiCard[] = [
-    { label: 'GMV', value: 'RM 126,320', change: '12.8%', changeUp: true, icon: <DollarOutlined />, bg: '#EEF3FF', color: '#4F6BFF' },
-    { label: '利润', value: 'RM 38,450', change: '5.2%', changeUp: true, icon: <RiseOutlined />, bg: '#FFF6E8', color: '#F59E0B' },
-    { label: '订单', value: '1,284', change: '8.1%', changeUp: true, icon: <ShoppingOutlined />, bg: '#F2F7FF', color: '#3B82F6' },
-    { label: '广告 ROAS', value: '4.59', change: '0.8%', changeUp: false, icon: <BarChartOutlined />, bg: '#F6F0FF', color: '#8B5CF6' },
-    { label: '达人', value: '32', change: '15.3%', changeUp: true, icon: <UserOutlined />, bg: '#F0FDF4', color: '#22C55E' },
-    { label: '库存', value: '98.5%', change: '0.3%', changeUp: false, icon: <AppstoreOutlined />, bg: '#FFF1F2', color: '#EF4444' },
-  ];
-
   // ── JSX ──
   return (
     <div style={{ display: 'flex', height: '100vh', background: T.bg, fontFamily: '"PingFang SC", -apple-system, "Inter", sans-serif', overflow: 'hidden' }}>
@@ -294,21 +269,37 @@ export default function Kyrie() {
             >
               返回主系统
             </Button>
-            <div style={{ width: 1, height: 24, background: T.cardBorder }} />
+            <div style={{ width: 1, height: 28, background: T.cardBorder }} />
+            {/* Agent Avatar */}
+            <div style={{
+              width: 40, height: 40, borderRadius: 14,
+              background: 'linear-gradient(135deg, #6B8CFF, #4F6BFF)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(79,107,255,0.25)',
+              flexShrink: 0,
+            }}>
+              <ThunderboltOutlined style={{ fontSize: 20, color: '#fff' }} />
+            </div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: T.textPrimary }}>欢迎回来</div>
-              <Text style={{ fontSize: 13, color: T.textTertiary }}>今天是 {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}</Text>
+              <div style={{ fontSize: 16, fontWeight: 700, color: T.textPrimary, lineHeight: 1.3 }}>早上好，欢迎回来</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 12, color: T.textTertiary }}>欧文正在管理你的跨境业务</Text>
+              </div>
             </div>
           </div>
-          <Space size={16}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, background: '#F0FDF4', fontSize: 12, color: '#16A34A' }}>
-              <Badge status="success" /> 欧文在线
+          <Space size={12}>
+            {/* Status pill */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 14px', borderRadius: 20,
+              background: '#ECFDF3', fontSize: 12, color: '#16A34A',
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: 3, background: '#22C55E' }} />
+              Agent 在线
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: T.textTertiary }}>
+            <div style={{ fontSize: 11, color: T.textTertiary }}>
               已连接 <span style={{ color: T.primary, fontWeight: 600 }}>TikTok Shop</span> · <span style={{ color: T.primary, fontWeight: 600 }}>Ads</span> · <span style={{ color: T.primary, fontWeight: 600 }}>ERP</span>
             </div>
-            <BellOutlined style={{ fontSize: 18, color: T.textSecondary, cursor: 'pointer' }} />
-            <Avatar size={36} style={{ background: T.primary }} icon={<UserOutlined />} />
           </Space>
         </header>
 
@@ -317,138 +308,228 @@ export default function Kyrie() {
           <div style={{ maxWidth: 1180, margin: '0 auto' }}>
 
             {activeNav === 'dashboard' && (
-              <>
-                {/*── KPI Row (Bento Grid) ──*/}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
-                  {kpiCards.map(kpi => (
-                    <Card key={kpi.label}
-                      hoverable
-                      style={{
-                        borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
-                        boxShadow: T.cardShadow, transition: 'all 0.2s',
-                      }}
-                      bodyStyle={{ padding: '20px 24px' }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                        <div>
-                          <Text style={{ fontSize: 13, color: T.textTertiary, fontWeight: 500 }}>{kpi.label}</Text>
-                          <div style={{ fontSize: 28, fontWeight: 700, color: T.textPrimary, marginTop: 4, fontFamily: '"Inter", -apple-system, sans-serif' }}>
-                            {kpi.value}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                            {kpi.changeUp ? <ArrowUpOutlined style={{ color: '#22C55E', fontSize: 12 }} /> : <ArrowDownOutlined style={{ color: '#EF4444', fontSize: 12 }} />}
-                            <Text style={{ fontSize: 12, color: kpi.changeUp ? '#22C55E' : '#EF4444', fontWeight: 600 }}>{kpi.change}</Text>
-                            <Text style={{ fontSize: 12, color: T.textTertiary }}>vs 昨日</Text>
-                          </div>
-                        </div>
-                        <div style={{
-                          width: 48, height: 48, borderRadius: 16, background: kpi.bg,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 22, color: kpi.color,
-                        }}>
-                          {kpi.icon}
-                        </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16 }}>
+
+                {/*── ROW 1: Agent Status (4) + Business Overview (8) ──*/}
+                <Card style={{
+                  gridColumn: 'span 4', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
+                  boxShadow: T.cardShadow, background: `linear-gradient(180deg, ${T.primaryLight}, #FFFFFF)`,
+                }} bodyStyle={{ padding: '20px 24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg, #6B8CFF, ${T.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ThunderboltOutlined style={{ color: '#fff', fontSize: 18 }} />
+                    </div>
+                    <div>
+                      <Text strong style={{ fontSize: 14, color: T.textPrimary }}>欧文 运行状态</Text>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 5, height: 5, borderRadius: 3, background: '#22C55E' }} />
+                        <Text style={{ fontSize: 11, color: '#16A34A' }}>正常运行中</Text>
                       </div>
-                    </Card>
-                  ))}
-                </div>
-
-                {/*── Trend Chart + AI Suggestions ──*/}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 24 }}>
-                  <Card style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
-                    bodyStyle={{ padding: '20px 24px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                      <Text strong style={{ fontSize: 16, color: T.textPrimary }}>GMV 趋势</Text>
-                      <Space size={8}>
-                        {['7天', '30天', '90天'].map(p => <Tag key={p} style={{ borderRadius: 8, cursor: 'pointer', border: 'none', background: p === '7天' ? T.primaryLight : '#F1F5F9', color: p === '7天' ? T.primary : T.textSecondary, fontSize: 12 }}>{p}</Tag>)}
-                      </Space>
                     </div>
-                    {/* 简易柱状图占位 */}
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 180, padding: '8px 0' }}>
-                      {[126, 142, 108, 168, 132, 156, 148].map((v, i) => {
-                        const h = `${(v / 180) * 100}%`;
-                        const days = ['7/9', '7/10', '7/11', '7/12', '7/13', '7/14', '7/15'];
-                        return (
-                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                            <Text style={{ fontSize: 11, color: T.textPrimary, fontWeight: 600 }}>{v}</Text>
-                            <div style={{
-                              width: '100%', height: h, borderRadius: '10px 10px 4px 4px',
-                              background: `linear-gradient(180deg, ${T.primary}88, ${T.primary})`,
-                              minHeight: 4, transition: 'height 0.3s',
-                            }} />
-                            <Text style={{ fontSize: 11, color: T.textTertiary }}>{days[i]}</Text>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Card>
-
-                  {/* AI Suggestions */}
-                  <Card style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
-                    bodyStyle={{ padding: '20px 24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 10, background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <ThunderboltOutlined style={{ color: T.primary, fontSize: 14 }} />
-                      </div>
-                      <Text strong style={{ fontSize: 16, color: T.textPrimary }}>AI 建议</Text>
-                    </div>
-                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                      {AI_SUGGESTIONS.map((s, i) => (
-                        <div key={i}
-                          style={{
-                            padding: '12px 16px', borderRadius: 16, cursor: 'pointer',
-                            background: '#FAFBFC', border: '1px solid transparent',
-                            transition: 'all 0.15s',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = T.primaryLight; e.currentTarget.style.borderColor = T.primary + '20'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = '#FAFBFC'; e.currentTarget.style.borderColor = 'transparent'; }}
-                          onClick={() => { setInputValue(s.text); inputRef.current?.focus(); }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <div style={{ width: 6, height: 6, borderRadius: 3, background: s.color, marginTop: 6, flexShrink: 0 }} />
-                            <Text style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.5 }}>{s.text}</Text>
-                          </div>
-                        </div>
-                      ))}
-                    </Space>
-                  </Card>
-                </div>
-
-                {/*── Recent Agent Tasks ──*/}
-                <Card style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
-                  bodyStyle={{ padding: '20px 24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                    <ClockCircleOutlined style={{ color: T.textSecondary }} />
-                    <Text strong style={{ fontSize: 16, color: T.textPrimary }}>最近任务</Text>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                    {MOCK_TASKS.map((t, i) => (
-                      <div key={i}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
-                          borderRadius: 16, background: '#FAFBFC', transition: 'background 0.15s',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = T.primaryLight; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = '#FAFBFC'; }}
-                      >
-                        {t.status === 'done' ? (
-                          <CheckCircleOutlined style={{ color: '#22C55E', fontSize: 18 }} />
-                        ) : t.status === 'running' ? (
-                          <SyncOutlined spin style={{ color: T.primary, fontSize: 18 }} />
-                        ) : (
-                          <ClockCircleOutlined style={{ color: T.textTertiary, fontSize: 18 }} />
-                        )}
-                        <div style={{ minWidth: 0 }}>
-                          <Text style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500, display: 'block' }}>{t.title}</Text>
-                          <Text style={{ fontSize: 11, color: T.textTertiary }}>{t.time}</Text>
+                  <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                    {[
+                      { label: '今日完成', value: 18, color: '#4F6BFF', bg: T.primaryLight },
+                      { label: '发现异常', value: 6, color: '#EF4444', bg: '#FEF2F2' },
+                      { label: '优化建议', value: 9, color: '#F59E0B', bg: '#FFFBEB' },
+                    ].map(item => (
+                      <div key={item.label} style={{ textAlign: 'center' }}>
+                        <div style={{
+                          width: 48, height: 48, borderRadius: 16, background: item.bg,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 22, fontWeight: 700, color: item.color,
+                          fontFamily: '"Inter", sans-serif',
+                        }}>{item.value}</div>
+                        <Text style={{ fontSize: 12, color: T.textTertiary, display: 'block', marginTop: 6 }}>{item.label}</Text>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
+                <Card style={{
+                  gridColumn: 'span 8', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
+                  boxShadow: T.cardShadow,
+                }} bodyStyle={{ padding: '20px 24px' }}>
+                  <Text strong style={{ fontSize: 14, color: T.textPrimary, marginBottom: 16, display: 'block' }}>今日经营概览</Text>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                    {[
+                      { label: 'GMV', value: 'RM 126,320', change: '+12.8%', color: '#4F6BFF', up: true },
+                      { label: '利润', value: 'RM 18,240', change: '+5.2%', color: '#22C55E', up: true },
+                      { label: 'ROAS', value: '4.59', change: '-0.8%', color: '#F59E0B', up: false },
+                      { label: '订单', value: '1,284', change: '+8.1%', color: '#8B5CF6', up: true },
+                    ].map(m => (
+                      <div key={m.label}>
+                        <Text style={{ fontSize: 12, color: T.textTertiary }}>{m.label}</Text>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: T.textPrimary, fontFamily: '"Inter", sans-serif', marginTop: 2 }}>
+                          {m.value}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                          {m.up ? <ArrowUpOutlined style={{ color: '#22C55E', fontSize: 11 }} /> : <ArrowDownOutlined style={{ color: '#EF4444', fontSize: 11 }} />}
+                          <Text style={{ fontSize: 12, color: m.up ? '#22C55E' : '#EF4444', fontWeight: 600 }}>{m.change}</Text>
+                          <Text style={{ fontSize: 11, color: T.textTertiary }}>vs 昨日</Text>
                         </div>
                       </div>
                     ))}
                   </div>
                 </Card>
-              </>
+
+                {/*── ROW 2: GMV Trend (8) + AI Suggestions (4) ──*/}
+                <Card style={{
+                  gridColumn: 'span 8', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
+                  boxShadow: T.cardShadow,
+                }} bodyStyle={{ padding: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div>
+                      <Text strong style={{ fontSize: 15, color: T.textPrimary }}>GMV 趋势</Text>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+                        <span style={{ fontSize: 26, fontWeight: 700, color: T.textPrimary, fontFamily: '"Inter", sans-serif' }}>RM 126K</span>
+                        <span style={{ fontSize: 13, color: '#22C55E', fontWeight: 600 }}>↑ 12.8%</span>
+                      </div>
+                    </div>
+                    <Space size={6}>
+                      {['7天', '30天'].map(p => (
+                        <Tag key={p} style={{ borderRadius: 8, cursor: 'pointer', border: p === '7天' ? `1px solid ${T.primary}` : 'none', background: p === '7天' ? T.primaryLight : '#F1F5F9', color: p === '7天' ? T.primary : T.textSecondary, fontSize: 12 }}>{p}</Tag>
+                      ))}
+                    </Space>
+                  </div>
+                  {/* Bar chart */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 150, padding: '12px 0' }}>
+                    {[126, 142, 108, 168, 132, 156, 148].map((v, i) => {
+                      const h = `${(v / 180) * 100}%`;
+                      const days = ['7/9', '7/10', '7/11', '7/12', '7/13', '7/14', '7/15'];
+                      const isToday = i === 6;
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 10, color: T.textSecondary, fontWeight: 600 }}>{v}</Text>
+                          <div style={{
+                            width: '100%', height: h, borderRadius: '8px 8px 4px 4px',
+                            background: isToday ? `linear-gradient(180deg, ${T.primary}, ${T.primary}88)` : `linear-gradient(180deg, #CBD5E1, #E2E8F0)`,
+                            minHeight: 4, transition: 'height 0.3s',
+                          }} />
+                          <Text style={{ fontSize: 10, color: isToday ? T.primary : T.textTertiary, fontWeight: isToday ? 600 : 400 }}>{days[i]}</Text>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* AI insight */}
+                  <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 12, background: T.primaryLight, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <ThunderboltOutlined style={{ color: T.primary, fontSize: 14 }} />
+                    <Text style={{ fontSize: 12, color: T.textSecondary }}>AI 分析：增长主要来自 <Text strong style={{ color: T.primary }}>FreshGuard</Text> SKU，建议追加预算</Text>
+                  </div>
+                </Card>
+
+                <Card style={{
+                  gridColumn: 'span 4', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
+                  boxShadow: T.cardShadow,
+                }} bodyStyle={{ padding: '20px 24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 10, background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ThunderboltOutlined style={{ color: T.primary, fontSize: 14 }} />
+                    </div>
+                    <Text strong style={{ fontSize: 15, color: T.textPrimary }}>AI 建议</Text>
+                  </div>
+                  {[
+                    { text: '库存风险：FreshGuard 库存不足7天', action: '查看', color: '#EF4444', bg: '#FEF2F2' },
+                    { text: '广告优化：ROAS 下降 23%，建议调整预算', action: '优化', color: '#F59E0B', bg: '#FFFBEB' },
+                    { text: '达人 @alex_beauty 昨日转化 +23%', action: '详情', color: '#22C55E', bg: '#F0FDF4' },
+                  ].map((s, i) => (
+                    <div key={i}
+                      onClick={() => { setInputValue(s.text); inputRef.current?.focus(); }}
+                      style={{
+                        padding: '12px 14px', borderRadius: 14, marginBottom: 8, cursor: 'pointer',
+                        background: s.bg, border: '1px solid transparent',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flex: 1, minWidth: 0 }}>
+                          <div style={{ width: 5, height: 5, borderRadius: 3, background: s.color, marginTop: 5, flexShrink: 0 }} />
+                          <Text style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.5 }}>{s.text}</Text>
+                        </div>
+                        <Button size="small" style={{ borderRadius: 8, fontSize: 11, height: 24, color: s.color, borderColor: s.color + '30' }}>{s.action}</Button>
+                      </div>
+                    </div>
+                  ))}
+                </Card>
+
+                {/*── ROW 3: Task Center (4) + Anomalies (4) + Quick Actions (4) ──*/}
+                {/* Task Center */}
+                <Card style={{
+                  gridColumn: 'span 4', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
+                  boxShadow: T.cardShadow,
+                }} bodyStyle={{ padding: '20px 24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <ClockCircleOutlined style={{ color: T.textSecondary }} />
+                    <Text strong style={{ fontSize: 14, color: T.textPrimary }}>任务中心</Text>
+                  </div>
+                  {MOCK_TASKS.slice(0, 4).map((t, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < 3 ? `1px solid ${T.cardBorder}` : 'none' }}>
+                      {t.status === 'done' ? <CheckCircleOutlined style={{ color: '#22C55E', fontSize: 16 }} /> : t.status === 'running' ? <SyncOutlined spin style={{ color: T.primary, fontSize: 16 }} /> : <ClockCircleOutlined style={{ color: T.textTertiary, fontSize: 16 }} />}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontSize: 13, color: T.textPrimary, display: 'block' }}>{t.title}</Text>
+                      </div>
+                      <Text style={{ fontSize: 11, color: T.textTertiary, flexShrink: 0 }}>{t.time}</Text>
+                    </div>
+                  ))}
+                </Card>
+
+                {/* Anomaly Center */}
+                <Card style={{
+                  gridColumn: 'span 4', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
+                  boxShadow: T.cardShadow,
+                }} bodyStyle={{ padding: '20px 24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <ExclamationCircleOutlined style={{ color: '#EF4444' }} />
+                    <Text strong style={{ fontSize: 14, color: T.textPrimary }}>今日异常</Text>
+                    <Badge count={6} size="small" styles={{ indicator: { background: '#EF4444' } }} />
+                  </div>
+                  {[
+                    { text: '2 个订单超时未发货', icon: <ShoppingOutlined /> },
+                    { text: '3 个 SKU 库存低于安全线', icon: <AppstoreOutlined /> },
+                    { text: '1 个广告系列 ROAS 异常', icon: <BarChartOutlined /> },
+                  ].map((a, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: i < 2 ? `1px solid ${T.cardBorder}` : 'none' }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 10, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ color: '#EF4444', fontSize: 13 }}>{a.icon}</span>
+                      </div>
+                      <Text style={{ fontSize: 12, color: T.textSecondary }}>{a.text}</Text>
+                    </div>
+                  ))}
+                </Card>
+
+                {/* Quick Actions */}
+                <Card style={{
+                  gridColumn: 'span 4', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`,
+                  boxShadow: T.cardShadow,
+                }} bodyStyle={{ padding: '20px 24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <ThunderboltOutlined style={{ color: T.primary }} />
+                    <Text strong style={{ fontSize: 14, color: T.textPrimary }}>快捷能力</Text>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                    {[
+                      { text: '利润诊断', query: '分析本月各店铺利润情况，定位亏损点并给出建议', icon: <DollarOutlined />, bg: T.primaryLight, c: T.primary },
+                      { text: '达人分析', query: '生成本周达人合作汇总报告', icon: <UserOutlined />, bg: '#F0FDF4', c: '#22C55E' },
+                      { text: '发货检查', query: '查看当前待发货订单，提醒超时异常', icon: <ShoppingOutlined />, bg: '#FFFBEB', c: '#F59E0B' },
+                      { text: '知识问答', query: '马来西亚 TikTok Shop 最新佣金政策', icon: <BookOutlined />, bg: '#F6F0FF', c: '#8B5CF6' },
+                    ].map(q => (
+                      <Button key={q.text} block
+                        onClick={() => { setInputValue(q.query); setActiveNav('chat'); }}
+                        style={{
+                          height: 'auto', padding: '12px 10px', borderRadius: 14, textAlign: 'center',
+                          border: 'none', background: q.bg, color: q.c,
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                        }}>
+                        <span style={{ fontSize: 18 }}>{q.icon}</span>
+                        <Text style={{ fontSize: 12, color: q.c, fontWeight: 600 }}>{q.text}</Text>
+                      </Button>
+                    ))}
+                  </div>
+                </Card>
+
+              </div>
             )}
 
             {/*── Chat View ──*/}
@@ -529,29 +610,22 @@ export default function Kyrie() {
           </div>
         </div>
 
-        {/* ═══════════════════ BOTTOM CHAT BAR 88px ═══════════════════ */}
+        {/* ═══════════════════ BOTTOM COMMAND BAR 72px ═══════════════════ */}
         <div style={{
           flexShrink: 0, background: T.cardBg, borderTop: `1px solid ${T.cardBorder}`,
-          padding: '12px 32px', height: T.chatBarHeight, display: 'flex', alignItems: 'center',
+          padding: '10px 32px', height: T.chatBarHeight, display: 'flex', alignItems: 'center',
         }}>
-          <div style={{ maxWidth: 1180, margin: '0 auto', width: '100%', display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Left: quick actions */}
-            <Space size={4}>
-              <Button type="text" icon={<PlusOutlined />} style={{ color: T.textTertiary, borderRadius: 10 }} />
-              <Button type="text" icon={<PictureOutlined />} style={{ color: T.textTertiary, borderRadius: 10 }} />
-              <Button type="text" icon={<BookOutlined />} style={{ color: T.textTertiary, borderRadius: 10 }} />
-            </Space>
-            {/* Input */}
+          <div style={{ maxWidth: 1180, margin: '0 auto', width: '100%' }}>
             <div style={{
-              flex: 1, display: 'flex', alignItems: 'center', background: '#F8FAFC',
-              border: `1px solid ${T.cardBorder}`, borderRadius: 16, padding: '3px 3px 3px 16px',
+              display: 'flex', alignItems: 'center', background: '#F8FAFC',
+              border: `1px solid ${T.cardBorder}`, borderRadius: 14, padding: '2px 2px 2px 18px',
             }}>
               <Input.TextArea
                 ref={inputRef}
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 onPressEnter={e => { if (!e.shiftKey) { e.preventDefault(); sendMessage(inputValue); } }}
-                placeholder="告诉欧文今天需要完成什么... 例如：帮我分析利润 / 检查达人 / 生成日报"
+                placeholder="告诉欧文下一步需要完成什么... 例如：分析昨日利润下降原因 / 检查异常订单"
                 autoSize={{ minRows: 1, maxRows: 4 }}
                 disabled={sending}
                 style={{
@@ -566,8 +640,8 @@ export default function Kyrie() {
                 loading={sending}
                 disabled={!inputValue.trim()}
                 style={{
-                  height: 40, width: 40, borderRadius: 12, background: T.primary, border: 'none',
-                  boxShadow: `0 2px 8px ${T.primary}40`, opacity: !inputValue.trim() ? 0.4 : 1,
+                  height: 38, width: 38, borderRadius: 12, background: T.primary, border: 'none',
+                  boxShadow: `0 2px 8px ${T.primary}40`, opacity: !inputValue.trim() ? 0.4 : 1, marginLeft: 4,
                 }}
               />
             </div>
