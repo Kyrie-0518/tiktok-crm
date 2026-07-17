@@ -22,7 +22,6 @@ interface DashboardData {
     sell_price: number; total_qty: number; total_sales_myr: number; order_times: number;
   }>;
   order_status_counts: Record<string, number>;
-  product_health: { total: number; in_stock: number; out_of_stock: number; with_sales: number; without_sales: number };
 }
 
 const T = {
@@ -201,7 +200,7 @@ export default function Dashboard() {
             {/* 店铺概况 */}
             <Card
               title={<Text strong style={{ fontSize: 14, color: T.textPrimary }}>店铺概况</Text>}
-              style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
+              style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow, flex: 1 }}
               bodyStyle={{ padding: '14px 18px' }}
             >
               <div style={{ marginBottom: 8 }}>
@@ -250,31 +249,7 @@ export default function Dashboard() {
               })()}
             </Card>
 
-            {/* 商品健康度 */}
-            <Card
-              title={<Text strong style={{ fontSize: 14, color: T.textPrimary }}>📊 商品健康度</Text>}
-              style={{ borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
-              bodyStyle={{ padding: '14px 18px' }}
-            >
-              {(() => {
-                const h = data.product_health || { total: 0, in_stock: 0, out_of_stock: 0, with_sales: 0, without_sales: 0 };
-                const items = [
-                  { label: '正常商品', count: h.in_stock, color: '#22C55E', bg: '#F0FDF4' },
-                  { label: '缺货', count: h.out_of_stock, color: '#EF4444', bg: '#FEF2F2' },
-                  { label: '未销售', count: h.without_sales, color: '#F59E0B', bg: '#FFFBEB' },
-                ];
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {items.map((item, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 8, background: item.bg }}>
-                        <Text style={{ fontSize: 12, color: T.textSecondary }}>{item.label}</Text>
-                        <Text strong style={{ fontSize: 14, color: item.color, fontFamily: '"Inter", sans-serif' }}>{item.count}</Text>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </Card>
+
           </div>
         </Col>
       </Row>
