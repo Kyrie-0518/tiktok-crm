@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import {
   Card, Button, Space, Modal, Form, Input, Select, Tag, message,
-  Popconfirm, Row, Col, Empty, Spin, Tooltip,
-  Switch, Alert,
+  Spin, Dropdown, Typography, Switch,
 } from 'antd';
 import {
   SyncOutlined, DeleteOutlined, ShopOutlined,
-  ApiOutlined, LinkOutlined, CloudDownloadOutlined, AppstoreOutlined,
+  LinkOutlined, CloudDownloadOutlined, AppstoreOutlined,
   ReloadOutlined, SafetyCertificateOutlined,
+  CheckCircleOutlined, ClockCircleOutlined, MoreOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 import { useHasPerm } from '../stores/authStore';
 
+const { Text, Title } = Typography;
+
+// ═══════════════════ STATIC DATA ═══════════════════
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   active:   { label: '运营中', color: 'success' },
   inactive: { label: '已停用', color: 'default' },
@@ -21,6 +25,20 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 const REGION_MAP: Record<string, string> = {
   MY: '马来西亚', SG: '新加坡', TH: '泰国', PH: '菲律宾',
   ID: '印度尼西亚', VN: '越南', GB: '英国', US: '美国',
+};
+
+const COUNTRY_EMOJI: Record<string, string> = {
+  MY: '🇲🇾', SG: '🇸🇬', TH: '🇹🇭', PH: '🇵🇭',
+  ID: '🇮🇩', VN: '🇻🇳', GB: '🇬🇧', US: '🇺🇸',
+};
+
+// ═══════════════════ DESIGN TOKENS ═══════════════════
+const T = {
+  bg: '#F7F9FC', cardBg: '#FFFFFF', cardBorder: '#E8ECF5',
+  primary: '#4F6BFF', primaryHover: '#3F5AF5',
+  textPrimary: '#1E293B', textSecondary: '#64748B', textTertiary: '#94A3B8',
+  success: '#22C55E', successBg: '#ECFDF3',
+  cardRadius: 20,
 };
 
 export default function ShopManagement() {
@@ -33,296 +51,289 @@ export default function ShopManagement() {
   const [refreshLoading, setRefreshLoading] = useState<Record<number, boolean>>({});
   const [form] = Form.useForm();
 
+  // ═══════════════════ DATA (unchanged) ═══════════════════
   const loadShops = async () => {
     setLoading(true);
-    try {
-      const res = await api.get('/shops');
-      setShops(res.data);
-    } catch {
-      message.error('加载店铺列表失败');
-    } finally {
-      setLoading(false);
-    }
+    try { const res = await api.get('/shops'); setShops(res.data); }
+    catch { message.error('加载店铺列表失败'); }
+    finally { setLoading(false); }
   };
 
-  // Init
-  useEffect(() => {
-    loadShops();
-  }, []);
+  useEffect(() => { loadShops(); }, []);
 
-  // Handle TikTok OAuth callback (two modes)
+  // OAuth callback handler (unchanged)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-
-    // Mode 1: GET /callback redirect (TikTok → backend → frontend)
     const authResult = params.get('auth');
     const authMsg = params.get('message');
-    const authShop = params.get('shop');
-
-    if (authResult === 'success') {
-      window.history.replaceState({}, '', '/shops');
-      message.success(`TikTok 店铺授权成功！`);
-      loadShops();
-      return;
-    }
-    if (authResult === 'error') {
-      window.history.replaceState({}, '', '/shops');
-      message.error(`授权失败: ${decodeURIComponent(authMsg || '未知错误')}`);
-      return;
-    }
-
-    // Mode 2: Frontend-based code submission (legacy support)
+    if (authResult === 'success') { window.history.replaceState({}, '', '/shops'); message.success('TikTok 店铺授权成功！'); loadShops(); return; }
+    if (authResult === 'error') { window.history.replaceState({}, '', '/shops'); message.error(`授权失败: ${decodeURIComponent(authMsg || '未知错误')}`); return; }
     const code = params.get('code');
-    if (code) {
-      window.history.replaceState({}, '', '/shops');
-      handleOAuthCallback(code);
-    }
+    if (code) { window.history.replaceState({}, '', '/shops'); handleOAuthCallback(code); }
   }, []);
 
   const handleOAuthCallback = async (code: string) => {
     setAuthLoading(true);
     try {
       const res = await api.post('/shops/tiktok/callback', { code });
-      if (res.data.created) {
-        message.success(`TikTok 店铺「${res.data.shop_name}」授权成功！`);
-      } else if (res.data.updated) {
-        message.success(`TikTok 店铺「${res.data.shop_name}」已重新授权！`);
-      }
+      if (res.data.created) message.success(`TikTok 店铺「${res.data.shop_name}」授权成功！`);
+      else if (res.data.updated) message.success(`TikTok 店铺「${res.data.shop_name}」已重新授权！`);
       loadShops();
-    } catch (e: any) {
-      message.error(e.response?.data?.error || '授权处理失败');
-    } finally {
-      setAuthLoading(false);
-    }
+    } catch (e: any) { message.error(e.response?.data?.error || '授权处理失败'); }
+    finally { setAuthLoading(false); }
   };
 
   const handleSync = async (e: React.MouseEvent, shopId: number) => {
     e.stopPropagation();
-    try {
-      const res = await api.post(`/shops/${shopId}/sync`);
-      message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`);
-      loadShops();
-    } catch (e: any) {
-      message.error(e.response?.data?.errors?.[0] || '同步失败');
-    }
+    try { const res = await api.post(`/shops/${shopId}/sync`); message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`); loadShops(); }
+    catch (e: any) { message.error(e.response?.data?.errors?.[0] || '同步失败'); }
   };
-
   const handleSyncProducts = async (e: React.MouseEvent, shopId: number) => {
     e.stopPropagation();
-    try {
-      const res = await api.post(`/shops/${shopId}/sync-products`);
-      message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`);
-      loadShops();
-    } catch (e: any) {
-      message.error(e.response?.data?.errors?.[0] || '同步失败');
-    }
+    try { const res = await api.post(`/shops/${shopId}/sync-products`); message.success(res.data.success ? `同步完成：新增${res.data.created} 更新${res.data.updated}` : `部分失败：${res.data.errors?.join(',')}`); loadShops(); }
+    catch (e: any) { message.error(e.response?.data?.errors?.[0] || '同步失败'); }
   };
-
   const handleSyncAll = async (e: React.MouseEvent, shopId: number) => {
     e.stopPropagation();
     message.loading({ content: '全量同步中...', key: 'sync-all' });
-    try {
-      const res = await api.post(`/shops/${shopId}/sync-all`);
-      const s = res.data.summary;
-      message.success({ content: `同步完成：产品${s.products_created + s.products_updated} 订单${s.orders_created + s.orders_updated}`, key: 'sync-all' });
-      loadShops();
-    } catch (e: any) {
-      message.error({ content: e.response?.data?.errors?.[0] || '同步失败', key: 'sync-all' });
-    }
+    try { const res = await api.post(`/shops/${shopId}/sync-all`); const s = res.data.summary; message.success({ content: `同步完成：产品${s.products_created + s.products_updated} 订单${s.orders_created + s.orders_updated}`, key: 'sync-all' }); loadShops(); }
+    catch (e: any) { message.error({ content: e.response?.data?.errors?.[0] || '同步失败', key: 'sync-all' }); }
   };
-
   const handleTest = async (e: React.MouseEvent, shopId: number) => {
     e.stopPropagation();
-    try {
-      const res = await api.post(`/shops/${shopId}/test`);
-      if (!res.data.success) {
-        console.error('[ShopManagement] 测试连接失败(后端返回):', res.data.message);
-      } else {
-        console.log('[ShopManagement] 测试连接成功:', res.data.message);
-      }
-      message[res.data.success ? 'success' : 'error'](res.data.message);
-    } catch (e: any) {
-      console.error('[ShopManagement] 测试连接失败(请求异常):', e);
-      message.error(e.response?.data?.message || e.response?.data?.error || '测试失败');
-    }
+    try { const res = await api.post(`/shops/${shopId}/test`); message[res.data.success ? 'success' : 'error'](res.data.message); }
+    catch (e: any) { message.error(e.response?.data?.message || e.response?.data?.error || '测试失败'); }
   };
-
   const handleRefreshToken = async (e: React.MouseEvent, shopId: number) => {
     e.stopPropagation();
     setRefreshLoading(prev => ({ ...prev, [shopId]: true }));
-    try {
-      const shop = shops.find(s => s.id === shopId);
-      await api.post('/shops/tiktok/refresh', { shop_id: shop?.shop_id || String(shopId) });
-      message.success('Token 刷新成功');
-      loadShops();
-    } catch (e: any) {
-      message.error(e.response?.data?.error || 'Token 刷新失败，请重新授权');
-    } finally {
-      setRefreshLoading(prev => ({ ...prev, [shopId]: false }));
-    }
+    try { const shop = shops.find(s => s.id === shopId); await api.post('/shops/tiktok/refresh', { shop_id: shop?.shop_id || String(shopId) }); message.success('Token 刷新成功'); loadShops(); }
+    catch (e: any) { message.error(e.response?.data?.error || 'Token 刷新失败，请重新授权'); }
+    finally { setRefreshLoading(prev => ({ ...prev, [shopId]: false })); }
   };
-
   const handleDelete = async (shopId: number) => {
-    try {
-      await api.delete(`/shops/${shopId}`);
-      message.success('已解绑');
-      loadShops();
-    } catch (e: any) {
-      message.error(e.response?.data?.error || '解绑失败');
-    }
+    try { await api.delete(`/shops/${shopId}`); message.success('已解绑'); loadShops(); }
+    catch (e: any) { message.error(e.response?.data?.error || '解绑失败'); }
   };
+  const handleStartOAuth = async () => { setAuthLoading(true); try { const res = await api.post('/shops/tiktok/auth-url'); const authUrl = res.data.authUrl || res.data.auth_url; if (authUrl) window.location.href = authUrl; } catch (e: any) { message.error(e.response?.data?.error || '获取授权链接失败'); setAuthLoading(false); } };
 
-  // ─── 一键授权 ──────────────────────────────────
-  const handleStartOAuth = async () => {
-    setAuthLoading(true);
-    try {
-      const res = await api.post('/shops/tiktok/auth-url');
-      const authUrl = res.data.authUrl || res.data.auth_url;
-      if (authUrl) {
-        // 直接跳转到 TikTok 授权页面
-        window.location.href = authUrl;
-      }
-    } catch (e: any) {
-      message.error(e.response?.data?.error || '获取授权链接失败');
-      setAuthLoading(false);
-    }
-  };
-
-  // ─── 编辑（基本信息，不含凭证） ────────────────
+  // Edit modal (unchanged)
   const handleOpenModal = async (shop?: any) => {
     setEditShop(shop || null);
-    if (shop) {
-      try {
-        const res = await api.get(`/shops/${shop.id}`);
-        form.setFieldsValue(res.data);
-      } catch {
-        form.setFieldsValue(shop);
-      }
-    } else {
-      form.resetFields();
-    }
+    if (shop) { try { const res = await api.get(`/shops/${shop.id}`); form.setFieldsValue(res.data); } catch { form.setFieldsValue(shop); } }
+    else { form.resetFields(); }
     setModalOpen(true);
   };
-
   const handleSubmit = async (values: any) => {
     try {
-      if (editShop) {
-        await api.put(`/shops/${editShop.id}`, values);
-        message.success('更新成功');
-      } else {
-        await api.post('/shops', { ...values, status: 'active' });
-        message.success('创建成功');
-      }
-      setModalOpen(false);
-      form.resetFields();
-      loadShops();
-    } catch (e: any) {
-      message.error(e.response?.data?.error || '操作失败');
-    }
+      if (editShop) { await api.put(`/shops/${editShop.id}`, values); message.success('更新成功'); }
+      else { await api.post('/shops', { ...values, status: 'active' }); message.success('创建成功'); }
+      setModalOpen(false); form.resetFields(); loadShops();
+    } catch (e: any) { message.error(e.response?.data?.error || '操作失败'); }
   };
 
-  const getTokenBadge = (shop: any) => {
-    if (shop._token_valid === false) return <Tag color="error">Token已过期</Tag>;
-    return <Tag color="green">Token有效</Tag>;
-  };
+  // ═══════════════════ RENDER ═══════════════════
+  const enabledCount = shops.length;
 
   return (
-    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
-      {/* 页面标题 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #2563eb, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18 }}>
-            <ShopOutlined />
+    <div style={{ padding: '24px', background: T.bg, minHeight: '100vh', fontFamily: '"PingFang SC", -apple-system, "Inter", sans-serif' }}>
+
+      {/* ═══ HEADER ═══ */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: `linear-gradient(135deg, #6B8CFF, ${T.primary})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: `0 4px 12px ${T.primary}30`,
+            }}>
+              <ShopOutlined style={{ fontSize: 20, color: '#fff' }} />
+            </div>
+            <div>
+              <Title level={3} style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.textPrimary }}>店铺授权中心</Title>
+              <Text style={{ fontSize: 13, color: T.textTertiary }}>连接你的 TikTok Shop 店铺</Text>
+            </div>
           </div>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>店铺管理</h2>
-            <span style={{ fontSize: 12, color: '#999' }}>一键授权绑定 TikTok 店铺 · 数据同步</span>
+          <div style={{ marginLeft: 50, marginTop: 2 }}>
+            <Text style={{ fontSize: 13, color: T.textSecondary }}>
+              已授权 <Text strong style={{ color: T.primary }}>{enabledCount}</Text> 个店铺
+            </Text>
           </div>
         </div>
         {canEdit && (
-          <Button type="primary" icon={<LinkOutlined />} size="large" onClick={handleStartOAuth} loading={authLoading}
-            style={{ borderRadius: 8, fontWeight: 600 }}>
-            一键授权 TikTok Shop
+          <Button
+            type="primary" size="large" icon={<LinkOutlined />}
+            onClick={handleStartOAuth} loading={authLoading}
+            style={{
+              width: 200, height: 44, borderRadius: 12, fontWeight: 600, fontSize: 14,
+              background: T.primary, border: 'none', boxShadow: `0 4px 12px ${T.primary}30`,
+            }}
+          >
+            授权 TikTok Shop
           </Button>
         )}
       </div>
 
-      {/* OAuth 授权提示 */}
-      {canEdit && shops.length === 0 && !loading && (
-        <Alert
-          type="info"
-          showIcon
-          icon={<SafetyCertificateOutlined />}
-          message="开始使用"
-          description="点击右上角「一键授权 TikTok Shop」按钮，跳转到 TikTok 授权页面完成授权后，系统将自动创建店铺并同步数据。首次使用请确保已在 TikTok Partner Center 注册应用并配置了回调地址。"
-          style={{ marginBottom: 20, borderRadius: 10 }}
-        />
-      )}
-
-      {/* 授权回调 loading */}
+      {/* ═══ AUTH LOADING ═══ */}
       {authLoading && (
-        <Card style={{ marginBottom: 20, textAlign: 'center', borderRadius: 10 }}>
+        <Card style={{ marginBottom: 24, textAlign: 'center', borderRadius: T.cardRadius, border: `1px solid ${T.cardBorder}` }}>
           <Spin tip="正在处理 TikTok 授权回调，请稍候..." />
         </Card>
       )}
 
-      {/* Shop Cards */}
+      {/* ═══ EMPTY STATE ═══ */}
+      {shops.length === 0 && !authLoading && !loading && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '80px 20px', textAlign: 'center',
+        }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: 24, background: `${T.primary}10`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+          }}>
+            <ShopOutlined style={{ fontSize: 40, color: T.primary }} />
+          </div>
+          <Title level={4} style={{ marginBottom: 8, color: T.textPrimary, fontWeight: 600 }}>暂无授权店铺</Title>
+          <Text style={{ fontSize: 14, color: T.textTertiary, marginBottom: 24, display: 'block', maxWidth: 320 }}>
+            连接 TikTok Shop 后即可同步店铺信息
+          </Text>
+          {canEdit && (
+            <Button type="primary" size="large" icon={<LinkOutlined />} onClick={handleStartOAuth}
+              style={{ borderRadius: 12, fontWeight: 600, height: 44, background: T.primary }}>
+              授权 TikTok Shop
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* ═══ SHOP CARDS (3-col grid) ═══ */}
       <Spin spinning={loading}>
-        {shops.length === 0 && !authLoading ? (
-          <Empty description="暂无绑定店铺，点击右上角「一键授权 TikTok Shop」开始" />
-        ) : (
-          <Row gutter={[16, 16]}>
-            {shops.map(shop => (
-              <Col key={shop.id} xs={24} sm={12} md={8} lg={6}>
+        {shops.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 24 }}>
+            {shops.map(shop => {
+              const countryName = REGION_MAP[shop.region] || shop.region || '—';
+              const emoji = COUNTRY_EMOJI[shop.region] || '';
+              const tokenValid = shop._token_valid !== false;
+              const lastSync = shop.last_synced_at;
+
+              // Action menu items
+              const menuItems: any[] = [
+                { key: 'detail', label: '查看授权信息', icon: <SafetyCertificateOutlined /> },
+                { key: 'sync', label: '同步订单', icon: <SyncOutlined /> },
+                { key: 'sync-products', label: '同步产品', icon: <AppstoreOutlined /> },
+                { key: 'sync-all', label: '全量同步', icon: <CloudDownloadOutlined /> },
+                { key: 'test', label: '测试连接', icon: <ApiOutlined /> },
+              ];
+              if (shop._refresh_token_exists) {
+                menuItems.push({ key: 'refresh', label: '刷新 Token', icon: <ReloadOutlined /> });
+              }
+              if (canEdit) {
+                menuItems.push({ key: 'edit', label: '编辑信息', icon: <ApiOutlined /> });
+                menuItems.push({ key: 'delete', label: '解除授权', icon: <DeleteOutlined />, danger: true });
+              }
+
+              const handleMenuClick = (e: any) => {
+                if (e.key === 'delete') { Modal.confirm({ title: '确认解绑此店铺？', okType: 'danger', okText: '解绑', onOk: () => handleDelete(shop.id) }); return; }
+                if (e.key === 'sync') handleSync(e.domEvent, shop.id);
+                else if (e.key === 'sync-products') handleSyncProducts(e.domEvent, shop.id);
+                else if (e.key === 'sync-all') handleSyncAll(e.domEvent, shop.id);
+                else if (e.key === 'test') handleTest(e.domEvent, shop.id);
+                else if (e.key === 'refresh') handleRefreshToken(e.domEvent, shop.id);
+                else if (e.key === 'edit') { e.domEvent.stopPropagation(); handleOpenModal(shop); }
+                else if (e.key === 'detail') handleOpenModal(shop);
+              };
+
+              return (
                 <Card
+                  key={shop.id}
                   hoverable
                   style={{
-                    border: '1px solid #e8e8e8',
-                    borderRadius: 10,
+                    width: '100%', minHeight: 220, borderRadius: T.cardRadius,
+                    border: `1px solid ${T.cardBorder}`,
+                    boxShadow: '0 8px 24px rgba(15,23,42,0.06)',
+                    transition: 'all 0.2s ease',
                   }}
-                  styles={{ body: { padding: 16 } }}
+                  styles={{ body: { padding: '20px 24px' } }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shop.name}</div>
-                      <Space size={4} wrap>
-                        <Tag color="blue">{REGION_MAP[shop.region] || shop.region}</Tag>
-                        <Tag color={STATUS_MAP[shop.status]?.color || 'default'}>{STATUS_MAP[shop.status]?.label || shop.status}</Tag>
-                        {getTokenBadge(shop)}
-                      </Space>
+                  {/* Row 1: Logo + Name + Menu */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 12, background: `${T.primary}10`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <ShopOutlined style={{ fontSize: 20, color: T.primary }} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <Text strong ellipsis style={{ fontSize: 15, color: T.textPrimary, display: 'block' }}>{shop.name}</Text>
+                        {shop.shop_id && <Text style={{ fontSize: 11, color: T.textTertiary }}>ID: {shop.shop_id}</Text>}
+                      </div>
                     </div>
-                    <ShopOutlined style={{ fontSize: 28, color: '#d0d0d0', flexShrink: 0 }} />
+                    <Dropdown menu={{ items: menuItems, onClick: handleMenuClick }} trigger={['click']} placement="bottomRight">
+                      <Button type="text" icon={<MoreOutlined />}
+                        onClick={e => e.stopPropagation()}
+                        style={{ color: T.textSecondary, borderRadius: 8, flexShrink: 0 }} />
+                    </Dropdown>
                   </div>
-                  <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
-                    {shop.last_synced_at ? `上次同步: ${shop.last_synced_at.slice(0, 16)}` : '尚未同步'}
-                    {shop.sync_enabled ? <Tag color="blue" style={{ marginLeft: 6, fontSize: 11 }}>订单同步</Tag> : null}
-                    {shop.product_sync_enabled ? <Tag color="purple" style={{ fontSize: 11 }}>产品同步</Tag> : null}
+
+                  {/* Row 2: Country + Status tags */}
+                  <div style={{ marginBottom: 14 }}>
+                    <Space size={6}>
+                      <Tag style={{
+                        borderRadius: 8, border: 'none',
+                        background: `${T.primary}10`, color: T.primary,
+                        fontSize: 12, padding: '2px 10px',
+                      }}>
+                        {emoji} {countryName}
+                      </Tag>
+                      <Tag style={{
+                        borderRadius: 8, border: 'none',
+                        background: T.successBg, color: T.success,
+                        fontSize: 12, padding: '2px 10px',
+                      }}>
+                        <CheckCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
+                        {tokenValid ? '授权有效' : 'Token 已过期'}
+                      </Tag>
+                      {shop.sync_enabled && (
+                        <Tag style={{ borderRadius: 8, border: 'none', background: '#FFF7ED', color: '#F59E0B', fontSize: 12 }}>订单同步</Tag>
+                      )}
+                      {shop.product_sync_enabled && (
+                        <Tag style={{ borderRadius: 8, border: 'none', background: '#F5F3FF', color: '#8B5CF6', fontSize: 12 }}>产品同步</Tag>
+                      )}
+                    </Space>
                   </div>
-                  <Space style={{ marginTop: 12 }} size="small" wrap>
-                    <Tooltip title="同步订单"><Button size="small" icon={<SyncOutlined />} onClick={e => handleSync(e, shop.id)}>订单</Button></Tooltip>
-                    <Tooltip title="同步产品"><Button size="small" icon={<AppstoreOutlined />} onClick={e => handleSyncProducts(e, shop.id)}>产品</Button></Tooltip>
-                    <Tooltip title="全量同步"><Button size="small" type="primary" ghost icon={<CloudDownloadOutlined />} onClick={e => handleSyncAll(e, shop.id)}>全部</Button></Tooltip>
-                    <Tooltip title="测试连接"><Button size="small" icon={<ApiOutlined />} onClick={e => handleTest(e, shop.id)}>测试</Button></Tooltip>
-                    {shop._refresh_token_exists && (
-                      <Tooltip title="刷新Token"><Button size="small" icon={<ReloadOutlined />} loading={refreshLoading[shop.id]} onClick={e => handleRefreshToken(e, shop.id)} /></Tooltip>
-                    )}
-                    {canEdit && (
-                      <>
-                        <Button size="small" onClick={e => { e.stopPropagation(); handleOpenModal(shop); }}>编辑</Button>
-                        <Popconfirm title="确认解绑此店铺？" onConfirm={e => { e?.stopPropagation(); handleDelete(shop.id); }}>
-                          <Button size="small" danger icon={<DeleteOutlined />} onClick={e => e.stopPropagation()}>解绑</Button>
-                        </Popconfirm>
-                      </>
-                    )}
-                  </Space>
+
+                  {/* Row 3: Sync time */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                    <ClockCircleOutlined style={{ color: T.textTertiary, fontSize: 13 }} />
+                    <Text style={{ fontSize: 12, color: T.textTertiary }}>
+                      {lastSync ? `最近同步：${lastSync.slice(0, 16).replace('T', ' ')}` : '尚未同步'}
+                    </Text>
+                  </div>
+
+                  {/* Row 4: Action button */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Button type="default" size="small"
+                      onClick={e => { e.stopPropagation(); handleOpenModal(shop); }}
+                      style={{
+                        borderRadius: 10, border: `1px solid ${T.cardBorder}`,
+                        color: T.textSecondary, fontSize: 12,
+                      }}>
+                      查看详情 →
+                    </Button>
+                    <Text style={{ fontSize: 11, color: T.textTertiary }}>{STATUS_MAP[shop.status]?.label || shop.status}</Text>
+                  </div>
                 </Card>
-              </Col>
-            ))}
-          </Row>
+              );
+            })}
+          </div>
         )}
       </Spin>
 
-      {/* Edit Modal — 仅编辑基本信息，不含 API 凭证 */}
+      {/* ═══ EDIT MODAL (unchanged) ═══ */}
       <Modal
         title={editShop ? '编辑店铺信息' : '手动添加店铺'}
         open={modalOpen}
@@ -362,7 +373,6 @@ export default function ShopManagement() {
           <Form.Item name="product_sync_enabled" label="启用产品同步" valuePropName="checked">
             <Switch checkedChildren="开" unCheckedChildren="关" />
           </Form.Item>
-
         </Form>
       </Modal>
     </div>
