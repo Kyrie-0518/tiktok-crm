@@ -81,7 +81,7 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
     sql += ` AND p.id IN (SELECT product_id FROM product_shops WHERE shop_name = ?)`;
     params.push(shop_name);
   }
-  sql += ` ORDER BY p.id DESC`;
+  sql += ` ORDER BY (SELECT COALESCE(SUM(stock), 0) FROM product_skus WHERE product_id = p.id) DESC, p.id DESC`;
   const list = db.prepare(sql).all(...params);
   // Attach skus and shops for each product
   for (const p of list as any[]) {
