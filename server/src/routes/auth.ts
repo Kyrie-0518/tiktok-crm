@@ -211,24 +211,27 @@ router.put('/password', authMiddleware, (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-// PUT /api/auth/users/:id/reset-password — developer can reset any user's password
+// PUT /api/auth/users/:id/reset-password — anyone can reset own password; developer can reset anyone's
 router.put('/users/:id/reset-password', authMiddleware, (req: Request, res: Response) => {
   const { newPassword } = req.body;
   const db = getDb();
   const roleKey = getUserRoleKey(req, db);
+  const targetId = Number(req.params.id);
+  const isSelf = req.user.userId === targetId;
 
-  if (roleKey !== 'developer') {
+  // 重置自己密码无需 developer 权限；重置他人必须 developer
+  if (!isSelf && roleKey !== 'developer') {
     return res.status(403).json({ error: '仅开发者可重置他人密码' });
   }
   if (!newPassword || newPassword.length < 6) {
     return res.status(400).json({ error: '密码至少6位' });
   }
 
-  const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id) as any;
+  const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(targetId) as any;
   if (!targetUser) return res.status(404).json({ error: '用户不存在' });
 
   const hash = bcrypt.hashSync(newPassword, 10);
-  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, req.params.id);
+  db.prepare('UPDATE users SET password = ?, password_changed = 1 WHERE id = ?').run(hash, targetId);
   res.json({ success: true });
 });
 

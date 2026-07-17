@@ -188,11 +188,16 @@ export default function Roles() {
                   </div>
                 </div>
 
-                {/* Edit button for fixed roles */}
-                {isFixed && (
+                {/* Edit button for fixed roles — developer has all permissions automatically */}
+                {isFixed && role.role_key !== 'developer' && (
                   <Button block size="small" onClick={() => openEdit(role)} style={{ borderRadius: 8, border: `1px solid ${T_COLOR.cardBorder}`, color: T_COLOR.textSecondary, fontSize: 12 }}>
                     配置权限
                   </Button>
+                )}
+                {isFixed && role.role_key === 'developer' && (
+                  <div style={{ textAlign: 'center', fontSize: 11, color: T_COLOR.textTertiary, padding: '4px 0' }}>
+                    ✦ 系统已自动分配全部权限
+                  </div>
                 )}
               </Card>
             </Col>
