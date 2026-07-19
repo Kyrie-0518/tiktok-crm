@@ -5,13 +5,16 @@ import {
   RobotOutlined,
   VideoCameraOutlined, SettingOutlined, PictureOutlined,
   FileImageOutlined, ThunderboltOutlined,
-  ArrowLeftOutlined,
+  ArrowLeftOutlined, ApiOutlined, StarOutlined, HistoryOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
 import AIStudio from './AIStudio';
 import AIAnalysis from './AIAnalysis';
 import SkiisAnalysis from './SkiisAnalysis';
 import AIVideoGenerator from './AIVideoGenerator';
+import AIEngineManager from './AIEngineManager';
+import TemplateCenter from './TemplateCenter';
+import TaskHistory from './TaskHistory';
 import VideoModelConfig from './VideoModelConfig';
 import MaterialLibrary from './MaterialLibrary';
 import RawMaterials from './RawMaterials';
@@ -48,6 +51,15 @@ const STUDIO_MENU_GROUPS = [
     label: '视频创作',
     items: [
       { key: '/ai-studio/seedance', icon: <VideoCameraOutlined />, label: 'AI视频生成' },
+      { key: '/ai-studio/history', icon: <HistoryOutlined />, label: '历史任务' },
+    ],
+  },
+  {
+    key: 'group-engine',
+    label: 'AI Engine',
+    items: [
+      { key: '/ai-studio/engine', icon: <ApiOutlined />, label: '引擎管理' },
+      { key: '/ai-studio/templates', icon: <StarOutlined />, label: '模板中心' },
     ],
   },
   {
@@ -343,6 +355,9 @@ export default function AIStudioLayout() {
                 <Route path="ai-analysis" element={<AIAnalysis />} />
                 <Route path="skiis" element={<SkiisAnalysis />} />
                 <Route path="seedance" element={<AIVideoGenerator />} />
+                <Route path="engine" element={<AIEngineManager />} />
+                <Route path="templates" element={<TemplateCenter />} />
+                <Route path="history" element={<TaskHistory />} />
                 <Route path="video-models" element={<VideoModelConfig />} />
                 <Route path="material-library" element={<MaterialLibrary />} />
                 <Route path="raw-materials" element={<RawMaterials />} />
