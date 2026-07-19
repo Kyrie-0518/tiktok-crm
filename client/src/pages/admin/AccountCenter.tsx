@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Typography, Tabs } from 'antd';
+import { Card, Row, Col, Typography, Tabs, Table } from 'antd';
 import { TeamOutlined, SafetyOutlined, LoginOutlined, UserOutlined } from '@ant-design/icons';
 import api from '../../api';
-import Users from './Users';
 import Roles from './Roles';
-import LoginLogs from './LoginLogs';
 
 const { Text } = Typography;
 
@@ -16,6 +14,18 @@ const T_COLOR = {
 };
 
 interface StatData { totalUsers: number; totalRoles: number; todayLogins: number; activeUsers: number; }
+
+/** 内联用户列表（替代已删除的 admin/Users.tsx） */
+function InlineUsers() {
+  const [users, setUsers] = useState<any[]>([]);
+  useEffect(() => { api.get('/auth/users').then(r => setUsers(r.data || [])).catch(() => {}); }, []);
+  return <Table rowKey="id" dataSource={users} size="small" pagination={{ pageSize: 15, size: 'small' }}
+    columns={[
+      { title: '用户名', dataIndex: 'username' },
+      { title: '角色', dataIndex: 'role', render: (v: string) => v || '—' },
+      { title: '创建时间', dataIndex: 'created_at', render: (v: string) => v?.slice(0, 10) },
+    ]} />;
+}
 
 export default function AccountCenter() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -119,17 +129,12 @@ export default function AccountCenter() {
           {
             key: 'users',
             label: '用户管理',
-            children: <Users />,
+            children: <InlineUsers />,
           },
           {
             key: 'roles',
             label: '角色管理',
             children: <Roles />,
-          },
-          {
-            key: 'logs',
-            label: '登录日志',
-            children: <LoginLogs />,
           },
         ]}
       />
