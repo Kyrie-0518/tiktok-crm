@@ -1139,4 +1139,94 @@ function seedTokenStats(db: any) {
   }
 }
 
+/* ═══════════════════════════════ AI Video Engine tables ═══════════════════════════════ */
+function initVideoEngineTables(db: any) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS video_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT UNIQUE NOT NULL,
+      product_id INTEGER,
+      product_name TEXT DEFAULT '',
+      user_prompt TEXT DEFAULT '',
+      template TEXT DEFAULT '',
+      model TEXT DEFAULT '',
+      resolution TEXT DEFAULT '720p',
+      aspect_ratio TEXT DEFAULT '9:16',
+      duration INTEGER DEFAULT 5,
+      count INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'pending',
+      final_prompt TEXT DEFAULT '',
+      quality_score INTEGER DEFAULT 0,
+      video_id INTEGER,
+      video_url TEXT DEFAULT '',
+      error TEXT DEFAULT '',
+      total_time_ms INTEGER DEFAULT 0,
+      total_tokens INTEGER DEFAULT 0,
+      steps_json TEXT DEFAULT '[]',
+      created_at DATETIME DEFAULT (datetime('now')),
+      updated_at DATETIME DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS video_task_steps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      input_json TEXT DEFAULT '',
+      output_json TEXT DEFAULT '',
+      tokens INTEGER DEFAULT 0,
+      duration_ms INTEGER DEFAULT 0,
+      error TEXT DEFAULT '',
+      created_at DATETIME DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_vt_steps_task ON video_task_steps(task_id);
+
+    CREATE TABLE IF NOT EXISTS video_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      category TEXT DEFAULT '',
+      prompt TEXT DEFAULT '',
+      strategy TEXT DEFAULT '',
+      params TEXT DEFAULT '{}',
+      tags TEXT DEFAULT '',
+      is_system INTEGER DEFAULT 1,
+      usage_count INTEGER DEFAULT 0,
+      created_by INTEGER,
+      created_at DATETIME DEFAULT (datetime('now')),
+      updated_at DATETIME DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS video_prompt_versions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,
+      version INTEGER DEFAULT 1,
+      prompt TEXT DEFAULT '',
+      strategy_json TEXT DEFAULT '{}',
+      director_json TEXT DEFAULT '{}',
+      optimizer_params TEXT DEFAULT '{}',
+      model TEXT DEFAULT '',
+      created_at DATETIME DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS video_quality_scores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT NOT NULL,
+      video_id INTEGER,
+      score INTEGER DEFAULT 0,
+      product_completeness INTEGER DEFAULT 0,
+      person_consistency INTEGER DEFAULT 0,
+      shot_fluency INTEGER DEFAULT 0,
+      brand_visibility INTEGER DEFAULT 0,
+      selling_point_coverage INTEGER DEFAULT 0,
+      overall_impression INTEGER DEFAULT 0,
+      needs_retry INTEGER DEFAULT 0,
+      suggestions TEXT DEFAULT '',
+      raw_json TEXT DEFAULT '',
+      created_at DATETIME DEFAULT (datetime('now'))
+    );
+  `);
+  console.log('[migrate v3.0] AI Video Engine tables initialized');
+}
+initVideoEngineTables(db);
+
 export default getDb;

@@ -67,6 +67,16 @@ const AI_INLINE_SUGGESTIONS = [
   { label: '加入CTA', icon: <ThunderboltOutlined />, text: '\n结尾：行动号召文字"立即购买"，动态弹跳效果。' },
 ];
 
+const AGENT_LABELS: Record<string, string> = {
+  vision: '🔍 商品理解',
+  strategy: '💡 创意策略',
+  director: '🎬 AI导演',
+  prompt_engine: '✍️ Prompt生成',
+  optimizer: '⚙️ Prompt优化',
+  adapter: '🔌 模型适配',
+  quality: '✅ 质量评估',
+};
+
 const AI_TOOLS = [
   { key: 'optimize', label: 'AI 优化', icon: <BulbOutlined /> },
   { key: 'script', label: '脚本生成', icon: <EditOutlined /> },
@@ -116,6 +126,8 @@ export default function AIVideoGenerator() {
   const [logoMaterial, setLogoMaterial] = useState<{ url: string; name: string } | null>(null);
 
   const [generating, setGenerating] = useState(false);
+  const [pipelineSteps, setPipelineSteps] = useState<Array<{ agent: string; status: string }>>([]);
+  const [pipelineResult, setPipelineResult] = useState<{ qualityScore?: number; totalTokens?: number; totalTime?: number } | null>(null);
   const [genError, setGenError] = useState('');
   const [progress, setProgress] = useState(0);
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
@@ -196,16 +208,30 @@ export default function AIVideoGenerator() {
     if (!prompt.trim()) return message.warning('请输入视频创意');
     if (generating) return;
     setGenerating(true); setGenError(''); setProgress(0); setPreviewVideo(null);
+    setPipelineSteps([]); setPipelineResult(null);
     try {
-      const pTimer = setInterval(() => setProgress(v => Math.min(v + Math.random() * 8, 92)), 700);
+      // Step 1: AI Engine Pipeline
+      const engRes = await api.post('/ai-engine/generate', {
+        productId: selectedProduct?.id, productImage: productMaterial?.url,
+        productName: selectedProduct?.name, userPrompt: prompt,
+        model: modelOption, resolution, aspectRatio, duration, count,
+      });
+      const result = engRes.data;
+      setPipelineSteps(result.steps || []);
+      setPipelineResult({ qualityScore: result.qualityScore, totalTokens: result.totalTokens, totalTime: result.totalTime });
+      if (result.status === 'failed') { setGenError(result.error || 'AI Engine 执行失败'); setGenerating(false); return; }
+
+      const finalPrompt = result.steps?.find((s: any) => s.agent === 'optimizer')?.output?.optimizedPrompts?.[0]?.prompt || prompt;
+      setProgress(20);
+      const pTimer = setInterval(() => setProgress(v => Math.min(v + Math.random() * 6, 88)), 700);
       const r = await api.post('/seedance/generate', {
-        prompt, product_id: selectedProduct?.id, product_image: productMaterial?.url, reference_image: referenceMaterial?.url,
+        prompt: finalPrompt, product_id: selectedProduct?.id, product_image: productMaterial?.url, reference_image: referenceMaterial?.url,
         model: modelOption, resolution, duration, aspect_ratio: aspectRatio, count, voice_enabled: voiceEnabled,
       });
       clearInterval(pTimer); setProgress(95);
       const vid = r.data?.video_id || r.data?.id;
       if (vid) { await poll(vid); } else if (r.data?.video_url) {
-        const v: Video = { id: r.data.id || Date.now(), title: selectedProduct?.name || 'AI 视频', video_url: r.data.video_url, thumbnail_url: r.data.thumbnail_url || '', prompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: new Date().toISOString(), token_usage: r.data.token_usage, product_name: selectedProduct?.name };
+        const v: Video = { id: r.data.id || Date.now(), title: selectedProduct?.name || 'AI 视频', video_url: r.data.video_url, thumbnail_url: r.data.thumbnail_url || '', prompt: finalPrompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: new Date().toISOString(), token_usage: r.data.token_usage, product_name: selectedProduct?.name };
         setPreviewVideo(v); setProgress(100); loadVideos();
       }
     } catch (e: any) { setGenError(e.response?.data?.error || e.message || '生成失败'); }
@@ -497,7 +523,29 @@ export default function AIVideoGenerator() {
                 <LoadingOutlined spin style={{ fontSize: 36, color: T.primary, marginBottom: 16 }} />
                 <Progress percent={Math.round(progress)} strokeColor={{ from: '#8b5cf6', to: '#6E56FF' }} style={{ maxWidth: 260, margin: '0 auto 12px' }} />
                 <Text style={{ fontSize: 14, color: T.textPrimary, display: 'block', fontWeight: 600 }}>正在生成…</Text>
-                <Text style={{ fontSize: 12, color: T.textTertiary }}>预计 40-60 秒，请耐心等待</Text>
+                {pipelineSteps.length > 0 && (
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {pipelineSteps.map(s => {
+                      const icon = s.status === 'completed' ? <CheckCircleFilled style={{ color: T.success, fontSize: 11 }} /> :
+                        s.status === 'failed' ? <CloseCircleFilled style={{ color: T.error, fontSize: 11 }} /> :
+                        s.status === 'running' ? <LoadingOutlined style={{ color: T.primary, fontSize: 11 }} /> :
+                        <ClockCircleOutlined style={{ color: T.textTertiary, fontSize: 11 }} />;
+                      return (
+                        <div key={s.agent} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: s.status === 'completed' ? T.success : T.textTertiary }}>
+                          {icon}
+                          <span>{AGENT_LABELS[s.agent] || s.agent}</span>
+                        </div>
+                      );
+                    })}
+                    {pipelineResult && (
+                      <div style={{ marginTop: 4, fontSize: 10, color: T.textTertiary }}>
+                        ⚡ {pipelineResult.totalTokens || 0} Token · {pipelineResult.totalTime ? `${(pipelineResult.totalTime / 1000).toFixed(1)}s` : ''}
+                        · 质量 {pipelineResult.qualityScore || '—'} 分
+                      </div>
+                    )}
+                  </div>
+                )}
+                <Text style={{ fontSize: 12, color: T.textTertiary, marginTop: pipelineSteps.length ? 8 : 0 }}>预计 40-60 秒，请耐心等待</Text>
               </div>
             ) : genError ? (
               <div style={{ textAlign: 'center', padding: '40px 20px' }}>
