@@ -226,18 +226,57 @@ export default function AIVideoGenerator() {
     <div style={{ background: T.bg, minHeight: 'calc(100vh - 64px)', overflow: 'auto' }}>
 
       {/* ── Header ── */}
-      <div style={{ height: 52, background: T.cardBg, borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 28px', flexShrink: 0 }}>
-        <PageHeader title="AI 视频工作台" icon={<VideoCameraOutlined />} style={{ marginBottom: 0 }} />
-        <Space size={16}>
+      <div style={{
+        height: 64,
+        background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FE 50%, #FFFFFF 100%)',
+        borderBottom: `1px solid ${T.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 24px', flexShrink: 0, position: 'relative',
+        boxShadow: '0 1px 3px rgba(15,23,42,0.03)',
+      }}>
+        {/* Left: Logo + Title + Subtitle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Logo 圆角方块 */}
+          <div style={{
+            width: 38, height: 38, borderRadius: 11,
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #6E56FF 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(110,86,255,0.30), inset 0 1px 0 rgba(255,255,255,0.2)',
+            position: 'relative',
+          }}>
+            <VideoCameraOutlined style={{ fontSize: 18, color: '#fff' }} />
+            <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, borderRadius: 5, background: '#22C55E', border: '2px solid #fff' }} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: T.textPrimary, letterSpacing: '0.3px' }}>AI 视频工作台</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: T.primary, background: T.primaryLight, padding: '2px 6px', borderRadius: 4, letterSpacing: '0.5px' }}>ENTERPRISE</span>
+            </div>
+            <div style={{ fontSize: 11, color: T.textTertiary, marginTop: 2, lineHeight: 1.2 }}>
+              文生视频 · 图生视频 · AI 智能创作 <span style={{ color: T.textSecondary, margin: '0 4px' }}>·</span> <span style={{ color: T.success, fontWeight: 500 }}>● 就绪</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Actions */}
+        <Space size={12}>
           {selectedProduct && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.primaryLight, borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 600, color: T.primary }}>
-              <img src={selectedProduct.image} style={{ width: 18, height: 18, borderRadius: 4 }} />
-              {selectedProduct.name.slice(0, 12)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.primaryLight, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: T.primary, border: `1px solid ${T.primaryLight}` }}>
+              <img src={selectedProduct.image} style={{ width: 20, height: 20, borderRadius: 4, objectFit: 'cover' }} />
+              <span style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedProduct.name}</span>
             </div>
           )}
-          <Select size="small" value={modelOption} onChange={setModelOption} variant="borderless" style={{ minWidth: 110, fontWeight: 600 }}
-            options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : [{ value: 'doubao-seedance-2-0-260128', label: 'Seedance V2' }, { value: 'kling-2.1', label: 'Kling 2.1' }]} />
-          <Badge count={videos.length} size="small"><Button size="small" icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>历史</Button></Badge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.cardBg }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: T.success }} />
+            <span style={{ fontSize: 11, color: T.textTertiary }}>模型</span>
+            <Select size="small" value={modelOption} onChange={setModelOption} variant="borderless" style={{ fontSize: 12, fontWeight: 600, minWidth: 100 }}
+              suffixIcon={<DownOutlined style={{ fontSize: 10, color: T.textTertiary }} />}
+              options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : [{ value: 'doubao-seedance-2-0-260128', label: 'Seedance V2' }, { value: 'kling-2.1', label: 'Kling 2.1' }]} />
+          </div>
+          <Badge count={videos.length} size="small" color={T.primary} offset={[-2, 2]}>
+            <Button size="middle" icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}
+              style={{ borderRadius: 8, fontWeight: 500 }}>历史</Button>
+          </Badge>
         </Space>
       </div>
 
