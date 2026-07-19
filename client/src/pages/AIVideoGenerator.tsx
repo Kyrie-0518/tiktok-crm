@@ -241,13 +241,13 @@ export default function AIVideoGenerator() {
         </Space>
       </div>
 
-      {/* ── Workspace: AI导演(158px) | Content(不变) ── */}
-      <div style={{ maxWidth: 1560, margin: '16px auto', display: 'flex', gap: 16, padding: '0 24px', alignItems: 'flex-start' }}>
+      {/* ── Workspace: AI导演(240px) | Content(不变) ── */}
+      <div style={{ maxWidth: 1700, margin: '16px auto', display: 'flex', gap: 16, padding: '0 16px', alignItems: 'flex-start' }}>
         {/* ═══ AI导演 ═══ */}
         <div style={{
-          width: 158, flexShrink: 0,
+          width: 240, flexShrink: 0,
           background: T.cardBg, borderRadius: T.radiusCard, border: `1px solid ${T.border}`,
-          boxShadow: T.shadow, padding: 14,
+          boxShadow: T.shadow, padding: 16,
           position: 'sticky', top: 16,
         }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: T.textPrimary, marginBottom: 10 }}>✨ AI导演</div>
@@ -257,11 +257,13 @@ export default function AIVideoGenerator() {
             <Text style={{ fontSize: 10, fontWeight: 600, color: '#F59E0B', display: 'block', marginBottom: 6 }}>🔥 今日推荐</Text>
             {TEMPLATES.slice(0, 3).map(t => (
               <div key={t.label} onClick={() => applyTemplate(t)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, cursor: 'pointer', marginBottom: 2 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', marginBottom: 3 }}
                 onMouseEnter={e => { e.currentTarget.style.background = `${t.color}08`; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                <div style={{ width: 18, height: 18, borderRadius: 4, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.color, fontSize: 10, flexShrink: 0 }}>{t.icon}</div>
-                <Text style={{ fontSize: 10, fontWeight: 500, color: T.textPrimary }}>{t.label}</Text>
+                <div style={{ width: 22, height: 22, borderRadius: 5, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.color, fontSize: 12, flexShrink: 0 }}>{t.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 500, color: T.textPrimary, lineHeight: 1.2 }}>{t.label}</Text>
+                </div>
               </div>
             ))}
           </div>
@@ -269,13 +271,13 @@ export default function AIVideoGenerator() {
           <div style={{ height: 1, background: T.borderLight, marginBottom: 10 }} />
 
           {/* 全部分类 */}
-          <Text style={{ fontSize: 10, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 6 }}>全部分类</Text>
+          <Text style={{ fontSize: 10, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 6 }}>📁 全部分类</Text>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {TEMPLATES.map(t => (
               <div key={t.label} onClick={() => applyTemplate(t)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', borderRadius: 4,
-                  cursor: 'pointer', fontSize: 10, color: T.textSecondary,
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 5,
+                  cursor: 'pointer', fontSize: 11, color: T.textSecondary,
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = `${t.color}08`; e.currentTarget.style.color = t.color; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.textSecondary; }}>
@@ -287,12 +289,13 @@ export default function AIVideoGenerator() {
 
           <div style={{ height: 1, background: T.borderLight, margin: '10px 0' }} />
 
-          {/* 收藏 + 最近 */}
-          <Text style={{ fontSize: 10, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 4 }}>⭐ 最近使用</Text>
-          {TEMPLATES.slice(3, 6).map(t => (
+          {/* 最近使用 */}
+          <Text style={{ fontSize: 10, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 4 }}>🕐 最近使用</Text>
+          {TEMPLATES.slice(3, 7).map(t => (
             <div key={t.label} onClick={() => applyTemplate(t)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 10, color: T.textSecondary, whiteSpace: 'nowrap' }}
-              onMouseEnter={e => { e.currentTarget.style.color = T.primary; }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 11, color: T.textSecondary }}
+              onMouseEnter={e => { e.currentTarget.style.color = T.primary; }}
+              onMouseLeave={e => { e.currentTarget.style.color = T.textSecondary; }}>
               {t.label}
             </div>
           ))}
