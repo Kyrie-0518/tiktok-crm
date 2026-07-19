@@ -5,7 +5,7 @@ import type { StrategyOutput, VisionOutput, AgentContext } from '../types';
  * ② Creative Strategy Agent（创意策略）
  * 决定视频的拍法、节奏、风格、平台适配
  */
-export async function creativeStrategyAgent(ctx: AgentContext & { vision: VisionOutput; userPrompt: string }): Promise<StrategyOutput> {
+export async function strategyAgent(ctx: AgentContext & { vision: VisionOutput; userPrompt: string }): Promise<StrategyOutput> {
   const systemPrompt = `你是短视频创意策略专家。根据商品属性和用户需求，制定视频创作策略。
 输出 JSON 格式：
 {
