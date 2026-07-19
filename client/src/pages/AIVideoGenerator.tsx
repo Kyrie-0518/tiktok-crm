@@ -7,7 +7,7 @@ import {
   CloseOutlined, FireOutlined, GiftOutlined, SmileOutlined, StarOutlined,
   AppstoreAddOutlined, DownOutlined, SaveOutlined, GlobalOutlined, ExpandOutlined,
   SoundOutlined, StopOutlined, EyeOutlined, FileImageOutlined, InboxOutlined,
-  ThunderboltFilled,
+  ThunderboltFilled, SearchOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 import { PageHeader } from '../components/design-system';
@@ -39,6 +39,26 @@ const ALL_TEMPLATES = [
   { cat: '品牌', items: [{ label: '品牌故事', icon: <StarOutlined />, color: '#F59E0B', prompt: '电影级品牌片：航拍城市 → 工匠细节 → 使用场景 → logo收尾，舒缓大气。' },{ label: '节日促销', icon: <FireOutlined />, color: '#EF4444', prompt: '节日促销：红色金色交错，礼盒特效，烟花背景，文字动画，节奏明快。' }] },
   { cat: '行业', items: [{ label: '科技产品', icon: <EyeOutlined />, color: '#3B82F6', prompt: '科技产品风格：深色背景、电子元件细节、多角度展示、未来感光线。' },{ label: '美妆', icon: <StarOutlined />, color: '#EC4899', prompt: '美妆风格：柔光特写、产品涂抹演示、前后对比、品牌质感。' }] },
 ];
+
+/* 侧栏 AI导演 用平面模板列表 */
+const TEMPLATES: TemplateItem[] = [
+  { label: '商品介绍',   icon: <GiftOutlined />,     color: '#6E56FF', prompt: '专业商品展示镜头：产品居中，背景纯净柔和，灯光突出产品质感，慢速 360° 旋转展示。' },
+  { label: 'TikTok爆款', icon: <ThunderboltOutlined />, color: '#EF4444', prompt: 'TikTok 潮流风：快速剪辑、动感音乐、字幕弹跳、前3秒抓眼球。' },
+  { label: '真人带货',   icon: <SmileOutlined />,     color: '#3B82F6', prompt: '真人口播：主播正对镜头，背景虚化自然，亲切介绍产品卖点。' },
+  { label: '种草测评',   icon: <StarOutlined />,      color: '#8B5CF6', prompt: '测评风格：手持产品近景演示，场景化使用画面，强调使用前后对比。' },
+  { label: '品牌故事',   icon: <StarOutlined />,      color: '#F59E0B', prompt: '电影级品牌片：航拍城市→工匠细节→用户场景→Logo收尾。' },
+  { label: '开箱测评',   icon: <AppstoreOutlined />,  color: '#22C55E', prompt: '开箱风格：俯拍桌面，双手优雅拆包装，渐次展示细节。' },
+  { label: '节日营销',   icon: <FireOutlined />,      color: '#EF4444', prompt: '节日促销：红金配色交错，礼盒特效，烟花背景，文字动画浮现。' },
+  { label: '3C数码',     icon: <EyeOutlined />,       color: '#3B82F6', prompt: '科技产品风格：深色背景、电子元件细节、多角度展示、未来感光线。' },
+  { label: '美食',       icon: <FireOutlined />,      color: '#F97316', prompt: '美食镜头：慢动作倒酱汁、水汽升腾、餐具特写、饱和度高有食欲。' },
+  { label: '家居',       icon: <AppstoreOutlined />,  color: '#22C55E', prompt: '家居展示：柔和自然光透过窗户，空间广角展示，细节特写材质纹理。' },
+  { label: '美妆',       icon: <SmileOutlined />,     color: '#EC4899', prompt: '美妆风格：柔光特写、产品涂抹演示、前后对比、品牌质感。' },
+  { label: 'Shopee',     icon: <PlayCircleOutlined />,color: '#F97316', prompt: 'Shopee展示：横向平铺产品，关键参数浮现，暖色调背景。' },
+  { label: '汽车',       icon: <ThunderboltOutlined />,color: '#DC2626', prompt: '汽车宣传：低角度车头特写→动态行驶追焦→山顶日出收尾。' },
+  { label: '服装',       icon: <StarOutlined />,      color: '#8B5CF6', prompt: '服装展示：模特动态镜头，光影跟随人体线条，节奏自然流畅。' },
+  { label: '宠物',       icon: <SmileOutlined />,     color: '#F59E0B', prompt: '宠物视频：活泼轻快节奏，可爱特写镜头，主人互动场景。' },
+];
+interface TemplateItem { label: string; icon: React.ReactNode; color: string; prompt: string; }
 
 const AI_INLINE_SUGGESTIONS = [
   { label: '加入镜头', icon: <VideoCameraOutlined />, text: '\n镜头：推近特写 → 环绕展示 → Logo淡入。' },
@@ -80,6 +100,7 @@ export default function AIVideoGenerator() {
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [productLoading, setProductLoading] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [templateMarketOpen, setTemplateMarketOpen] = useState(false);
 
   const [prompt, setPrompt] = useState('');
   const [modelOption, setModelOption] = useState('doubao-seedance-2-0-260128');
@@ -133,6 +154,9 @@ export default function AIVideoGenerator() {
     setSelectedProduct(p); setProductMaterial({ url: p.image, name: p.name }); setProductModalOpen(false);
     if (!prompt) setPrompt(`专业商品展示：${p.name}，产品居中，背景柔和干净，灯光突出产品质感，节奏舒缓大气。`);
   };
+
+  /* ── Template ── */
+  const applyTemplate = (t: TemplateItem) => { setPrompt(t.prompt); setTemplateMarketOpen(false); message.success({ content: `✓ 已应用「${t.label}」`, duration: 2 }); };
 
   /* ── Upload ── */
   const uploadImage = async (file: File): Promise<string> => {
@@ -217,8 +241,72 @@ export default function AIVideoGenerator() {
         </Space>
       </div>
 
-      {/* ── Workspace: Left(60%) + Right(40%) ── */}
-      <div style={{ maxWidth: T.maxW, margin: '16px auto', display: 'flex', gap: 16, padding: '0 24px' }}>
+      {/* ── Workspace: AI导演(158px) | Content(不变) ── */}
+      <div style={{ maxWidth: 1560, margin: '16px auto', display: 'flex', gap: 16, padding: '0 24px', alignItems: 'flex-start' }}>
+        {/* ═══ AI导演 ═══ */}
+        <div style={{
+          width: 158, flexShrink: 0,
+          background: T.cardBg, borderRadius: T.radiusCard, border: `1px solid ${T.border}`,
+          boxShadow: T.shadow, padding: 14,
+          position: 'sticky', top: 16,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.textPrimary, marginBottom: 10 }}>✨ AI导演</div>
+
+          {/* 今日推荐 */}
+          <div style={{ marginBottom: 10 }}>
+            <Text style={{ fontSize: 10, fontWeight: 600, color: '#F59E0B', display: 'block', marginBottom: 6 }}>🔥 今日推荐</Text>
+            {TEMPLATES.slice(0, 3).map(t => (
+              <div key={t.label} onClick={() => applyTemplate(t)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, cursor: 'pointer', marginBottom: 2 }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${t.color}08`; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                <div style={{ width: 18, height: 18, borderRadius: 4, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.color, fontSize: 10, flexShrink: 0 }}>{t.icon}</div>
+                <Text style={{ fontSize: 10, fontWeight: 500, color: T.textPrimary }}>{t.label}</Text>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ height: 1, background: T.borderLight, marginBottom: 10 }} />
+
+          {/* 全部分类 */}
+          <Text style={{ fontSize: 10, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 6 }}>全部分类</Text>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {TEMPLATES.map(t => (
+              <div key={t.label} onClick={() => applyTemplate(t)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', borderRadius: 4,
+                  cursor: 'pointer', fontSize: 10, color: T.textSecondary,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${t.color}08`; e.currentTarget.style.color = t.color; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.textSecondary; }}>
+                <div style={{ width: 4, height: 4, borderRadius: 2, background: t.color, flexShrink: 0 }} />
+                {t.label}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ height: 1, background: T.borderLight, margin: '10px 0' }} />
+
+          {/* 收藏 + 最近 */}
+          <Text style={{ fontSize: 10, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 4 }}>⭐ 最近使用</Text>
+          {TEMPLATES.slice(3, 6).map(t => (
+            <div key={t.label} onClick={() => applyTemplate(t)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 10, color: T.textSecondary, whiteSpace: 'nowrap' }}
+              onMouseEnter={e => { e.currentTarget.style.color = T.primary; }}>
+              {t.label}
+            </div>
+          ))}
+
+          <div style={{ height: 1, background: T.borderLight, margin: '10px 0' }} />
+
+          <Button block size="small" type="text" onClick={() => setTemplateMarketOpen(true)}
+            style={{ fontSize: 10, color: T.primary, fontWeight: 500, borderRadius: 6 }}>
+            🔍 全部模板 →
+          </Button>
+        </div>
+
+        {/* ═══════ Original V5 Content (unchanged) ═══════ */}
+        <div style={{ maxWidth: T.maxW, display: 'flex', gap: 16, flex: 1, minWidth: 0 }}>
         {/* ═══════ LEFT: 视频创作区 60% ═══════ */}
         <div style={{ flex: '3 1 0%', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
 
@@ -418,6 +506,7 @@ export default function AIVideoGenerator() {
           )}
         </div>
       </div>
+      </div>
 
       {/* ══ Product Modal ══ */}
       <Modal title="选择商品" open={productModalOpen} onCancel={() => setProductModalOpen(false)} footer={null} width={540}>
@@ -456,6 +545,28 @@ export default function AIVideoGenerator() {
             </div>
           </div>
         ))}
+      </Modal>
+
+      {/* ══ Template Market Modal (full grid) ══ */}
+      <Modal title="✨ AI导演 · 全部模板" open={templateMarketOpen} onCancel={() => setTemplateMarketOpen(false)} footer={null} width={760} style={{ top: 20 }}>
+        <Input prefix={<SearchOutlined style={{ color: T.textTertiary }} />} placeholder="搜索模板…" allowClear
+          onChange={() => {}} style={{ marginBottom: 16, borderRadius: 8 }} />
+        <div style={{ maxHeight: 500, overflow: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            {TEMPLATES.map(t => (
+              <div key={t.label} onClick={() => applyTemplate(t)}
+                style={{ padding: '14px 16px', borderRadius: 10, border: `1px solid ${T.border}`, cursor: 'pointer', transition: 'all .15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = t.color; e.currentTarget.style.boxShadow = `0 0 0 2px ${t.color}20`; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = 'none'; }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 8, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.color, fontSize: 16 }}>{t.icon}</div>
+                  <Text style={{ fontSize: 13, fontWeight: 600 }}>{t.label}</Text>
+                </div>
+                <Text style={{ fontSize: 11, color: T.textTertiary, display: 'block', maxHeight: 28, overflow: 'hidden', lineHeight: 1.4 }}>{t.prompt.slice(0, 60)}…</Text>
+              </div>
+            ))}
+          </div>
+        </div>
       </Modal>
 
       {/* ══ Params Drawer ══ */}
