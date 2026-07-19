@@ -1227,6 +1227,6 @@ function initVideoEngineTables(db: any) {
   `);
   console.log('[migrate v3.0] AI Video Engine tables initialized');
 }
-initVideoEngineTables(db);
+initVideoEngineTables(getDb());
 
 export default getDb;
