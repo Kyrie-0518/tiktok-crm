@@ -6,7 +6,7 @@ import { promptEngine } from './agents/prompt-engine';
 import { optimizerAgent } from './agents/optimizer';
 import { adapterAgent } from './agents/adapter';
 import { qualityAgent } from './agents/quality';
-import { getDb } from '../../db';
+import getDb from '../../db';
 import { VideoTaskContext, PipelineResult, PipelineStep, VisionOutput, StrategyOutput, DirectorOutput, PromptEngineOutput, OptimizerOutput, AdapterOutput, QualityOutput } from './types';
 
 export async function runPipeline(ctx: VideoTaskContext): Promise<PipelineResult> {

@@ -2,7 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { createAndRun } from '../services/ai-engine/orchestrator';
-import { getDb } from '../db';
+import getDb from '../db';
 import crypto from 'crypto';
 
 function uuid(): string {
