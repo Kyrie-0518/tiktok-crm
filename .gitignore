@@ -10,3 +10,6 @@ server/.env
 .DS_Store
 Thumbs.db
 .playwright-cli/
+*.pptx
+adrate-*.png
+nodejs_sdk*.zip
