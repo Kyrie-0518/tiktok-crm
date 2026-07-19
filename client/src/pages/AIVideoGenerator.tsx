@@ -241,8 +241,8 @@ export default function AIVideoGenerator() {
         </Space>
       </div>
 
-      {/* ── Workspace: AI导演(240px) | Content(不变) ── */}
-      <div style={{ maxWidth: 1700, margin: '16px auto', display: 'flex', gap: 16, padding: '0 16px', alignItems: 'flex-start' }}>
+      {/* ── Workspace: 3 列铺满页面 ── */}
+      <div style={{ margin: '16px 0', display: 'flex', gap: 16, padding: '0 16px', alignItems: 'flex-start', width: '100%' }}>
         {/* ═══ AI导演 ═══ */}
         <div style={{
           width: 240, flexShrink: 0,
@@ -308,8 +308,8 @@ export default function AIVideoGenerator() {
           </Button>
         </div>
 
-        {/* ═══════ Original V5 Content (unchanged) ═══════ */}
-        <div style={{ maxWidth: T.maxW, display: 'flex', gap: 16, flex: 1, minWidth: 0 }}>
+        {/* ═══════ Original V5 Content (flex 填满剩余空间) ═══════ */}
+        <div style={{ display: 'flex', gap: 16, flex: 1, minWidth: 0 }}>
         {/* ═══════ LEFT: 视频创作区 60% ═══════ */}
         <div style={{ flex: '3 1 0%', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
 
