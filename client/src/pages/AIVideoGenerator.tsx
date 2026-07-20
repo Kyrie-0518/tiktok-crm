@@ -226,9 +226,9 @@ export default function AIVideoGenerator() {
       const finalPrompt = result.steps?.find((s: any) => s.agent === 'optimizer')?.output?.optimizedPrompts?.[0]?.prompt || prompt;
       setProgress(20);
       const pTimer = setInterval(() => setProgress(v => Math.min(v + Math.random() * 6, 88)), 700);
-      const r = await api.post('/seedance/generate', {
-        prompt: finalPrompt, product_id: selectedProduct?.id, product_image: productMaterial?.url, reference_image: referenceMaterial?.url,
-        model: modelOption, resolution, duration, aspect_ratio: aspectRatio, count, voice_enabled: voiceEnabled,
+      const r = await api.post('/video-models/generate', {
+        prompt: finalPrompt, product_image: productMaterial?.url, reference_image: referenceMaterial?.url,
+        model_type: modelOption, model_name: modelOption, resolution, duration, aspect_ratio: aspectRatio, count, voice_enabled: voiceEnabled,
       });
       clearInterval(pTimer); setProgress(95);
       const vid = r.data?.video_id || r.data?.id;
@@ -242,7 +242,7 @@ export default function AIVideoGenerator() {
 
   const poll = async (vid: number) => {
     for (let i = 0; i < 60; i++) {
-      try { const r = await api.get(`/seedance/videos/${vid}`); const v = r.data?.video || r.data; if (v.status === 'completed' || v.video_url) { setPreviewVideo(v); setProgress(100); loadVideos(); return; } if (v.status === 'failed') { setGenError(v.error || '生成失败'); return; } if (v.progress) setProgress(v.progress); } catch {}
+      try { const r = await api.get(`/video-models/poll/${vid}`); const v = r.data?.video || r.data; if (v?.status === 'completed' || v?.video_url) { const finalV: Video = { id: v.id || vid, title: selectedProduct?.name || 'AI 视频', video_url: v.video_url, thumbnail_url: v.thumbnail_url || '', prompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: v.created_at || new Date().toISOString(), token_usage: v.token_usage, product_name: selectedProduct?.name }; setPreviewVideo(finalV); setProgress(100); loadVideos(); return; } if (v?.status === 'failed') { setGenError(v.error || '生成失败'); return; } if (v?.progress) setProgress(v.progress); } catch {}
       await new Promise(r => setTimeout(r, 5000));
     } setGenError('超时，请查看历史记录');
   };
