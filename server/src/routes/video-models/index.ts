@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import authMiddleware from '../middleware/auth';
+import authMiddleware from '../../middleware/auth';
 import configsRouter from './configs';
 import generateRouter from './generate';
 import pollRouter from './poll';
