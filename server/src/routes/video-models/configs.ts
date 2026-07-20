@@ -97,7 +97,7 @@ router.post('/:type/test', async (req: Request, res: Response, next) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
 
-    if (modelType === 'seedance') {
+    if (modelType === 'default') {
       const response = await fetch(baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ model: model.toLowerCase(), duration: 5, ratio: '16:9', content: [{ type: 'text', text: 'test' }] }), signal: controller.signal });
       clearTimeout(timer);
       if (response.ok) { updateTestResult(userId, modelType, 'success', 'API 接入正常'); res.json({ success: true, message: `${modelInfo.name} API 接入正常` }); }

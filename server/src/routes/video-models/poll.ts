@@ -42,7 +42,7 @@ router.get('/:videoId', async (req: Request, res: Response) => {
     return res.json({ status: 'failed', error: '未找到任务ID，任务可能提交失败' });
   }
 
-  const config = getUserModelConfig(userId, 'seedance');
+  const config = getUserModelConfig(userId, 'default');
   if (!config || !config.api_key) {
     db.prepare(`UPDATE seedance_videos SET status = 'failed' WHERE id = ?`).run(videoId);
     return res.json({ status: 'failed', error: '该账号未配置或未启用 Seedance API' });

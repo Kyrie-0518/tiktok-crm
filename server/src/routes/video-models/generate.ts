@@ -62,7 +62,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     const timer = setTimeout(() => controller.abort(), 120000);
     let requestBody: any;
 
-    if (model_type === 'seedance') {
+    if (model_type === 'default') {
       // 所有图片都放入 content 数组（按顺序：商品图 → 参考图 → 补充图 → 文字）
       const content: any[] = [];
 
@@ -142,7 +142,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     videoId = r.lastInsertRowid;
 
     const taskId = data.id || data.task_id;
-    if (model_type === 'seedance' && taskId) {
+    if (model_type === 'default' && taskId) {
       db.prepare(`UPDATE seedance_videos SET status = 'pending', api_response = ? WHERE id = ?`).run(JSON.stringify({ ...data, task_id: taskId }), videoId);
       res.json({ success: true, id: videoId, task_id: taskId, model: `${model_type}:${model}`, message: '视频生成任务已提交，请稍后刷新查看结果' });
     } else {

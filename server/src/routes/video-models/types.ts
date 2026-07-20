@@ -1,7 +1,7 @@
 // 视频模型类型定义
 
 export const VIDEO_MODEL_TYPES = [
-  { type: 'seedance', name: '火山引擎', icon: 'volcano', description: '字节跳动火山引擎视频生成模型', defaultEndpoint: 'https://ark.cn-beijing.volces.com/api/v3', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'doubao-seedance-2-0-260128', messages: [{ role: 'user', content: 'hi' }], max_tokens: 10 } },
+  { type: 'default', name: '视频生成引擎', icon: 'volcano', description: '通用视频生成模型', defaultEndpoint: '', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'doubao-seedance-1-0-pro-250528', messages: [{ role: 'user', content: 'hi' }], max_tokens: 10 } },
   { type: 'kling', name: '快手可灵 (Kling)', icon: '⚡', description: '快手视频生成模型', defaultEndpoint: 'https://api.klingai.com', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'kling-v1', task_type: 'text2video', prompt: 'hi' } },
   { type: 'minimax', name: 'MiniMax', icon: '🎯', description: 'MiniMax 海螺视频生成模型', defaultEndpoint: 'https://api.minimax.chat', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'abab6-video-01', prompt: 'hi' } },
   { type: 'haiper', name: 'Haiper', icon: '🌊', description: 'Haiper AI 视频生成模型', defaultEndpoint: 'https://api.haiper.ai', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'haiper-video-v2', prompt: 'hi' } },

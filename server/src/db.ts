@@ -1302,4 +1302,14 @@ initVideoEngineTables(getDb());
   console.log(`[migrate tz] UTC->Beijing migration done, total ${totalUpdated} rows updated`);
 })();
 
+/* 迁移：video_model_configs model_type 键名规范化 'seedance' → 'default' */
+(() => {
+  const db = getDb();
+  const flag = db.prepare("SELECT value FROM settings WHERE key = 'model_type_renamed_v1'").get() as any;
+  if (flag) return;
+  const result = db.prepare("UPDATE video_model_configs SET model_type = 'default' WHERE model_type = 'seedance'").run();
+  if (result.changes > 0) console.log(`[migrate] model_type seedance->default: ${result.changes} rows`);
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('model_type_renamed_v1', '1')").run();
+})();
+
 export default getDb;

@@ -98,14 +98,14 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
   let videoKey = '';
   let videoConfigured = false;
   let videoEnabled = false;
-  let videoModelType = 'seedance';
+  let videoModelType = 'default';
   let videoQueryEndpoint = '';
 
   if (videoCfg) {
     videoApiUrl = videoCfg.api_url || '';
     videoModel = videoCfg.model_name || '';
     videoKey = videoCfg.api_key || '';
-    videoModelType = videoCfg.model_type || 'seedance';
+    videoModelType = videoCfg.model_type || 'default';
     videoConfigured = !!(videoApiUrl && videoKey && videoModel);
     videoEnabled = videoCfg.status === 'enabled';
   }
@@ -184,7 +184,7 @@ router.put('/:type', authMiddleware, (req: Request, res: Response) => {
   } else if (type === 'video') {
     // 保存到 video_model_configs（默认 model_type = seedance）
     const userId = (req as any).user?.userId || 0;
-    const modelType = req.body.model_type || 'seedance';
+    const modelType = req.body.model_type || 'default';
     try {
       const existing = db.prepare("SELECT id FROM video_model_configs WHERE model_type = ? ORDER BY id ASC LIMIT 1").get(modelType) as any;
       if (existing) {
