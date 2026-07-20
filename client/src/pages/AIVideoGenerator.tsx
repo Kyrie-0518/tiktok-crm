@@ -115,7 +115,7 @@ export default function AIVideoGenerator() {
   const [prompt, setPrompt] = useState('');
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [tempPrompt, setTempPrompt] = useState('');
-  const [modelOption, setModelOption] = useState('doubao-seedance-2-0-260128');
+  const [modelOption, setModelOption] = useState('');
   const [resolution, setResolution] = useState('720p');
   const [aspectRatio, setAspectRatio] = useState('9:16');
   const [duration, setDuration] = useState(5);
@@ -208,6 +208,7 @@ export default function AIVideoGenerator() {
   /* ── Generate ── */
   const handleGenerate = async () => {
     if (!prompt.trim()) return message.warning('请输入视频创意');
+    if (!modelOption) return message.warning('请先在「模型API配置」中启用至少一个视频模型');
     if (generating) return;
     setGenerating(true); setGenError(''); setProgress(0); setPreviewVideo(null);
     // 初始化 7 个 Agent 步骤，全设为 pending，前端先把骨架显示出来
@@ -375,7 +376,9 @@ export default function AIVideoGenerator() {
             <span style={{ fontSize: 11, color: T.textTertiary }}>模型</span>
             <Select size="small" value={modelOption} onChange={setModelOption} variant="borderless" style={{ fontSize: 12, fontWeight: 600, minWidth: 100 }}
               suffixIcon={<DownOutlined style={{ fontSize: 10, color: T.textTertiary }} />}
-              options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : [{ value: 'doubao-seedance-2-0-260128', label: 'Seedance V2' }, { value: 'kling-2.1', label: 'Kling 2.1' }]} />
+              placeholder={availableModels.length > 0 ? undefined : '请配置'}
+              disabled={availableModels.length === 0}
+              options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : []} />
           </div>
           <Badge count={videos.length} size="small" color={T.primary} offset={[-2, 2]}>
             <Button size="middle" icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}
@@ -776,7 +779,9 @@ export default function AIVideoGenerator() {
         <Space direction="vertical" size={24} style={{ width: '100%' }}>
           <div><Text style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>模型</Text>
             <Select value={modelOption} onChange={setModelOption} style={{ width: '100%' }}
-              options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : [{ value: 'doubao-seedance-2-0-260128', label: 'Seedance V2' }, { value: 'kling-2.1', label: 'Kling 2.1' }]} />
+              placeholder={availableModels.length > 0 ? undefined : '请先在「模型API配置」中启用模型'}
+              disabled={availableModels.length === 0}
+              options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : []} />
           </div>
           <div><Text style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>比例</Text>
             <Segmented block value={aspectRatio} onChange={(v: any) => setAspectRatio(v)} options={[{ value: '9:16', label: '9:16' }, { value: '16:9', label: '16:9' }, { value: '1:1', label: '1:1' }]} />
