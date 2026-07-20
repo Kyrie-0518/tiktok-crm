@@ -5,7 +5,7 @@ import {
   ReloadOutlined, DownloadOutlined, CheckCircleFilled, CloseCircleFilled, ClockCircleOutlined,
   LoadingOutlined, PlayCircleOutlined, AppstoreOutlined, PlusOutlined, BulbOutlined, EditOutlined,
   CloseOutlined, FireOutlined, GiftOutlined, SmileOutlined, StarOutlined,
-  AppstoreAddOutlined, DownOutlined, SaveOutlined, GlobalOutlined, ExpandOutlined,
+  AppstoreAddOutlined, DownOutlined, SaveOutlined, GlobalOutlined, ExpandOutlined, CompressOutlined,
   SoundOutlined, StopOutlined, EyeOutlined, FileImageOutlined, InboxOutlined,
   ThunderboltFilled, SearchOutlined,
 } from '@ant-design/icons';
@@ -113,6 +113,7 @@ export default function AIVideoGenerator() {
   const [templateMarketOpen, setTemplateMarketOpen] = useState(false);
 
   const [prompt, setPrompt] = useState('');
+  const [promptExpanded, setPromptExpanded] = useState(false);
   const [modelOption, setModelOption] = useState('doubao-seedance-2-0-260128');
   const [resolution, setResolution] = useState('720p');
   const [aspectRatio, setAspectRatio] = useState('9:16');
@@ -416,7 +417,17 @@ export default function AIVideoGenerator() {
             borderColor: prompt ? '#d4bfff' : T.border, transition: 'border-color .2s',
           }}>
             <div style={{ padding: '12px 16px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary }}>💡 Prompt 创意</Text>
+              <Space size={6}>
+                <Text style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary }}>💡 Prompt 创意</Text>
+                <Button
+                  size="small" type="text"
+                  icon={promptExpanded ? <CompressOutlined style={{ fontSize: 12 }} /> : <ExpandOutlined style={{ fontSize: 12 }} />}
+                  onClick={() => setPromptExpanded(!promptExpanded)}
+                  style={{ height: 20, fontSize: 10, padding: '0 6px', color: T.textSecondary, fontWeight: 500 }}
+                >
+                  {promptExpanded ? '收起' : '展开'}
+                </Button>
+              </Space>
               <Space size={4}>
                 <Text style={{ fontSize: 11, color: q.color }}>{q.label}</Text>
                 <div style={{ width: 44, height: 4, borderRadius: 2, background: '#F1F3F5', overflow: 'hidden' }}>
@@ -428,7 +439,7 @@ export default function AIVideoGenerator() {
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               placeholder={`描述越详细，视频越精准。\n\n例如：马来西亚 TikTok 风格商品带货视频。\n主体：AirPods Pro — 哑光黑充电仓特写\n场景：开放式办公室，间接光环境\n镜头：推近特写 → 环绕展示降噪麦克风 → 佩戴使用\n风格：年轻科技感，轻快剪辑节奏\n光线：侧逆光 + 柔光散射\n结尾：品牌 Logo 淡入 + "立即购买"行动号召`}
-              autoSize={{ minRows: 8, maxRows: 8 }}
+              autoSize={promptExpanded ? { minRows: 18, maxRows: 28 } : { minRows: 8, maxRows: 8 }}
               style={{ fontSize: 13, lineHeight: 1.7, resize: 'none', border: 'none', boxShadow: 'none', padding: '0 20px', flex: 1, fontFamily: '-apple-system, "Inter", sans-serif' }}
               variant="borderless"
               maxLength={4000}
