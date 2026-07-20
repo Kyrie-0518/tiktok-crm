@@ -819,6 +819,7 @@ function initTables() {
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         model_type TEXT NOT NULL,
         api_url TEXT NOT NULL DEFAULT '',
+        query_api_url TEXT NOT NULL DEFAULT '',
         api_key TEXT NOT NULL DEFAULT '',
         model_name TEXT NOT NULL DEFAULT '',
         extra_params TEXT DEFAULT '{}',
@@ -831,6 +832,13 @@ function initTables() {
         UNIQUE(user_id, model_type)
       );
     `);
+  } else {
+    // 表已存在：补充 query_api_url 列
+    const cols = db.prepare(`PRAGMA table_info(video_model_configs)`).all() as any[];
+    if (!cols.some(c => c.name === 'query_api_url')) {
+      db.exec(`ALTER TABLE video_model_configs ADD COLUMN query_api_url TEXT NOT NULL DEFAULT ''`);
+      console.log('[migrate] video_model_configs 添加 query_api_url 列');
+    }
   }
 
   // Migrate: seedance_user_configs 表（兼容旧接口）

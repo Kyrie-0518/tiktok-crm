@@ -52,7 +52,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
   }
 
   const modelInfo = getModelType(model_type);
-  const baseUrl = config.api_url.replace(/\/+$/, '');
+  const endpoint = config.api_url;
   const model = model_name || config.model_name;
   let videoId: number | null = null;
   const db = getDb();
@@ -60,10 +60,9 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 120000);
-    let requestBody: any; let endpoint = `${baseUrl}`;
+    let requestBody: any;
 
     if (model_type === 'seedance') {
-      endpoint = buildEndpoint(baseUrl, '/contents/generations/tasks');
       // 所有图片都放入 content 数组（按顺序：商品图 → 参考图 → 补充图 → 文字）
       const content: any[] = [];
 
@@ -101,10 +100,8 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       };
       console.log('[SEEDANCE] content items:', content.length, '(images:', content.filter(c => c.type === 'image_url').length, 'text:', content.filter(c => c.type === 'text').length, ')');
     } else if (model_type === 'kling') {
-      endpoint = `${baseUrl}/v1/t2i`;
       requestBody = { model, prompt, ...(resolution && { aspect_ratio: resolution.includes('p') ? resolution : `${resolution}p` }), ...(duration && { duration }) };
     } else if (model_type === 'custom' || model_type === 'openai-sora') {
-      endpoint = `${baseUrl}/chat/completions`;
       // Build content array for multi-modal messages
       const msgContent: any[] = [{ type: 'text', text: prompt }];
       if (reference_images && reference_images.length > 0) {

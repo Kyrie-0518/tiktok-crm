@@ -54,22 +54,22 @@ export function getUserModelConfig(userId: number | undefined, modelType: string
 export function saveUserModelConfig(
   userId: number,
   modelType: string,
-  data: { api_url: string; api_key: string; model_name: string; extra_params?: any; status?: string }
+  data: { api_url: string; query_api_url?: string; api_key: string; model_name: string; extra_params?: any; status?: string }
 ) {
   const db = getDb();
-  const { api_url, api_key, model_name, extra_params, status } = data;
+  const { api_url, query_api_url, api_key, model_name, extra_params, status } = data;
   const existing = db.prepare('SELECT id FROM video_model_configs WHERE user_id = ? AND model_type = ?').get(userId, modelType);
 
   if (existing) {
-    const updates: string[] = ['api_url = ?', 'model_name = ?', 'status = ?', 'updated_at = CURRENT_TIMESTAMP'];
-    const values: any[] = [api_url, model_name, status || 'disabled'];
+    const updates: string[] = ['api_url = ?', 'query_api_url = ?', 'model_name = ?', 'status = ?', 'updated_at = CURRENT_TIMESTAMP'];
+    const values: any[] = [api_url, query_api_url || '', model_name, status || 'disabled'];
     if (api_key) { updates.push('api_key = ?'); values.push(api_key); }
     if (extra_params !== undefined) { updates.push('extra_params = ?'); values.push(typeof extra_params === 'string' ? extra_params : JSON.stringify(extra_params)); }
     values.push(userId, modelType);
     db.prepare(`UPDATE video_model_configs SET ${updates.join(', ')} WHERE user_id = ? AND model_type = ?`).run(...values);
   } else {
-    db.prepare(`INSERT INTO video_model_configs (user_id, model_type, api_url, api_key, model_name, extra_params, status) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-      userId, modelType, api_url, api_key, model_name, typeof extra_params === 'string' ? extra_params : JSON.stringify(extra_params || {}), status || 'disabled'
+    db.prepare(`INSERT INTO video_model_configs (user_id, model_type, api_url, query_api_url, api_key, model_name, extra_params, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      userId, modelType, api_url, query_api_url || '', api_key, model_name, typeof extra_params === 'string' ? extra_params : JSON.stringify(extra_params || {}), status || 'disabled'
     );
   }
 }

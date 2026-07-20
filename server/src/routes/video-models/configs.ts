@@ -58,13 +58,13 @@ router.get('/:type', (req: Request, res: Response) => {
 router.put('/:type', (req: Request, res: Response) => {
   const userId = (req as any).user?.userId;
   const modelType = req.params.type;
-  const { api_url, api_key, model_name, extra_params, status } = req.body as any;
+  const { api_url, query_api_url, api_key, model_name, extra_params, status } = req.body as any;
   const modelInfo = getModelType(modelType);
   if (!modelInfo) return res.status(400).json({ error: `不支持的模型类型: ${modelType}` });
   if (!api_url) return res.status(400).json({ error: '请输入 API 接口地址' });
   if (!model_name) return res.status(400).json({ error: '请输入模型名称' });
 
-  saveUserModelConfig(userId, modelType, { api_url, api_key: api_key || '', model_name, extra_params: extra_params || {}, status });
+  saveUserModelConfig(userId, modelType, { api_url, query_api_url: query_api_url || '', api_key: api_key || '', model_name, extra_params: extra_params || {}, status });
   res.json({ success: true, message: `${modelInfo.name} 配置保存成功` });
 });
 
@@ -98,8 +98,7 @@ router.post('/:type/test', async (req: Request, res: Response, next) => {
     const timer = setTimeout(() => controller.abort(), 30000);
 
     if (modelType === 'seedance') {
-      const endpoint = `${baseUrl}/contents/generations/tasks`;
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ model: model.toLowerCase(), duration: 5, ratio: '16:9', content: [{ type: 'text', text: 'test' }] }), signal: controller.signal });
+      const response = await fetch(baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ model: model.toLowerCase(), duration: 5, ratio: '16:9', content: [{ type: 'text', text: 'test' }] }), signal: controller.signal });
       clearTimeout(timer);
       if (response.ok) { updateTestResult(userId, modelType, 'success', 'API 接入正常'); res.json({ success: true, message: `${modelInfo.name} API 接入正常` }); }
       else if (response.status === 400) {

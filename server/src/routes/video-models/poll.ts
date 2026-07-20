@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import getDb from '../../db';
 import authMiddleware from '../../middleware/auth';
 import { getUserModelConfig, downloadVideoToLocal } from './db-helpers';
-import { buildEndpoint } from './types';
 
 const router = Router();
 
@@ -50,7 +49,10 @@ router.get('/:videoId', async (req: Request, res: Response) => {
   }
 
   const baseUrl = config.api_url.replace(/\/+$/, '');
-  const endpoint = buildEndpoint(baseUrl, `/contents/generations/tasks/${taskId}`);
+  // 查询 URL：优先用 query_api_url（用户配置的完整 URL），用 {task_id} 占位
+  // 兼容旧逻辑：若没有 query_api_url 则用 api_url + 标准路径
+  const queryUrl = config.query_api_url || `${baseUrl}/contents/generations/tasks/${taskId}`;
+  const endpoint = queryUrl.includes('{task_id}') ? queryUrl.replace(/\{task_id\}/g, taskId) : queryUrl;
 
   try {
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 30000);
