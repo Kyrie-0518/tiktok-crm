@@ -49,6 +49,11 @@ interface AiChannel {
   is_default: boolean;
   avg_latency?: number;
   success_count?: number;
+  error_count?: number;
+  last_used_at?: string;
+  last_success_at?: string;
+  last_error_at?: string;
+  last_error_message?: string;
   last_test_result?: string;
   last_test_message?: string;
   last_tested_at?: string;
@@ -140,20 +145,19 @@ export default function ApiConfig() {
   const fetchAiChannel = useCallback(async () => {
     setAiLoading(true);
     try {
-      const res = await api.get('/ai-channels/enabled');
+      const res = await api.get('/ai-channels');
       const channels = res.data || [];
       // 优先取默认，否则取第一条
-      const def = channels.find((c: any) => c.is_default) || channels[0] || null;
+      const def = channels.find((c: any) => c.is_default && c.status === 'enabled')
+        || channels.find((c: any) => c.status === 'enabled')
+        || channels[0] || null;
       if (def) {
         setAiChannel(def);
         aiForm.setFieldsValue({
           provider: def.provider || 'deepseek',
-          model: def.model || 'deepseek-chat',
-          api_base: def.api_base || 'https://api.deepseek.com/v1',
+          model: def.model || '',
+          api_base: def.api_base || '',
           api_key: '',
-          temperature: (safeParse(def.extra_params).temperature as number) ?? 0.6,
-          max_tokens: (safeParse(def.extra_params).max_tokens as number) ?? 16000,
-          timeout: (safeParse(def.extra_params).timeout as number) ?? 60,
         });
       }
     } catch { /* 表可能为空 */ }
@@ -175,11 +179,6 @@ export default function ApiConfig() {
         status: 'enabled' as const,
         is_default: true,
         priority: 1,
-        extra_params: JSON.stringify({
-          temperature: values.temperature,
-          max_tokens: values.max_tokens,
-          timeout: values.timeout,
-        }),
       };
       if (aiChannel?.id) {
         await api.put(`/ai-channels/${aiChannel.id}`, payload);
@@ -352,14 +351,33 @@ export default function ApiConfig() {
               整个后台所有 AI 能力统一使用该模型
             </Text>
           </div>
-          {configed && (
-            <Badge
-              status={channel.status === 'enabled' ? 'success' : 'error'}
-              text={<span style={{ fontSize: 13, color: channel.status === 'enabled' ? DS.success : DS.error }}>
-                {channel.status === 'enabled' ? '在线' : '离线'}
-              </span>}
-            />
-          )}
+          {configed && (() => {
+            // 在线：5 分钟内有成功调用
+            // 异常：最近一次错误 > 最近一次成功
+            // 待机：从未调用 / 超过 5 分钟无调用
+            const now = Date.now();
+            const lastOk = channel.last_success_at ? new Date(channel.last_success_at).getTime() : 0;
+            const lastErr = channel.last_error_at ? new Date(channel.last_error_at).getTime() : 0;
+            let liveStatus: 'success' | 'error' | 'default' = 'default';
+            let liveText = '待机';
+            if (channel.status !== 'enabled') {
+              liveStatus = 'error'; liveText = '已禁用';
+            } else if (lastErr > lastOk && lastErr > now - 5 * 60 * 1000) {
+              liveStatus = 'error'; liveText = '异常';
+            } else if (now - lastOk < 5 * 60 * 1000) {
+              liveStatus = 'success'; liveText = '在线';
+            } else if (lastOk > 0) {
+              liveText = '待机';
+            } else {
+              liveText = '未调用';
+            }
+            return (
+              <Badge
+                status={liveStatus}
+                text={<span style={{ fontSize: 13, color: liveStatus === 'success' ? DS.success : liveStatus === 'error' ? DS.error : DS.textSecondary }}>{liveText}</span>}
+              />
+            );
+          })()}
         </div>
 
         <div style={{ padding: '24px 32px' }}>
@@ -367,7 +385,7 @@ export default function ApiConfig() {
             {/* ── 基础配置 ── */}
             {sectionTitle('基础配置')}
             <Row gutter={20}>
-              <Col span={12}>
+              <Col span={8}>
                 <Form.Item name="provider" label={<span style={{ fontSize: 13, fontWeight: 500 }}>模型厂商</span>}>
                   <Select style={{ ...inputStyle, width: '100%' }} size="large">
                     <Option value="deepseek">DeepSeek</Option>
@@ -378,16 +396,10 @@ export default function ApiConfig() {
                   </Select>
                 </Form.Item>
               </Col>
-              <Col span={12}>
-                <Form.Item name="model" label={<span style={{ fontSize: 13, fontWeight: 500 }}>模型</span>}>
-                  <Select style={{ ...inputStyle, width: '100%' }} size="large">
-                    <Option value="deepseek-chat">DeepSeek V3</Option>
-                    <Option value="deepseek-reasoner">DeepSeek R1</Option>
-                    <Option value="doubao-pro-32k">豆包 Pro 32K</Option>
-                    <Option value="gpt-4o">GPT-4o</Option>
-                    <Option value="claude-3-opus">Claude 3 Opus</Option>
-                    <Option value="qwen-max">通义千问 Max</Option>
-                  </Select>
+              <Col span={16}>
+                <Form.Item name="model" label={<span style={{ fontSize: 13, fontWeight: 500 }}>模型</span>}
+                  extra="手动填写完整模型标识，例如 deepseek-chat / deepseek-reasoner / doubao-pro-32k">
+                  <Input style={inputStyle} placeholder="deepseek-chat" prefix={<RobotOutlined style={{ color: DS.textTertiary }} />} />
                 </Form.Item>
               </Col>
             </Row>
@@ -398,40 +410,6 @@ export default function ApiConfig() {
               extra={channel?.api_key_masked ? `当前密钥: ${channel.api_key_masked}（留空保持不变）` : ''}>
               <Input.Password style={inputStyle} placeholder="sk-..." prefix={<KeyOutlined style={{ color: DS.textTertiary }} />} />
             </Form.Item>
-
-            <div style={{ height: 1, background: DS.cardBorder, margin: '32px -32px 24px' }} />
-
-            {/* ── 生成配置 ── */}
-            {sectionTitle('生成配置')}
-            <Row gutter={20}>
-              <Col span={8}>
-                <Form.Item name="temperature" label={<span style={{ fontSize: 13, fontWeight: 500 }}>Temperature</span>}>
-                  <Row align="middle" gutter={8}>
-                    <Col flex="auto">
-                      <Slider min={0} max={2} step={0.1} style={{ margin: 0 }} />
-                    </Col>
-                    <Col>
-                      <InputNumber size="small" min={0} max={2} step={0.1} style={{ width: 60, borderRadius: 6 }} />
-                    </Col>
-                  </Row>
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item name="max_tokens" label={<span style={{ fontSize: 13, fontWeight: 500 }}>Max Tokens</span>}>
-                  <InputNumber style={{ width: '100%', height: DS.inputHeight, borderRadius: DS.radiusSm }} size="large" min={256} max={128000} step={1000} />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item name="timeout" label={<span style={{ fontSize: 13, fontWeight: 500 }}>Timeout（秒）</span>}>
-                  <Select style={{ ...inputStyle, width: '100%' }} size="large">
-                    <Option value={30}>30 秒</Option>
-                    <Option value={60}>60 秒</Option>
-                    <Option value={120}>120 秒</Option>
-                    <Option value={300}>300 秒</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
 
             <div style={{ height: 1, background: DS.cardBorder, margin: '32px -32px 24px' }} />
 
@@ -489,19 +467,27 @@ export default function ApiConfig() {
                 <CloseCircleFilled style={{ color: DS.error, fontSize: 16 }} />
                 <Text style={{ color: DS.error }}>{aiTestMsg}</Text>
               </div>
-            ) : channel?.avg_latency ? (
+            ) : (
               <Row gutter={24}>
-                <Col span={8}>
-                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>平均响应</Text>
-                  <Text style={{ fontSize: 18, fontWeight: 600, color: DS.text }}>{channel.avg_latency}s</Text>
-                </Col>
-                <Col span={8}>
+                <Col span={6}>
                   <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>成功调用</Text>
-                  <Text style={{ fontSize: 18, fontWeight: 600, color: DS.text }}>{channel.success_count ?? '—'}</Text>
+                  <Text style={{ fontSize: 18, fontWeight: 600, color: DS.text }}>{channel?.success_count ?? 0}<Text type="secondary" style={{ fontSize: 12, fontWeight: 400, marginLeft: 4 }}>次</Text></Text>
+                </Col>
+                <Col span={6}>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>失败次数</Text>
+                  <Text style={{ fontSize: 18, fontWeight: 600, color: (channel?.error_count ?? 0) > 0 ? DS.error : DS.text }}>{channel?.error_count ?? 0}<Text type="secondary" style={{ fontSize: 12, fontWeight: 400, marginLeft: 4 }}>次</Text></Text>
+                </Col>
+                <Col span={6}>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>平均响应</Text>
+                  <Text style={{ fontSize: 18, fontWeight: 600, color: DS.text }}>{channel?.avg_latency ? `${channel.avg_latency}ms` : '—'}</Text>
+                </Col>
+                <Col span={6}>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>最近调用</Text>
+                  <Text style={{ fontSize: 14, fontWeight: 500, color: DS.text, display: 'block' }}>
+                    {channel?.last_used_at ? new Date(channel.last_used_at).toLocaleString('zh-CN') : '—'}
+                  </Text>
                 </Col>
               </Row>
-            ) : (
-              <Text type="secondary" style={{ fontSize: 13 }}>暂未测试，点击下方「测试连接」验证</Text>
             )}
           </Form>
         </div>
