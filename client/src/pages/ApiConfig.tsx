@@ -151,11 +151,11 @@ export default function ApiConfig() {
   useEffect(() => { fetchVideoConfig(); }, [fetchVideoConfig]);
 
   const saveVideoConfig = async () => {
-    if (!videoCfg) { message.warning('暂无配置可保存'); return; }
     try {
       const values = await videoForm.validateFields();
       setVideoSaving(true);
-      await api.put(`/video-models/configs/${videoCfg.model_type}`, {
+      const modelType = videoCfg?.model_type || 'seedance';
+      await api.put(`/video-models/configs/${modelType}`, {
         api_url: values.api_url, query_api_url: values.query_api_url,
         api_key: values.api_key || undefined, model_name: values.model_name,
         status: 'enabled',
@@ -169,15 +169,15 @@ export default function ApiConfig() {
   };
 
   const testVideo = async () => {
-    if (!videoCfg) { message.warning('暂无配置可测试'); return; }
+    const modelType = videoCfg?.model_type || 'seedance';
     setVideoTesting(true); setVideoTestStatus('testing'); setVideoTestMsg('');
     try {
       const values = videoForm.getFieldsValue();
-      await api.put(`/video-models/configs/${videoCfg.model_type}`, {
+      await api.put(`/video-models/configs/${modelType}`, {
         api_url: values.api_url, query_api_url: values.query_api_url,
         api_key: values.api_key || undefined, model_name: values.model_name, status: 'enabled',
       });
-      const res = await api.post(`/video-models/configs/${videoCfg.model_type}/test`, {
+      const res = await api.post(`/video-models/configs/${modelType}/test`, {
         api_url: values.api_url, api_key: values.api_key, model_name: values.model_name,
       });
       if (res.data.success) { setVideoTestStatus('success'); setVideoTestMsg('连接成功'); }
