@@ -7,7 +7,7 @@ import {
   CloseOutlined, FireOutlined, GiftOutlined, SmileOutlined, StarOutlined,
   AppstoreAddOutlined, DownOutlined, SaveOutlined, GlobalOutlined, ExpandOutlined, CompressOutlined,
   SoundOutlined, StopOutlined, EyeOutlined, FileImageOutlined, InboxOutlined,
-  ThunderboltFilled, SearchOutlined, SettingOutlined,
+  ThunderboltFilled, SearchOutlined,
 } from '@ant-design/icons';
 import api from '../api';
 import { PageHeader } from '../components/design-system';
@@ -301,11 +301,6 @@ export default function AIVideoGenerator() {
               suffixIcon={<DownOutlined style={{ fontSize: 10, color: T.textTertiary }} />}
               options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : [{ value: 'doubao-seedance-2-0-260128', label: 'Seedance V2' }, { value: 'kling-2.1', label: 'Kling 2.1' }]} />
           </div>
-          <Button size="small" type="text" icon={<SettingOutlined style={{ fontSize: 12 }} />}
-            onClick={() => window.open('/admin/api-config', '_blank')}
-            style={{ fontSize: 11, color: T.textSecondary, fontWeight: 500, height: 24, padding: '0 8px' }}>
-            API 配置
-          </Button>
           <Badge count={videos.length} size="small" color={T.primary} offset={[-2, 2]}>
             <Button size="middle" icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}
               style={{ borderRadius: 8, fontWeight: 500 }}>历史</Button>
