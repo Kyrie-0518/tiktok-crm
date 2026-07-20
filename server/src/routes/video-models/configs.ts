@@ -56,16 +56,19 @@ router.get('/:type', (req: Request, res: Response) => {
 
 // PUT /configs/:type
 router.put('/:type', (req: Request, res: Response) => {
-  const userId = (req as any).user?.userId;
-  const modelType = req.params.type;
-  const { api_url, query_api_url, api_key, model_name, extra_params, status } = req.body as any;
-  const modelInfo = getModelType(modelType);
-  if (!modelInfo) return res.status(400).json({ error: `不支持的模型类型: ${modelType}` });
-  if (!api_url) return res.status(400).json({ error: '请输入 API 接口地址' });
-  if (!model_name) return res.status(400).json({ error: '请输入模型名称' });
+  try {
+    const userId = (req as any).user?.userId;
+    const modelType = req.params.type;
+    const { api_url, query_api_url, api_key, model_name, extra_params, status } = req.body as any;
+    if (!api_url) return res.status(400).json({ error: '请输入 API 接口地址' });
+    if (!model_name) return res.status(400).json({ error: '请输入模型名称' });
 
-  saveUserModelConfig(userId, modelType, { api_url, query_api_url: query_api_url || '', api_key: api_key || '', model_name, extra_params: extra_params || {}, status });
-  res.json({ success: true, message: `${modelInfo.name} 配置保存成功` });
+    saveUserModelConfig(userId, modelType, { api_url, query_api_url: query_api_url || '', api_key: api_key || '', model_name, extra_params: extra_params || {}, status });
+    res.json({ success: true, message: '配置保存成功' });
+  } catch (e: any) {
+    console.error('[video-models PUT]', e.message);
+    res.status(500).json({ error: e.message || '保存失败' });
+  }
 });
 
 // DELETE /configs/:type
