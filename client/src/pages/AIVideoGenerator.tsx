@@ -249,33 +249,33 @@ export default function AIVideoGenerator() {
 
   /* ════════════════════════════════════ Render ════════════════════════════════════ */
   return (
-    <div style={{ background: T.bg, minHeight: 'calc(100vh - 64px)', overflow: 'auto' }}>
+    <div style={{ background: T.bg, minHeight: 'calc(100vh - 56px)', overflow: 'hidden' }}>
 
       {/* ── Header ── */}
       <div style={{
-        height: 64,
+        height: 56,
         background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FE 50%, #FFFFFF 100%)',
         borderBottom: `1px solid ${T.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', flexShrink: 0, position: 'relative',
+        padding: '0 20px', flexShrink: 0, position: 'relative',
         boxShadow: '0 1px 3px rgba(15,23,42,0.03)',
       }}>
         {/* Left: Logo + Title + Subtitle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Logo 圆角方块 */}
           <div style={{
-            width: 38, height: 38, borderRadius: 11,
+            width: 32, height: 32, borderRadius: 9,
             background: 'linear-gradient(135deg, #8b5cf6 0%, #6E56FF 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 4px 12px rgba(110,86,255,0.30), inset 0 1px 0 rgba(255,255,255,0.2)',
             position: 'relative',
           }}>
-            <VideoCameraOutlined style={{ fontSize: 18, color: '#fff' }} />
+            <VideoCameraOutlined style={{ fontSize: 15, color: '#fff' }} />
             <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, borderRadius: 5, background: '#22C55E', border: '2px solid #fff' }} />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: T.textPrimary, letterSpacing: '0.3px' }}>AI 视频工作台</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary, letterSpacing: '0.3px' }}>KyrieVG V1</span>
               <span style={{ fontSize: 10, fontWeight: 600, color: T.primary, background: T.primaryLight, padding: '2px 6px', borderRadius: 4, letterSpacing: '0.5px' }}>ENTERPRISE</span>
             </div>
             <div style={{ fontSize: 11, color: T.textTertiary, marginTop: 2, lineHeight: 1.2 }}>
@@ -307,15 +307,15 @@ export default function AIVideoGenerator() {
       </div>
 
       {/* ── Workspace: 3 列铺满页面 ── */}
-      <div style={{ margin: '16px 0', display: 'flex', gap: 16, padding: '0 16px', alignItems: 'flex-start', width: '100%' }}>
+      <div style={{ margin: '8px 0', display: 'flex', gap: 12, padding: '0 12px', alignItems: 'flex-start', width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
         {/* ═══ AI导演 ═══ */}
         <div style={{
-          width: 240, flexShrink: 0,
+          width: 200, flexShrink: 0,
           background: T.cardBg, borderRadius: T.radiusCard, border: `1px solid ${T.border}`,
-          boxShadow: T.shadow, padding: 16,
-          position: 'sticky', top: 16,
+          boxShadow: T.shadow, padding: 12,
+          position: 'sticky', top: 8, fontSize: 11,
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: T.textPrimary, marginBottom: 10 }}>✨ AI导演</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.textPrimary, marginBottom: 8 }}>✨ Prompt模板</div>
 
           {/* 今日推荐 */}
           <div style={{ marginBottom: 10 }}>
@@ -374,7 +374,7 @@ export default function AIVideoGenerator() {
         </div>
 
         {/* ═══════ Original V5 Content (flex 填满剩余空间) ═══════ */}
-        <div style={{ display: 'flex', gap: 16, flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 0, overflow: 'hidden' }}>
         {/* ═══════ LEFT: 视频创作区 60% ═══════ */}
         <div style={{ flex: '3 1 0%', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
 
@@ -383,10 +383,10 @@ export default function AIVideoGenerator() {
             {/* 当前任务 */}
             <CardCompact style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, fontWeight: 600, color: T.textSecondary }}>📋 当前任务</Text>
-                <Button size="small" type="text" icon={<AppstoreAddOutlined />} onClick={() => setProductModalOpen(true)} style={{ color: T.textSecondary, fontSize: 11 }}>选择商品</Button>
+                <Text style={{ fontSize: 11, fontWeight: 600, color: T.textSecondary }}>📋 当前任务</Text>
+                <Button size="small" type="text" icon={<AppstoreAddOutlined />} onClick={() => setProductModalOpen(true)} style={{ color: T.textSecondary, fontSize: 10 }}>选择商品</Button>
               </div>
-              <div style={{ marginTop: 8, fontSize: 14, fontWeight: 700, color: T.textPrimary }}>
+              <div style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: T.textPrimary }}>
                 {selectedProduct ? selectedProduct.name : '未选择商品'}
               </div>
               <div style={{ fontSize: 11, color: T.textTertiary, marginTop: 2 }}>
@@ -415,8 +415,8 @@ export default function AIVideoGenerator() {
             boxShadow: T.shadow, display: 'flex', flexDirection: 'column',
             borderColor: prompt ? '#d4bfff' : T.border, transition: 'border-color .2s',
           }}>
-            <div style={{ padding: '16px 20px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>💡 Prompt 创意</Text>
+            <div style={{ padding: '12px 16px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary }}>💡 Prompt 创意</Text>
               <Space size={4}>
                 <Text style={{ fontSize: 11, color: q.color }}>{q.label}</Text>
                 <div style={{ width: 44, height: 4, borderRadius: 2, background: '#F1F3F5', overflow: 'hidden' }}>
@@ -515,14 +515,14 @@ export default function AIVideoGenerator() {
         </div>
 
         {/* ═══════ RIGHT: AI 生成中心 40% ═══════ */}
-        <div style={{ flex: '2 1 0%', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 360 }}>
+        <div style={{ flex: '2 1 0%', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 320 }}>
           {/* ── Status + Preview ── */}
           <CardCompact style={{ flex: 1 }}>
             {generating ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <LoadingOutlined spin style={{ fontSize: 36, color: T.primary, marginBottom: 16 }} />
-                <Progress percent={Math.round(progress)} strokeColor={{ from: '#8b5cf6', to: '#6E56FF' }} style={{ maxWidth: 260, margin: '0 auto 12px' }} />
-                <Text style={{ fontSize: 14, color: T.textPrimary, display: 'block', fontWeight: 600 }}>正在生成…</Text>
+              <div style={{ textAlign: 'center', padding: '20px 16px' }}>
+                <LoadingOutlined spin style={{ fontSize: 28, color: T.primary, marginBottom: 12 }} />
+                <Progress percent={Math.round(progress)} strokeColor={{ from: '#8b5cf6', to: '#6E56FF' }} style={{ maxWidth: 240, margin: '0 auto 8px' }} />
+                <Text style={{ fontSize: 12, color: T.textPrimary, display: 'block', fontWeight: 600 }}>正在生成…</Text>
                 {pipelineSteps.length > 0 && (
                   <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {pipelineSteps.map(s => {
@@ -638,7 +638,7 @@ export default function AIVideoGenerator() {
       </Modal>
 
       {/* ══ Template Market Modal (full grid) ══ */}
-      <Modal title="✨ AI导演 · 全部模板" open={templateMarketOpen} onCancel={() => setTemplateMarketOpen(false)} footer={null} width={760} style={{ top: 20 }}>
+      <Modal title="✨ Prompt模板 · 全部模板" open={templateMarketOpen} onCancel={() => setTemplateMarketOpen(false)} footer={null} width={760} style={{ top: 20 }}>
         <Input prefix={<SearchOutlined style={{ color: T.textTertiary }} />} placeholder="搜索模板…" allowClear
           onChange={() => {}} style={{ marginBottom: 16, borderRadius: 8 }} />
         <div style={{ maxHeight: 500, overflow: 'auto' }}>
@@ -713,9 +713,9 @@ function CardCompact({ title, children, style }: { title?: string; children: Rea
   return (
     <div style={{
       background: T.cardBg, borderRadius: T.radiusCard, border: `1px solid ${T.border}`,
-      boxShadow: T.shadow, padding: '14px 18px', ...style,
+      boxShadow: T.shadow, padding: '10px 14px', ...style,
     }}>
-      {title && <Text style={{ fontSize: 12, fontWeight: 600, color: T.textSecondary, display: 'block', marginBottom: 8 }}>{title}</Text>}
+      {title && <Text style={{ fontSize: 11, fontWeight: 600, color: T.textSecondary, display: 'block', marginBottom: 6 }}>{title}</Text>}
       {children}
     </div>
   );
