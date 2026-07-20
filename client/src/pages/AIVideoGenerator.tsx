@@ -113,7 +113,8 @@ export default function AIVideoGenerator() {
   const [templateMarketOpen, setTemplateMarketOpen] = useState(false);
 
   const [prompt, setPrompt] = useState('');
-  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [tempPrompt, setTempPrompt] = useState('');
   const [modelOption, setModelOption] = useState('doubao-seedance-2-0-260128');
   const [resolution, setResolution] = useState('720p');
   const [aspectRatio, setAspectRatio] = useState('9:16');
@@ -421,11 +422,11 @@ export default function AIVideoGenerator() {
                 <Text style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary }}>💡 Prompt 创意</Text>
                 <Button
                   size="small" type="text"
-                  icon={promptExpanded ? <CompressOutlined style={{ fontSize: 12 }} /> : <ExpandOutlined style={{ fontSize: 12 }} />}
-                  onClick={() => setPromptExpanded(!promptExpanded)}
+                  icon={<ExpandOutlined style={{ fontSize: 12 }} />}
+                  onClick={() => { setTempPrompt(prompt); setPromptModalOpen(true); }}
                   style={{ height: 20, fontSize: 10, padding: '0 6px', color: T.textSecondary, fontWeight: 500 }}
                 >
-                  {promptExpanded ? '收起' : '展开'}
+                  全屏编辑
                 </Button>
               </Space>
               <Space size={4}>
@@ -439,7 +440,7 @@ export default function AIVideoGenerator() {
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               placeholder={`AI Video Engine 将自动完成：商品理解 → 创意策略 → AI导演分镜 → Prompt生成 → 模型优化 → 质量评估。\n\n你只需要描述核心创意，剩下的交给 7 个 Agent：\n\n例如：马来西亚 TikTok 风格商品带货视频。\n主体：AirPods Pro — 哑光黑充电仓特写\n场景：开放式办公室，间接光环境\n镜头：推近特写 → 环绕展示降噪麦克风 → 佩戴使用\n风格：年轻科技感，轻快剪辑节奏\n光线：侧逆光 + 柔光散射\n结尾：品牌 Logo 淡入 + "立即购买"行动号召\n\n（也可以只写一句话，如"马来西亚卖 AirPods"，AI Engine 会自动补全）`}
-              autoSize={promptExpanded ? { minRows: 18, maxRows: 28 } : { minRows: 8, maxRows: 8 }}
+              autoSize={{ minRows: 8, maxRows: 8 }}
               style={{ fontSize: 13, lineHeight: 1.7, resize: 'none', border: 'none', boxShadow: 'none', padding: '0 20px', flex: 1, fontFamily: '-apple-system, "Inter", sans-serif' }}
               variant="borderless"
               maxLength={4000}
@@ -667,6 +668,30 @@ export default function AIVideoGenerator() {
               </div>
             ))}
           </div>
+        </div>
+      </Modal>
+
+      {/* ══ Prompt 全屏编辑 Modal（自适应字数） ══ */}
+      <Modal
+        title="💡 Prompt 全屏编辑"
+        open={promptModalOpen}
+        onCancel={() => setPromptModalOpen(false)}
+        onOk={() => { setPrompt(tempPrompt); setPromptModalOpen(false); }}
+        okText="确认应用"
+        cancelText="取消"
+        width={800}
+        destroyOnClose
+      >
+        <TextArea
+          value={tempPrompt}
+          onChange={e => setTempPrompt(e.target.value)}
+          placeholder={`AI Video Engine 将自动完成：商品理解 → 创意策略 → AI导演分镜 → Prompt生成 → 模型优化 → 质量评估。\n\n你只需要描述核心创意，剩下的交给 7 个 Agent。\n\n例如：马来西亚 TikTok 风格商品带货视频。\n主体：AirPods Pro — 哑光黑充电仓特写\n场景：开放式办公室，间接光环境\n镜头：推近特写 → 环绕展示降噪麦克风 → 佩戴使用\n风格：年轻科技感，轻快剪辑节奏\n光线：侧逆光 + 柔光散射\n结尾：品牌 Logo 淡入 + "立即购买"行动号召\n\n（也可以只写一句话，如"马来西亚卖 AirPods"，AI Engine 会自动补全）`}
+          autoSize={{ minRows: 10, maxRows: 30 }}
+          style={{ fontSize: 13, lineHeight: 1.8, fontFamily: '-apple-system, "Inter", sans-serif', resize: 'vertical' }}
+          maxLength={4000}
+        />
+        <div style={{ marginTop: 8, fontSize: 11, color: '#94A3B8', textAlign: 'right' }}>
+          已输入 {tempPrompt.length} 字 / 最多 4000 字
         </div>
       </Modal>
 
