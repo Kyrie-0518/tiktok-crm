@@ -9,6 +9,7 @@ import {
   VideoCameraOutlined, AudioOutlined, PlusOutlined
 } from '@ant-design/icons';
 import api from '../api';
+import { formatDateTime } from '../utils/time';
 
 const { Text } = Typography;
 
@@ -196,7 +197,7 @@ export default function RawMaterials() {
       title: '上传时间',
       dataIndex: 'created_at',
       width: 160,
-      render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
+      render: (v: string) => v ? formatDateTime(v) : '-',
     },
     {
       title: '操作',

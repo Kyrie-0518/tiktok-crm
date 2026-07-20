@@ -1166,8 +1166,8 @@ function initVideoEngineTables(db: any) {
       total_time_ms INTEGER DEFAULT 0,
       total_tokens INTEGER DEFAULT 0,
       steps_json TEXT DEFAULT '[]',
-      created_at DATETIME DEFAULT (datetime('now')),
-      updated_at DATETIME DEFAULT (datetime('now'))
+      created_at DATETIME DEFAULT (datetime('now','localtime')),
+      updated_at DATETIME DEFAULT (datetime('now','localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS video_task_steps (
@@ -1180,7 +1180,7 @@ function initVideoEngineTables(db: any) {
       tokens INTEGER DEFAULT 0,
       duration_ms INTEGER DEFAULT 0,
       error TEXT DEFAULT '',
-      created_at DATETIME DEFAULT (datetime('now'))
+      created_at DATETIME DEFAULT (datetime('now','localtime'))
     );
     CREATE INDEX IF NOT EXISTS idx_vt_steps_task ON video_task_steps(task_id);
 
@@ -1195,8 +1195,8 @@ function initVideoEngineTables(db: any) {
       is_system INTEGER DEFAULT 1,
       usage_count INTEGER DEFAULT 0,
       created_by INTEGER,
-      created_at DATETIME DEFAULT (datetime('now')),
-      updated_at DATETIME DEFAULT (datetime('now'))
+      created_at DATETIME DEFAULT (datetime('now','localtime')),
+      updated_at DATETIME DEFAULT (datetime('now','localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS video_prompt_versions (
@@ -1208,7 +1208,7 @@ function initVideoEngineTables(db: any) {
       director_json TEXT DEFAULT '{}',
       optimizer_params TEXT DEFAULT '{}',
       model TEXT DEFAULT '',
-      created_at DATETIME DEFAULT (datetime('now'))
+      created_at DATETIME DEFAULT (datetime('now','localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS video_quality_scores (
@@ -1225,7 +1225,7 @@ function initVideoEngineTables(db: any) {
       needs_retry INTEGER DEFAULT 0,
       suggestions TEXT DEFAULT '',
       raw_json TEXT DEFAULT '',
-      created_at DATETIME DEFAULT (datetime('now'))
+      created_at DATETIME DEFAULT (datetime('now','localtime'))
     );
   `);
   console.log('[migrate v3.0] AI Video Engine tables initialized');

@@ -41,7 +41,7 @@ router.post('/generate', authMiddleware, async (req: Request, res: Response) => 
     try {
       const db = getDb();
       db.prepare(`INSERT INTO video_tasks (task_id, product_id, product_name, user_prompt, model, resolution, aspect_ratio, duration, count, status, created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,datetime('now'))`)
+        VALUES (?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))`)
         .run(taskId, productId || null, productName || '通用商品', userPrompt || '',
              ctx.model, ctx.resolution, ctx.aspectRatio, ctx.duration, ctx.count, 'running');
     } catch (e: any) {

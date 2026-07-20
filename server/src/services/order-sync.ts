@@ -176,7 +176,7 @@ export async function syncShopOrders(shopId: number): Promise<{ created: number;
   }
 
   // 7. 更新同步时间
-  db.prepare("UPDATE tiktok_shops SET last_synced_at = datetime('now') WHERE id = ?").run(shopId);
+  db.prepare("UPDATE tiktok_shops SET last_synced_at = datetime('now','localtime') WHERE id = ?").run(shopId);
 
   } catch (e: any) {
     errors.push(`API 调用失败: ${e.message}`);

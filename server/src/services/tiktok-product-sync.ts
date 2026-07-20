@@ -152,7 +152,7 @@ export async function syncShopProducts(
     }
 
     // 更新产品同步时间
-    db.prepare("UPDATE tiktok_shops SET last_synced_at = datetime('now') WHERE id = ?").run(shopId);
+    db.prepare("UPDATE tiktok_shops SET last_synced_at = datetime('now','localtime') WHERE id = ?").run(shopId);
 
   } catch (e: any) {
     errors.push(`API 调用失败: ${e.message}`);
@@ -367,7 +367,7 @@ function saveProduct(
         name = ?, sell_price = ?, original_price = ?,
         stock = ?, weight = ?, image = IIF(? != '', ?, image),
         description = ?, status = ?, tiktok_status = ?, category_name = ?,
-        extra_data = ?, last_synced_at = datetime('now'), updated_at = datetime('now')
+        extra_data = ?, last_synced_at = datetime('now','localtime'), updated_at = datetime('now','localtime')
       WHERE id = ?
     `).run(
       name, sellPrice, originalPrice,
@@ -387,7 +387,7 @@ function saveProduct(
         image, description, status, tiktok_status, category_name,
         source_platform, source_product_id, extra_data,
         last_synced_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'), datetime('now','localtime'), datetime('now','localtime'))
     `).run(
       name, sourcePid, sellPrice, originalPrice, stock, weight,
       image, description, status, tiktokStatus, categoryName,
@@ -469,7 +469,7 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
       weight = COALESCE(NULLIF(?, 0), weight),
       status = COALESCE(NULLIF(?, ''), status),
       tiktok_status = COALESCE(NULLIF(?, ''), tiktok_status),
-      updated_at = datetime('now')
+      updated_at = datetime('now','localtime')
     WHERE id = ?
   `).run(sellPrice, originalPrice, stock, image, description, categoryName, weight, status, tiktokStatus, existing.id);
 
@@ -504,7 +504,7 @@ function enrichProductData(db: any, sourcePid: string, detail: any, platform: st
   }
 
   // 更新 extra_data
-  db.prepare("UPDATE products SET extra_data = ?, updated_at = datetime('now') WHERE id = ?")
+  db.prepare("UPDATE products SET extra_data = ?, updated_at = datetime('now','localtime') WHERE id = ?")
     .run(JSON.stringify(extra), existing.id);
 
   // 同步详情级别的 SKU

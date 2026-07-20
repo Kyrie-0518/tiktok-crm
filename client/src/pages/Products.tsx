@@ -9,6 +9,7 @@ import type { ColumnsType } from 'antd/es/table';
 import DataTable from '../components/DataTable';
 import ExportButton from '../components/ExportButton';
 import { PageHeader } from '../components/design-system';
+import { todayStr } from '../utils/time';
 
 const T = { primary: '#4568FF', primaryLight: '#EDF0FF', cardBorder: '#EEF1F6', cardRadius: 16, textPrimary: '#172033', textSecondary: '#64748B', textTertiary: '#94A3B8', success: '#22C55E', warning: '#F59E0B', danger: '#EF4444' };
 
@@ -187,7 +188,7 @@ export default function Products() {
       })));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '产品列表');
-      XLSX.writeFile(wb, `MERA_产品列表_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(wb, `MERA_产品列表_${todayStr()}.xlsx`);
       message.success('导出成功');
     } catch {
       message.error('导出失败');

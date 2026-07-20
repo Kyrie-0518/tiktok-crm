@@ -10,6 +10,7 @@ import {
   ThunderboltFilled, SearchOutlined,
 } from '@ant-design/icons';
 import api from '../api';
+import { formatDateTime, nowISO } from '../utils/time';
 import { PageHeader } from '../components/design-system';
 
 const { TextArea } = Input;
@@ -263,7 +264,7 @@ export default function AIVideoGenerator() {
       clearInterval(pTimer); setProgress(95);
       const vid = r.data?.video_id || r.data?.id;
       if (vid) { await poll(vid); } else if (r.data?.video_url) {
-        const v: Video = { id: r.data.id || Date.now(), title: selectedProduct?.name || 'AI 视频', video_url: r.data.video_url, thumbnail_url: r.data.thumbnail_url || '', prompt: finalPrompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: new Date().toISOString(), token_usage: r.data.token_usage, product_name: selectedProduct?.name };
+        const v: Video = { id: r.data.id || Date.now(), title: selectedProduct?.name || 'AI 视频', video_url: r.data.video_url, thumbnail_url: r.data.thumbnail_url || '', prompt: finalPrompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: nowISO(), token_usage: r.data.token_usage, product_name: selectedProduct?.name };
         setPreviewVideo(v); setProgress(100); loadVideos();
       }
     } catch (e: any) { setGenError(e.response?.data?.error || e.message || '生成失败'); }
@@ -319,7 +320,7 @@ export default function AIVideoGenerator() {
 
   const poll = async (vid: number) => {
     for (let i = 0; i < 60; i++) {
-      try { const r = await api.get(`/video-models/poll/${vid}`); const v = r.data?.video || r.data; if (v?.status === 'completed' || v?.video_url) { const finalV: Video = { id: v.id || vid, title: selectedProduct?.name || 'AI 视频', video_url: v.video_url, thumbnail_url: v.thumbnail_url || '', prompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: v.created_at || new Date().toISOString(), token_usage: v.token_usage, product_name: selectedProduct?.name }; setPreviewVideo(finalV); setProgress(100); loadVideos(); return; } if (v?.status === 'failed') { setGenError(v.error || '生成失败'); return; } if (v?.progress) setProgress(v.progress); } catch {}
+      try { const r = await api.get(`/video-models/poll/${vid}`); const v = r.data?.video || r.data; if (v?.status === 'completed' || v?.video_url) { const finalV: Video = { id: v.id || vid, title: selectedProduct?.name || 'AI 视频', video_url: v.video_url, thumbnail_url: v.thumbnail_url || '', prompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: v.created_at || nowISO(), token_usage: v.token_usage, product_name: selectedProduct?.name }; setPreviewVideo(finalV); setProgress(100); loadVideos(); return; } if (v?.status === 'failed') { setGenError(v.error || '生成失败'); return; } if (v?.progress) setProgress(v.progress); } catch {}
       await new Promise(r => setTimeout(r, 5000));
     } setGenError('超时，请查看历史记录');
   };
@@ -812,7 +813,7 @@ export default function AIVideoGenerator() {
                 <img src={v.thumbnail_url || v.product_image || ''} style={{ width: 64, height: 64, borderRadius: 6, objectFit: 'cover', background: T.bg }} />
                 <div style={{ flex: 1 }}>
                   <Text ellipsis style={{ fontSize: 12, fontWeight: 500, display: 'block' }}>{v.title || '未命名'}</Text>
-                  <Text style={{ fontSize: 11, color: T.textTertiary }}>{v.model} · {v.duration}s · {new Date(v.created_at).toLocaleString()}</Text>
+                  <Text style={{ fontSize: 11, color: T.textTertiary }}>{v.model} · {v.duration}s · {formatDateTime(v.created_at)}</Text>
                 </div>
                 {v.status === 'completed' ? <CheckCircleFilled style={{ color: T.success }} /> : <CloseCircleFilled style={{ color: T.error }} />}
               </div>

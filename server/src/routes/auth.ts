@@ -24,7 +24,7 @@ router.post('/login', (req: Request, res: Response) => {
     const ip = req.ip || req.socket?.remoteAddress || '';
     const ua = req.get('User-Agent') || '';
     db.prepare(
-      `UPDATE users SET last_login_ip = ?, last_login_at = datetime('now'), last_user_agent = ? WHERE id = ?`
+      `UPDATE users SET last_login_ip = ?, last_login_at = datetime('now','localtime'), last_user_agent = ? WHERE id = ?`
     ).run(ip, ua, user.id);
   } catch { /* 不影响登录流程 */ }
 

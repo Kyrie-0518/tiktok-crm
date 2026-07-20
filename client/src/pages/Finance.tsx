@@ -10,6 +10,7 @@ import {
   DollarOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { formatDate } from '../utils/time';
 import * as echarts from 'echarts';
 import { useFinanceStore, FormulaItem, evaluateFormulaFrontend } from '../stores/financeStore';
 import { useProductStore } from '../stores/productStore';
@@ -377,7 +378,7 @@ export default function Finance() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '利润核算');
       const now = new Date();
-      XLSX.writeFile(wb, `MERA_利润核算_${now.toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(wb, `MERA_利润核算_${formatDate(now)}.xlsx`);
       message.success('导出成功');
     } catch { message.error('导出失败'); }
   };

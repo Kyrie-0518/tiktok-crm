@@ -12,6 +12,7 @@ import {
 import dayjs from 'dayjs';
 import { useInfluencerStore } from '../stores/influencerStore';
 import api from '../api';
+import { formatDateTime } from '../utils/time';
 import { useHasPerm } from '../stores/authStore';
 import DataTable from '../components/DataTable';
 import ExportButton from '../components/ExportButton';
@@ -1180,7 +1181,7 @@ export default function Influencers() {
                 )}
 
                 <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #f0f0f0', fontSize: 12, color: '#999', textAlign: 'right' }}>
-                  提交时间：{new Date(viewingReport.created_at).toLocaleString('zh-CN')}
+                  提交时间：{formatDateTime(viewingReport.created_at)}
                 </div>
               </div>
             );

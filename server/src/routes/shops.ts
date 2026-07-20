@@ -47,7 +47,7 @@ router.post('/upsert', authMiddleware, (req: Request, res: Response) => {
   ).get(shop_id || '', shop_name || '') as any;
   if (existing) {
     db.prepare(`
-      UPDATE tiktok_shops SET name=?, region=?, shop_id=?, status=?, last_synced_at=datetime('now')
+      UPDATE tiktok_shops SET name=?, region=?, shop_id=?, status=?, last_synced_at=datetime('now','localtime')
       WHERE id=?
     `).run(
       shop_name || existing.name,

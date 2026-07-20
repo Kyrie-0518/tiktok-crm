@@ -443,7 +443,7 @@ router.post('/sync-from-platform', authMiddleware, (req: Request, res: Response)
         tracking_number=?, logistics_provider=?,
         ship_time=CASE WHEN ? != '' THEN COALESCE(?, ship_time) ELSE ship_time END,
         complete_time=CASE WHEN ? != '' THEN COALESCE(?, complete_time) ELSE complete_time END,
-        last_synced_at=datetime('now')
+        last_synced_at=datetime('now','localtime')
       WHERE id=?
     `).run(
       erpStatus, order_amount ?? existing.actual_amount,
@@ -490,7 +490,7 @@ router.post('/sync-from-platform', authMiddleware, (req: Request, res: Response)
         created_at, updated_at, last_synced_at
       ) VALUES (
         1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        datetime('now'), datetime('now'), datetime('now')
+        datetime('now','localtime'), datetime('now','localtime'), datetime('now','localtime')
       )
     `).run(
       source_platform || '',

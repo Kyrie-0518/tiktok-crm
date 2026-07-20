@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Typography, Tabs, Table } from 'antd';
 import { TeamOutlined, SafetyOutlined, LoginOutlined, UserOutlined } from '@ant-design/icons';
 import api from '../../api';
+import { todayStr } from '../../utils/time';
 import Roles from './Roles';
 
 const { Text } = Typography;
@@ -40,7 +41,7 @@ export default function AccountCenter() {
           api.get('/auth/roles'),
         ]);
         const users = usersRes.data || [];
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayStr();
         setStats({
           totalUsers: users.length,
           totalRoles: (rolesRes.data || []).length,

@@ -9,6 +9,7 @@ import {
   PlayCircleOutlined
 } from '@ant-design/icons';
 import api from '../api';
+import { formatDateTimeSec } from '../utils/time';
 import DataTable from '../components/DataTable';
 import { useIsDeveloper } from '../stores/authStore';
 
@@ -191,13 +192,7 @@ export default function MaterialLibrary() {
       width: 160,
       render: (v: string) => {
         if (!v) return '-';
-        const d = new Date(v + 'Z');
-        if (isNaN(d.getTime())) return v;
-        return d.toLocaleString('zh-CN', {
-          month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit',
-          hour12: false,
-        });
+        return formatDateTimeSec(v);
       },
     },
     {

@@ -10,6 +10,7 @@ import {
   SettingOutlined
 } from '@ant-design/icons';
 import api from '../api';
+import { formatDateTime } from '../utils/time';
 
 // 火山引擎 Logo SVG
 const VolcanoIcon = ({ size = 22 }: { size?: number }) => (
@@ -189,7 +190,7 @@ export default function VideoModelConfig() {
       if (!values.model_name) { message.warning('请填写模型名称'); return; }
 
       setTesting(true);
-      const localTime = new Date().toLocaleString('zh-CN');
+      const localTime = formatDateTime();
       const updated = { ...testLocalTime, [selectedModel!]: localTime };
       setTestLocalTime(updated);
       sessionStorage.setItem('videoModelTestTimes', JSON.stringify(updated));
@@ -287,7 +288,7 @@ export default function VideoModelConfig() {
         </Space>
         {(testLocalTime[config.model_type] || config.last_tested_at) && (
           <div style={{ fontSize: 11, color: '#999', marginTop: 8 }}>
-            测试时间: {testLocalTime[config.model_type] || new Date(config.last_tested_at!).toLocaleString('zh-CN')}
+            测试时间: {testLocalTime[config.model_type] || formatDateTime(config.last_tested_at!)}
           </div>
         )}
       </Card>
@@ -471,7 +472,7 @@ export default function VideoModelConfig() {
                   }
                   description={
                     <div>
-                      <div>测试时间: {testLocalTime[selectedModel!] || new Date(editConfig.last_tested_at).toLocaleString('zh-CN')}</div>
+                      <div>测试时间: {testLocalTime[selectedModel!] || formatDateTime(editConfig.last_tested_at)}</div>
                       {editConfig.last_test_message && (
                         <div>详情: {editConfig.last_test_message}</div>
                       )}

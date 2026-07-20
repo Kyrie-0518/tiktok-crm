@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import PageHeader from '../components/design-system/PageHeader';
 import api from '../api';
+import { formatDateTime } from '../utils/time';
 
 const { Text, Paragraph } = Typography;
 
@@ -190,7 +191,7 @@ export default function AIEngineManager() {
               <Descriptions.Item label="成功率">{agentModal.steps.length > 0 ? `${Math.round(agentModal.steps.filter(s => s.status === 'completed').length / agentModal.steps.length * 100)}%` : '—'}</Descriptions.Item>
               <Descriptions.Item label="累计 Token">{agentModal.steps.reduce((s, x) => s + (x.tokens || 0), 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="平均耗时">{agentModal.steps.length > 0 ? `${(agentModal.steps.reduce((s, x) => s + (x.duration_ms || 0), 0) / agentModal.steps.length / 1000).toFixed(1)}s` : '—'}</Descriptions.Item>
-              <Descriptions.Item label="最近调用">{agentModal.steps.length > 0 ? new Date(Math.max(...agentModal.steps.map(s => s.created_at ? new Date(s.created_at).getTime() : 0))).toLocaleString('zh-CN') : '—'}</Descriptions.Item>
+              <Descriptions.Item label="最近调用">{agentModal.steps.length > 0 ? formatDateTime(agentModal.steps.reduce((max, s) => (s.created_at && s.created_at > max ? s.created_at : max), '')) : '—'}</Descriptions.Item>
             </Descriptions>
 
             {agentModal.steps.length === 0 ? (
@@ -205,7 +206,7 @@ export default function AIEngineManager() {
                     <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: '#F8FAFC', borderLeft: `3px solid ${agentModal.meta.color}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         {icon}
-                        <Text style={{ fontSize: 11, fontWeight: 600 }}>{new Date(s.created_at).toLocaleString('zh-CN')}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: 600 }}>{formatDateTime(s.created_at)}</Text>
                         <Tag color={s.status === 'completed' ? 'success' : s.status === 'failed' ? 'error' : 'default'} style={{ fontSize: 10 }}>{s.status}</Tag>
                         {s.duration_ms && <Text style={{ fontSize: 10, color: '#94A3B8' }}>{(s.duration_ms / 1000).toFixed(1)}s</Text>}
                         {s.tokens > 0 && <Text style={{ fontSize: 10, color: '#94A3B8' }}>{s.tokens} Token</Text>}

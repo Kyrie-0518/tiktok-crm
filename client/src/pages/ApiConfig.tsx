@@ -11,6 +11,7 @@ import {
   CheckOutlined,
 } from '@ant-design/icons';
 import api from '../api';
+import { formatDateTime } from '../utils/time';
 
 const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
@@ -484,7 +485,7 @@ export default function ApiConfig() {
                 <Col span={6}>
                   <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>最近调用</Text>
                   <Text style={{ fontSize: 14, fontWeight: 500, color: DS.text, display: 'block' }}>
-                    {channel?.last_used_at ? new Date(channel.last_used_at).toLocaleString('zh-CN') : '—'}
+                    {channel?.last_used_at ? formatDateTime(channel.last_used_at) : '—'}
                   </Text>
                 </Col>
               </Row>
@@ -738,7 +739,7 @@ export default function ApiConfig() {
                     <Col span={6}>
                       <Text type="secondary" style={{ fontSize: 12 }}>测试时间</Text>
                       <Text style={{ fontSize: 14, fontWeight: 500, color: DS.text, display: 'block' }}>
-                        {new Date(cfg.last_tested_at).toLocaleString('zh-CN')}
+                        {formatDateTime(cfg.last_tested_at)}
                       </Text>
                     </Col>
                   </Row>

@@ -285,8 +285,8 @@ router.post('/sync-from-platform', authMiddleware, (req: Request, res: Response)
     db.prepare(`
       UPDATE products SET name=?, sell_price=?, original_price=?, stock=?,
         weight=?, image=?, description=?, status=?,
-        category_name=?, extra_data=?, updated_at=datetime('now'),
-        last_synced_at=datetime('now')
+        category_name=?, extra_data=?, updated_at=datetime('now','localtime'),
+        last_synced_at=datetime('now','localtime')
       WHERE id=?
     `).run(
       name, sell_price ?? existing.sell_price,
@@ -308,7 +308,7 @@ router.post('/sync-from-platform', authMiddleware, (req: Request, res: Response)
         image, description, status, category_name,
         source_platform, source_product_id, extra_data,
         created_at, updated_at, last_synced_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'), datetime('now','localtime'), datetime('now','localtime'))
     `).run(
       name, sku || '', sell_price || 0, original_price || 0,
       stock || 0, weight || 0, image || '', description || '',

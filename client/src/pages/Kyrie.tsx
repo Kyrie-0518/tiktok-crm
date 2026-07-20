@@ -15,6 +15,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import api from '../api';
+import { formatDateTime } from '../utils/time';
 
 const { Text, Title } = Typography;
 
@@ -249,7 +250,7 @@ export default function Kyrie() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <Text ellipsis style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500, display: 'block' }}>{s.name}</Text>
                   <Text style={{ fontSize: 11, color: T.textTertiary }}>
-                    {new Date(s.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {formatDateTime(s.createdAt)}
                     {' '}· {s.messages.filter(m => m.role === 'user').length} 问
                   </Text>
                 </div>

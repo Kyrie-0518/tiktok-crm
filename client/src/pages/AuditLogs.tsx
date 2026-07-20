@@ -5,6 +5,7 @@ import {
   ApiOutlined, UserOutlined, CalendarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { formatDateTimeSec } from '../utils/time';
 import api from '../api';
 
 const { Text } = Typography;
@@ -74,9 +75,7 @@ export default function AuditLogs() {
       width: 160,
       render: (v: string) => {
         if (!v) return '-';
-        const d = new Date(v + 'Z');
-        if (isNaN(d.getTime())) return v;
-        return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        return formatDateTimeSec(v);
       },
     },
     {

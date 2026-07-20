@@ -108,7 +108,7 @@ export async function runPipeline(ctx: VideoTaskContext): Promise<PipelineResult
 export async function createAndRun(ctx: VideoTaskContext): Promise<PipelineResult> {
   const db = getDb();
   db.prepare(`INSERT INTO video_tasks (task_id, product_id, product_name, user_prompt, model, resolution, aspect_ratio, duration, count, status, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,'running',datetime('now'))`)
+    VALUES (?,?,?,?,?,?,?,?,?,'running',datetime('now','localtime'))`)
     .run(ctx.taskId, ctx.productId, ctx.productName, ctx.userPrompt, ctx.model, ctx.resolution, ctx.aspectRatio, ctx.duration, ctx.count);
   return runPipeline(ctx);
 }
