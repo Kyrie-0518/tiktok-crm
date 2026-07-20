@@ -1,11 +1,11 @@
 import { callLLM, parseJSON } from '../llm';
-import type { StrategyOutput, VisionOutput, AgentContext } from '../types';
+import type { StrategyOutput, VisionOutput } from '../types';
 
 /**
  * ② Creative Strategy Agent（创意策略）
  * 决定视频的拍法、节奏、风格、平台适配
  */
-export async function strategyAgent(ctx: AgentContext & { vision: VisionOutput; userPrompt: string }): Promise<StrategyOutput> {
+export async function strategyAgent(ctx: { vision: VisionOutput; userPrompt: string }): Promise<StrategyOutput> {
   const systemPrompt = `你是短视频创意策略专家。根据商品属性和用户需求，制定视频创作策略。
 输出 JSON 格式：
 {
@@ -19,6 +19,18 @@ export async function strategyAgent(ctx: AgentContext & { vision: VisionOutput; 
   "shotRhythm": "拍摄节奏描述"
 }`;
 
+  const fallback: StrategyOutput = {
+    videoGoal: '产品展示',
+    platform: 'TikTok',
+    pacing: '快节奏',
+    style: '现代商业',
+    duration: 15,
+    cta: '立即购买',
+    shootingStyle: '真人+产品',
+    shotRhythm: '前3秒抓眼球→中段展示卖点→结尾CTA',
+    rawJson: '',
+  };
+
   try {
     const raw = await callLLM({
       systemPrompt,
@@ -27,26 +39,20 @@ export async function strategyAgent(ctx: AgentContext & { vision: VisionOutput; 
       maxTokens: 1024,
       responseFormat: 'json_object',
     });
-    return parseJSON(raw) || {
-      videoGoal: '产品展示',
-      platform: 'TikTok',
-      pacing: '快节奏',
-      style: '现代商业',
-      duration: 15,
-      cta: '立即购买',
-      shootingStyle: '真人+产品',
-      shotRhythm: '前3秒抓眼球→中段展示卖点→结尾CTA',
+    const parsed = parseJSON(raw);
+    if (!parsed) return fallback;
+    return {
+      videoGoal: parsed.videoGoal || fallback.videoGoal,
+      platform: parsed.platform || fallback.platform,
+      pacing: parsed.pacing || fallback.pacing,
+      style: parsed.style || fallback.style,
+      duration: parsed.duration || fallback.duration,
+      cta: parsed.cta || fallback.cta,
+      shootingStyle: parsed.shootingStyle || fallback.shootingStyle,
+      shotRhythm: parsed.shotRhythm || fallback.shotRhythm,
+      rawJson: raw,
     };
   } catch {
-    return {
-      videoGoal: '产品展示',
-      platform: 'TikTok',
-      pacing: '快节奏',
-      style: '现代商业',
-      duration: 15,
-      cta: '立即购买',
-      shootingStyle: '真人+产品',
-      shotRhythm: '前3秒抓眼球→中段展示卖点→结尾CTA',
-    };
+    return fallback;
   }
 }
