@@ -154,8 +154,7 @@ export default function ApiConfig() {
     try {
       const values = await videoForm.validateFields();
       setVideoSaving(true);
-      const modelType = videoCfg?.model_type || 'seedance';
-      await api.put(`/video-models/configs/${modelType}`, {
+      await api.put('/video-models/configs/seedance', {
         api_url: values.api_url, query_api_url: values.query_api_url,
         api_key: values.api_key || undefined, model_name: values.model_name,
         status: 'enabled',
@@ -169,15 +168,14 @@ export default function ApiConfig() {
   };
 
   const testVideo = async () => {
-    const modelType = videoCfg?.model_type || 'seedance';
     setVideoTesting(true); setVideoTestStatus('testing'); setVideoTestMsg('');
     try {
       const values = videoForm.getFieldsValue();
-      await api.put(`/video-models/configs/${modelType}`, {
+      await api.put('/video-models/configs/seedance', {
         api_url: values.api_url, query_api_url: values.query_api_url,
         api_key: values.api_key || undefined, model_name: values.model_name, status: 'enabled',
       });
-      const res = await api.post(`/video-models/configs/${modelType}/test`, {
+      const res = await api.post('/video-models/configs/seedance/test', {
         api_url: values.api_url, api_key: values.api_key, model_name: values.model_name,
       });
       if (res.data.success) { setVideoTestStatus('success'); setVideoTestMsg('连接成功'); }
