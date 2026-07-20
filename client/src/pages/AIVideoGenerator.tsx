@@ -128,7 +128,7 @@ export default function AIVideoGenerator() {
   const [logoMaterial, setLogoMaterial] = useState<{ url: string; name: string } | null>(null);
 
   const [generating, setGenerating] = useState(false);
-  const [pipelineSteps, setPipelineSteps] = useState<Array<{ agent: string; status: string }>>([]);
+  const [pipelineSteps, setPipelineSteps] = useState<Array<{ agent: string; status: string; output?: any }>>([]);
   const [pipelineResult, setPipelineResult] = useState<{ qualityScore?: number; totalTokens?: number; totalTime?: number } | null>(null);
   const [genError, setGenError] = useState('');
   const [progress, setProgress] = useState(0);
@@ -210,20 +210,49 @@ export default function AIVideoGenerator() {
     if (!prompt.trim()) return message.warning('请输入视频创意');
     if (generating) return;
     setGenerating(true); setGenError(''); setProgress(0); setPreviewVideo(null);
-    setPipelineSteps([]); setPipelineResult(null);
+    // 初始化 7 个 Agent 步骤，全设为 pending，前端先把骨架显示出来
+    const allAgents = ['vision', 'strategy', 'director', 'prompt_engine', 'optimizer', 'adapter', 'quality'];
+    setPipelineSteps(allAgents.map(a => ({ agent: a, status: 'pending' as const })));
+    setPipelineResult(null);
+
     try {
-      // Step 1: AI Engine Pipeline (7 Agent 全链路, 通常需 30~60 秒)
+      // Step 1: 启动 AI Engine Pipeline（异步模式，立即返回 taskId）
       const engRes = await api.post('/ai-engine/generate', {
         productId: selectedProduct?.id, productImage: productMaterial?.url,
         productName: selectedProduct?.name, userPrompt: prompt,
         model: modelOption, resolution, aspectRatio, duration, count,
-      }, { timeout: 180000 });
-      const result = engRes.data;
-      setPipelineSteps(result.steps || []);
-      setPipelineResult({ qualityScore: result.qualityScore, totalTokens: result.totalTokens, totalTime: result.totalTime });
-      if (result.status === 'failed') { setGenError(result.error || 'AI Engine 执行失败'); setGenerating(false); return; }
+      }, { timeout: 15000 });
+      const taskId: string = engRes.data?.taskId;
+      if (!taskId) throw new Error('AI Engine 未返回 taskId');
 
-      const finalPrompt = result.steps?.find((s: any) => s.agent === 'optimizer')?.output?.optimizedPrompts?.[0]?.prompt || prompt;
+      // Step 2: 轮询 task 状态，每 1.5s 拉一次
+      const finalTask = await pollAiEngine(taskId);
+
+      if (finalTask.status === 'failed') {
+        setGenError(finalTask.error || 'AI Engine 执行失败');
+        return;
+      }
+
+      // Step 3: 从数据库读到的 steps 中提取最终 prompt
+      const steps = (finalTask.steps || []).map((s: any) => ({
+        agent: s.agent,
+        status: s.status,
+        output: s.output_json ? safeParse(s.output_json) : null,
+      }));
+      setPipelineSteps(steps);
+
+      const optimizerStep = steps.find((s: any) => s.agent === 'optimizer');
+      const finalPrompt = optimizerStep?.output?.optimizedPrompts?.[0]?.prompt || prompt;
+
+      // 同步最终统计
+      const taskRow = finalTask.task || {};
+      setPipelineResult({
+        qualityScore: taskRow.quality_score,
+        totalTokens: taskRow.total_tokens,
+        totalTime: taskRow.total_time_ms,
+      });
+
+      // Step 4: 调用视频模型生成（Seedance）
       setProgress(20);
       const pTimer = setInterval(() => setProgress(v => Math.min(v + Math.random() * 6, 88)), 700);
       const r = await api.post('/video-models/generate', {
@@ -239,6 +268,53 @@ export default function AIVideoGenerator() {
     } catch (e: any) { setGenError(e.response?.data?.error || e.message || '生成失败'); }
     finally { setGenerating(false); }
   };
+
+  // 轮询 AI Engine 任务状态，更新 pipelineSteps
+  const pollAiEngine = (taskId: string): Promise<{ status: string; task: any; steps: any[]; error?: string }> => {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const maxAttempts = 90; // 最多 90 次 × 1.5s = 135 秒
+      const tick = async () => {
+        attempts++;
+        try {
+          const r = await api.get(`/ai-engine/tasks/${taskId}`, { timeout: 10000 });
+          const data = r.data || {};
+          const taskRow = data.task;
+          const stepsFromDb: any[] = data.steps || [];
+
+          // 实时更新前端步骤状态
+          if (stepsFromDb.length > 0) {
+            setPipelineSteps(prev => prev.map(s => {
+              const fromDb = stepsFromDb.find((d: any) => d.agent === s.agent);
+              return fromDb ? { agent: s.agent, status: fromDb.status } : s;
+            }));
+          }
+
+          // 估算进度（基于完成的 step 数）
+          const completedCount = stepsFromDb.filter((s: any) => s.status === 'completed').length;
+          setProgress(Math.min(completedCount * 3, 18)); // 0~18 留给 pipeline，20+ 给视频生成
+
+          const status = taskRow?.status;
+          if (status === 'completed' || status === 'failed' || status === 'retrying') {
+            resolve({ status, task: taskRow, steps: stepsFromDb, error: taskRow?.error });
+            return;
+          }
+        } catch (e) {
+          // 单次轮询失败不中断，继续下一次
+        }
+        if (attempts >= maxAttempts) {
+          reject(new Error('AI Engine 轮询超时（135秒）'));
+          return;
+        }
+        setTimeout(tick, 1500);
+      };
+      tick();
+    });
+  };
+
+  function safeParse(json: string): any {
+    try { return JSON.parse(json); } catch { return null; }
+  }
 
   const poll = async (vid: number) => {
     for (let i = 0; i < 60; i++) {

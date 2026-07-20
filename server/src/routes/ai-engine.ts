@@ -1,7 +1,7 @@
 // AI Engine API — Pipeline 入口
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
-import { createAndRun } from '../services/ai-engine/orchestrator';
+import { createAndRun, runPipeline } from '../services/ai-engine/orchestrator';
 import getDb from '../db';
 import crypto from 'crypto';
 
@@ -11,7 +11,7 @@ function uuid(): string {
 
 const router = Router();
 
-// POST /api/ai-engine/generate — 执行全链路 AI Pipeline
+// POST /api/ai-engine/generate — 异步模式：立即返回 taskId，pipeline 在后台跑
 router.post('/generate', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { productId, productImage, productName, productDescription, userPrompt, template, model, resolution, aspectRatio, duration, count } = req.body;
@@ -21,8 +21,7 @@ router.post('/generate', authMiddleware, async (req: Request, res: Response) => 
     }
 
     const taskId = `vt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    const result = await createAndRun({
+    const ctx = {
       taskId,
       productId,
       productImage,
@@ -36,11 +35,28 @@ router.post('/generate', authMiddleware, async (req: Request, res: Response) => 
       duration: duration || 5,
       count: count || 1,
       createdAt: new Date().toISOString(),
-    });
+    };
 
-    res.json(result);
+    // 1. 立即插入 task 记录（status='pending'，pipeline 启动后变 'running'）
+    try {
+      const db = getDb();
+      db.prepare(`INSERT INTO video_tasks (task_id, product_id, product_name, user_prompt, model, resolution, aspect_ratio, duration, count, status, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,datetime('now'))`)
+        .run(taskId, productId || null, productName || '通用商品', userPrompt || '',
+             ctx.model, ctx.resolution, ctx.aspectRatio, ctx.duration, ctx.count, 'running');
+    } catch (e: any) {
+      console.error('[ai-engine/generate] 插入 task 失败:', e.message);
+    }
+
+    // 2. 立即返回 taskId，前端可以开始轮询
+    res.json({ taskId, status: 'running', async: true });
+
+    // 3. 后台异步执行 pipeline（不阻塞响应）
+    runPipeline(ctx).catch((e) => {
+      console.error(`[ai-engine/generate] Pipeline ${taskId} 异常:`, e.message);
+    });
   } catch (e: any) {
-    res.status(500).json({ error: e.message || 'AI Engine 执行失败' });
+    res.status(500).json({ error: e.message || 'AI Engine 启动失败' });
   }
 });
 
