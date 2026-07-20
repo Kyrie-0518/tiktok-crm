@@ -1232,4 +1232,66 @@ function initVideoEngineTables(db: any) {
 }
 initVideoEngineTables(getDb());
 
+/* ═══════════════════════════════════════════════════════════════
+   一次性迁移：把存量 UTC 时间数据 +8 小时转为北京时间
+   之前用 datetime('now') 写入的字段都是 UTC，现在统一修正
+   ═══════════════════════════════════════════════════════════════ */
+(() => {
+  const db = getDb();
+  const flag = db.prepare("SELECT value FROM settings WHERE key = 'tz_migrated_v1'").get() as any;
+  if (flag) return;
+
+  const migrations: [string, string[]][] = [
+    ['ai_channels', ['last_used_at', 'last_success_at', 'last_error_at']],
+    ['audit_logs', ['created_at']],
+    ['video_tasks', ['created_at', 'updated_at']],
+    ['video_task_steps', ['created_at']],
+    ['video_templates', ['created_at', 'updated_at']],
+    ['users', ['created_at', 'last_login_at']],
+    ['user_sessions', ['created_at', 'expires_at']],
+    ['products', ['created_at', 'updated_at']],
+    ['orders', ['order_time', 'created_at', 'updated_at']],
+    ['order_items', ['created_at']],
+    ['influencers', ['created_at', 'updated_at']],
+    ['tiktok_shops', ['created_at', 'updated_at']],
+    ['shops', ['created_at']],
+    ['financial_records', ['created_at']],
+    ['cost_items', ['created_at', 'updated_at']],
+    ['ad_accounts', ['created_at', 'updated_at']],
+    ['ad_campaigns', ['created_at', 'updated_at']],
+    ['ad_creatives', ['created_at', 'updated_at']],
+    ['ad_logs', ['created_at']],
+    ['ai_engine_tasks', ['created_at', 'updated_at']],
+    ['bot_messages', ['created_at']],
+    ['material_library', ['created_at', 'updated_at']],
+    ['ai_videos', ['created_at', 'updated_at']],
+    ['influencer_reports', ['created_at', 'updated_at']],
+  ];
+
+  let totalUpdated = 0;
+  for (const [table, columns] of migrations) {
+    const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(table);
+    if (!tableExists) continue;
+
+    for (const col of columns) {
+      const colExists = db.prepare(`PRAGMA table_info(${table})`).all().find((c: any) => c.name === col);
+      if (!colExists) continue;
+      try {
+        const result = db.prepare(
+          `UPDATE ${table} SET ${col} = datetime(${col}, '+8 hours') WHERE ${col} IS NOT NULL AND length(${col}) >= 19`
+        ).run();
+        if (result.changes > 0) {
+          totalUpdated += result.changes;
+          console.log(`[migrate tz] ${table}.${col}: ${result.changes} rows`);
+        }
+      } catch (e: any) {
+        console.warn(`[migrate tz] ${table}.${col} failed: ${e.message}`);
+      }
+    }
+  }
+
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('tz_migrated_v1', '1')").run();
+  console.log(`[migrate tz] UTC->Beijing migration done, total ${totalUpdated} rows updated`);
+})();
+
 export default getDb;
