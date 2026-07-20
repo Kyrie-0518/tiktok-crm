@@ -438,7 +438,7 @@ export default function AIVideoGenerator() {
             <TextArea
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
-              placeholder={`描述越详细，视频越精准。\n\n例如：马来西亚 TikTok 风格商品带货视频。\n主体：AirPods Pro — 哑光黑充电仓特写\n场景：开放式办公室，间接光环境\n镜头：推近特写 → 环绕展示降噪麦克风 → 佩戴使用\n风格：年轻科技感，轻快剪辑节奏\n光线：侧逆光 + 柔光散射\n结尾：品牌 Logo 淡入 + "立即购买"行动号召`}
+              placeholder={`AI Video Engine 将自动完成：商品理解 → 创意策略 → AI导演分镜 → Prompt生成 → 模型优化 → 质量评估。\n\n你只需要描述核心创意，剩下的交给 7 个 Agent：\n\n例如：马来西亚 TikTok 风格商品带货视频。\n主体：AirPods Pro — 哑光黑充电仓特写\n场景：开放式办公室，间接光环境\n镜头：推近特写 → 环绕展示降噪麦克风 → 佩戴使用\n风格：年轻科技感，轻快剪辑节奏\n光线：侧逆光 + 柔光散射\n结尾：品牌 Logo 淡入 + "立即购买"行动号召\n\n（也可以只写一句话，如"马来西亚卖 AirPods"，AI Engine 会自动补全）`}
               autoSize={promptExpanded ? { minRows: 18, maxRows: 28 } : { minRows: 8, maxRows: 8 }}
               style={{ fontSize: 13, lineHeight: 1.7, resize: 'none', border: 'none', boxShadow: 'none', padding: '0 20px', flex: 1, fontFamily: '-apple-system, "Inter", sans-serif' }}
               variant="borderless"
