@@ -17,9 +17,9 @@ const { Option } = Select;
 
 /* ══════════════════════════ Design Tokens (Apple + Linear style) ══════════════════════════ */
 const DS = {
-  bg: '#F7F8FA',
+  bg: '#f5f3f0',
   cardBg: '#FFFFFF',
-  cardBorder: '#EAEAEA',
+  cardBorder: '#e8e5e0',
   cardShadow: '0 1px 3px rgba(0,0,0,0.04)',
   cardHoverShadow: '0 4px 16px rgba(0,0,0,0.08)',
   primary: '#5B4CFA',
@@ -34,7 +34,6 @@ const DS = {
   radius: 16,
   radiusSm: 10,
   inputHeight: 48,
-  maxWidth: 1600,
 };
 
 /* ══════════════════════════ Types ══════════════════════════ */
@@ -804,11 +803,10 @@ export default function ApiConfig() {
   /* ══════════════════════════ Main ══════════════════════════ */
   return (
     <div style={{
-      padding: 32, background: DS.bg, minHeight: '100%',
-      maxWidth: DS.maxWidth, margin: '0 auto',
+      padding: 24, minHeight: '100%',
     }}>
       {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
         <div style={{
           width: 42, height: 42, borderRadius: 12,
           background: `linear-gradient(135deg, ${DS.primary}, ${DS.primaryHover})`,
