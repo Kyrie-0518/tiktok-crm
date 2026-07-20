@@ -117,6 +117,12 @@ app.use('/api/ai-engine', aiEngineRoutes);
 app.use('/api/products-tiktok', productsTiktokRoutes);
 app.use('/api/ad-center', adCenterRoutes);
 
+// ⚠️ 404 诊断：记录所有未匹配 /api/* 的请求（便于排查前端调错路径）
+app.use('/api', (req, res) => {
+  console.error(`[404-API] ${req.method} ${req.originalUrl} from ${req.ip}`);
+  res.status(404).json({ error: `接口不存在: ${req.method} ${req.originalUrl}` });
+});
+
 
 // Serve uploaded images
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'data', 'uploads');
