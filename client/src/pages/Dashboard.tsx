@@ -111,8 +111,8 @@ export default function Dashboard() {
 
   return (
     <div style={{ fontFamily: 'var(--bo-font-family)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-        <PageHeader title="经营概览" description="店铺经营数据驾驶舱" icon={<BarChartOutlined />} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+        <PageHeader title="经营概览" description="店铺经营数据驾驶舱" icon={<BarChartOutlined />} style={{ marginBottom: 0 }} />
         <Space size={8} style={{ marginTop: 4 }}>
           <Text style={{ fontSize: 11, color: '#94A3B8' }}>
             更新于 {lastUpdated.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} · 每小时自动刷新
