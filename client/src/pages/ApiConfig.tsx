@@ -136,11 +136,6 @@ export default function ApiConfig() {
           query_api_url: configured.query_api_url || '',
           model_name: configured.model_name || '',
           api_key: '',
-          ratio: configured.extra_params?.ratio || '16:9',
-          duration: configured.extra_params?.duration || 5,
-          resolution: configured.extra_params?.resolution || '720p',
-          count: configured.extra_params?.count || 1,
-          voice: configured.extra_params?.voice !== false,
         });
         setVideoTestStatus(configured.last_test_result === 'success' ? 'success' : configured.last_test_result === 'failed' ? 'error' : 'idle');
         setVideoTestMsg(configured.last_test_message || '');
@@ -158,7 +153,6 @@ export default function ApiConfig() {
         api_url: values.api_url, query_api_url: values.query_api_url,
         api_key: values.api_key || undefined, model_name: values.model_name,
         status: 'enabled',
-        extra_params: { ratio: values.ratio, duration: values.duration, resolution: values.resolution, count: values.count, voice: values.voice },
       });
       message.success('配置已保存'); fetchVideoConfig();
     } catch (e: any) {
@@ -322,34 +316,6 @@ export default function ApiConfig() {
                   <Input.Password style={inputStyle} placeholder="请输入 API Key" prefix={<KeyOutlined style={{ color: DS.textTertiary }} />} />
                 </Form.Item>
               </Col>
-            </Row>
-            <div style={{ height: 1, background: DS.cardBorder, margin: '32px -32px 24px' }} />
-            {sectionTitle('默认生成参数')}
-            <Row gutter={20}>
-              <Col span={8}>
-                <Form.Item name="ratio" label={<span style={{ fontSize: 13, fontWeight: 500 }}>默认比例</span>}>
-                  <Select style={{ ...inputStyle, width: '100%' }} size="large">
-                    <Option value="16:9">16:9</Option><Option value="9:16">9:16</Option>
-                    <Option value="1:1">1:1</Option><Option value="4:3">4:3</Option><Option value="3:4">3:4</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={4}><Form.Item name="duration" label={<span style={{ fontSize: 13, fontWeight: 500 }}>时长</span>}>
-                <Select style={{ ...inputStyle, width: '100%' }} size="large">{[3, 5, 8, 10, 15, 30].map(s => <Option key={s} value={s}>{s} 秒</Option>)}</Select>
-              </Form.Item></Col>
-              <Col span={4}><Form.Item name="resolution" label={<span style={{ fontSize: 13, fontWeight: 500 }}>分辨率</span>}>
-                <Select style={{ ...inputStyle, width: '100%' }} size="large">
-                  <Option value="540p">540P</Option><Option value="720p">720P</Option><Option value="1080p">1080P</Option>
-                </Select>
-              </Form.Item></Col>
-              <Col span={4}><Form.Item name="count" label={<span style={{ fontSize: 13, fontWeight: 500 }}>数量</span>}>
-                <Select style={{ ...inputStyle, width: '100%' }} size="large">{[1, 2, 3, 4].map(n => <Option key={n} value={n}>{n}</Option>)}</Select>
-              </Form.Item></Col>
-              <Col span={4}><Form.Item name="voice" label={<span style={{ fontSize: 13, fontWeight: 500 }}>声音</span>}>
-                <Select style={{ ...inputStyle, width: '100%' }} size="large">
-                  <Option value={true}>开启</Option><Option value={false}>关闭</Option>
-                </Select>
-              </Form.Item></Col>
             </Row>
             <div style={{ height: 1, background: DS.cardBorder, margin: '32px -32px 24px' }} />
             {sectionTitle('运行状态')}

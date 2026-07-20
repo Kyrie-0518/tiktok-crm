@@ -61,16 +61,25 @@ export function saveUserModelConfig(
   const existing = db.prepare('SELECT id FROM video_model_configs WHERE user_id = ? AND model_type = ?').get(userId, modelType);
 
   if (existing) {
-    const updates: string[] = ['api_url = ?', 'query_api_url = ?', 'model_name = ?', 'status = ?', 'updated_at = CURRENT_TIMESTAMP'];
-    const values: any[] = [api_url, query_api_url || '', model_name, status || 'disabled'];
+    const hasQueryCol = db.prepare("PRAGMA table_info(video_model_configs)").all().some((c: any) => c.name === 'query_api_url');
+    const updates: string[] = ['api_url = ?', 'model_name = ?', 'status = ?', 'updated_at = CURRENT_TIMESTAMP'];
+    const values: any[] = [api_url, model_name, status || 'disabled'];
+    if (hasQueryCol) { updates.push('query_api_url = ?'); values.push(query_api_url || ''); }
     if (api_key) { updates.push('api_key = ?'); values.push(api_key); }
     if (extra_params !== undefined) { updates.push('extra_params = ?'); values.push(typeof extra_params === 'string' ? extra_params : JSON.stringify(extra_params)); }
     values.push(userId, modelType);
     db.prepare(`UPDATE video_model_configs SET ${updates.join(', ')} WHERE user_id = ? AND model_type = ?`).run(...values);
   } else {
-    db.prepare(`INSERT INTO video_model_configs (user_id, model_type, api_url, query_api_url, api_key, model_name, extra_params, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      userId, modelType, api_url, query_api_url || '', api_key, model_name, typeof extra_params === 'string' ? extra_params : JSON.stringify(extra_params || {}), status || 'disabled'
-    );
+    const cols = ['user_id', 'model_type', 'api_url'];
+    const vals: any[] = [userId, modelType, api_url];
+    const ph: string[] = ['?', '?', '?'];
+    if (db.prepare("PRAGMA table_info(video_model_configs)").all().some((c: any) => c.name === 'query_api_url')) {
+      cols.push('query_api_url'); vals.push(query_api_url || ''); ph.push('?');
+    }
+    cols.push('api_key', 'model_name', 'extra_params', 'status');
+    vals.push(api_key, model_name, typeof extra_params === 'string' ? extra_params : JSON.stringify(extra_params || {}), status || 'disabled');
+    ph.push('?', '?', '?', '?');
+    db.prepare(`INSERT INTO video_model_configs (${cols.join(', ')}) VALUES (${ph.join(', ')})`).run(...vals);
   }
 }
 
