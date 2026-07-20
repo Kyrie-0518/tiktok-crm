@@ -41,10 +41,13 @@ async function resolveImageUrl(url: string): Promise<string> {
 router.post('/', authMiddleware, async (req: Request, res: Response) => {
   const userId = (req as any).user?.userId;
   const { model_type, prompt, model_name, product_image, reference_image, reference_images, resolution, duration, aspect_ratio, extra_params } = req.body as any;
+  console.log('[VideoGenerate] body=', JSON.stringify({ model_type, prompt: prompt?.slice(0, 60), model_name, resolution, duration, aspect_ratio }));
   if (!prompt) return res.status(400).json({ error: '请输入提示词' });
+  if (!model_type) return res.status(400).json({ error: '请选择视频模型' });
 
   const config = getUserModelConfig(userId, model_type);
   if (!config || !config.api_key || config.status !== 'enabled') {
+    console.error(`[VideoGenerate] 模型未配置或未启用: userId=${userId} model_type=${model_type} config=`, config);
     return res.status(400).json({ error: `请先在「模型API配置」中配置并启用 ${model_type} 模型` });
   }
 
