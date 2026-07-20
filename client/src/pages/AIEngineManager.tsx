@@ -3,7 +3,7 @@ import { Card, Tag, Spin, Typography, Table, Empty, Collapse, Button, message, M
 import {
   ApiOutlined, CheckCircleOutlined, CloseCircleOutlined,
   ClockCircleOutlined, ThunderboltOutlined, SettingOutlined,
-  SearchOutlined, EyeOutlined, ReloadOutlined,
+  SearchOutlined, EyeOutlined, ReloadOutlined, ArrowRightOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../components/design-system/PageHeader';
 import api from '../api';
@@ -11,13 +11,13 @@ import api from '../api';
 const { Text, Paragraph } = Typography;
 
 const AGENT_META: Record<string, { icon: React.ReactNode; title: string; desc: string; color: string }> = {
-  vision:   { icon: <SearchOutlined />,     title: '① 商品理解',   desc: '分析商品图片与描述，输出结构化属性与卖点',   color: '#6E56FF' },
-  strategy: { icon: <ThunderboltOutlined />, title: '② 创意策略',   desc: '基于商品与用户需求，制定视频风格与节奏',       color: '#3B82F6' },
-  director: { icon: <EyeOutlined />,         title: '③ AI 导演',    desc: '生成分镜脚本，规划镜头时序与转场',              color: '#8B5CF6' },
-  prompt_engine: { icon: <SettingOutlined />,title: '④ Prompt 引擎',desc: '将分镜转化为模型可用的 Prompt',                   color: '#F59E0B' },
-  optimizer:{ icon: <ApiOutlined />,         title: '⑤ Prompt 优化',desc: '根据不同模型偏好微调 Prompt 表达',                color: '#EF4444' },
-  adapter:  { icon: <ApiOutlined />,         title: '⑥ 模型适配',   desc: '统一所有模型的生成参数格式',                      color: '#22C55E' },
-  quality:  { icon: <CheckCircleOutlined />, title: '⑦ 质量评估',   desc: '评估生成结果，低于 85 分自动触发重试',            color: '#EC4899' },
+  vision:   { icon: <SearchOutlined />,     title: '商品理解',   desc: '分析商品图片与描述，输出结构化属性与卖点',   color: '#6E56FF' },
+  strategy: { icon: <ThunderboltOutlined />, title: '创意策略',   desc: '基于商品与用户需求，制定视频风格与节奏',       color: '#3B82F6' },
+  director: { icon: <EyeOutlined />,         title: 'AI 导演',    desc: '生成分镜脚本，规划镜头时序与转场',              color: '#8B5CF6' },
+  prompt_engine: { icon: <SettingOutlined />,title: 'Prompt 引擎',desc: '将分镜转化为模型可用的 Prompt',                   color: '#F59E0B' },
+  optimizer:{ icon: <ApiOutlined />,         title: 'Prompt 优化',desc: '根据不同模型偏好微调 Prompt 表达',                color: '#EF4444' },
+  adapter:  { icon: <ApiOutlined />,         title: '模型适配',   desc: '统一所有模型的生成参数格式',                      color: '#22C55E' },
+  quality:  { icon: <CheckCircleOutlined />, title: '质量评估',   desc: '评估生成结果，低于 85 分自动触发重试',            color: '#EC4899' },
 };
 
 export default function AIEngineManager() {
@@ -66,28 +66,36 @@ export default function AIEngineManager() {
         <Button icon={<ReloadOutlined />} onClick={fetchTasks} loading={loading}>刷新</Button>
       </div>
 
-      {/* Agent 总览 7 卡 - 可点击查看详情 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10, marginBottom: 20 }}>
-        {Object.entries(AGENT_META).map(([key, meta]) => {
+      {/* Agent 总览 7 卡 - 可点击查看详情 + 流程箭头 */}
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: 20 }}>
+        {Object.entries(AGENT_META).map(([key, meta], idx, arr) => {
           const agentSteps = tasks.flatMap(t => (t.steps || []).filter((s: any) => s.agent === key));
           const okCount = agentSteps.filter((s: any) => s.status === 'completed').length;
           const totalCalls = agentSteps.length;
+          const isLast = idx === arr.length - 1;
           return (
-            <Card key={key} size="small" hoverable
-              onClick={() => setAgentModal({ key, meta, steps: agentSteps })}
-              style={{ borderRadius: 10, cursor: 'pointer', transition: 'all .15s' }}
-              bodyStyle={{ padding: '12px 14px' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = meta.color; e.currentTarget.style.boxShadow = `0 0 0 2px ${meta.color}30`; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 4 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${meta.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: meta.color, fontSize: 16 }}>
-                  {meta.icon}
+            <React.Fragment key={key}>
+              <Card size="small" hoverable
+                onClick={() => setAgentModal({ key, meta, steps: agentSteps })}
+                style={{ flex: 1, minWidth: 0, borderRadius: idx === 0 ? '10px 0 0 10px' : isLast ? '0 10px 10px 0' : 0, cursor: 'pointer', transition: 'all .15s' }}
+                bodyStyle={{ padding: '12px 14px' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = meta.color; e.currentTarget.style.boxShadow = `0 0 0 2px ${meta.color}30`; e.currentTarget.style.zIndex = '2'; e.currentTarget.style.position = 'relative'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.zIndex = ''; e.currentTarget.style.position = ''; }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 4 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: `${meta.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: meta.color, fontSize: 16 }}>
+                    {meta.icon}
+                  </div>
+                  <Text style={{ fontSize: 11, fontWeight: 700, color: '#1E293B' }}>{meta.title}</Text>
+                  <Text style={{ fontSize: 10, color: '#94A3B8', lineHeight: 1.4 }}>{meta.desc}</Text>
+                  {totalCalls > 0 && <Text style={{ fontSize: 10, color: meta.color, marginTop: 2, fontWeight: 600 }}>调用 {totalCalls} 次 · 成功 {okCount}</Text>}
                 </div>
-                <Text style={{ fontSize: 11, fontWeight: 700, color: '#1E293B' }}>{meta.title}</Text>
-                <Text style={{ fontSize: 10, color: '#94A3B8', lineHeight: 1.4 }}>{meta.desc}</Text>
-                {totalCalls > 0 && <Text style={{ fontSize: 10, color: meta.color, marginTop: 2, fontWeight: 600 }}>调用 {totalCalls} 次 · 成功 {okCount}</Text>}
-              </div>
-            </Card>
+              </Card>
+              {!isLast && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 14, color: '#CBD5E1' }}>
+                  <ArrowRightOutlined style={{ fontSize: 12 }} />
+                </div>
+              )}
+            </React.Fragment>
           );
         })}
       </div>
