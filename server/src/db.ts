@@ -865,6 +865,9 @@ function initTables() {
     if (!seedanceColNames.includes('last_test_message')) {
       db.exec("ALTER TABLE seedance_user_configs ADD COLUMN last_test_message TEXT DEFAULT ''");
     }
+    if (!seedanceColNames.includes('query_endpoint')) {
+      db.exec("ALTER TABLE seedance_user_configs ADD COLUMN query_endpoint TEXT DEFAULT ''");
+    }
   }
 
   // Migrate: seedance_templates 初始化默认模板

@@ -5,7 +5,7 @@ import {
 import {
   ApiOutlined, ThunderboltOutlined, DeleteOutlined,
   EditOutlined, LinkOutlined, KeyOutlined, RobotOutlined, ReloadOutlined,
-  ExperimentOutlined, EyeInvisibleOutlined
+  ExperimentOutlined, EyeInvisibleOutlined, SearchOutlined
 } from '@ant-design/icons';
 import api from '../api';
 
@@ -19,6 +19,7 @@ interface ApiConfigItem {
   configured: boolean;
   enabled: boolean;
   api_url: string;
+  query_endpoint?: string;
   model_name: string;
   api_key_masked: string;
   has_key: boolean;
@@ -62,8 +63,10 @@ export default function ApiConfig() {
 
   const handleEdit = (cfg: ApiConfigItem) => {
     setEditingType(cfg.type);
+    const defaultQuery = cfg.api_url ? `${cfg.api_url.replace(/\/+$/, '')}/contents/generations/tasks/{id}` : '';
     form.setFieldsValue({
       api_url: cfg.api_url,
+      query_endpoint: cfg.query_endpoint || defaultQuery,
       model_name: cfg.model_name,
       api_key: '',
       status: cfg.enabled ? 'enabled' : 'disabled',
@@ -183,12 +186,22 @@ export default function ApiConfig() {
             <div style={{ marginTop: 20, paddingLeft: 60 }}>
               <div style={{ marginBottom: 8 }}>
                 <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  接口地址
+                  提交接口 (POST)
                 </Text>
-                <div style={{ fontSize: 13, color: '#1e293b', fontFamily: 'monospace', marginTop: 2 }}>
-                  {cfg.api_url || '—'}
+                <div style={{ fontSize: 13, color: '#1e293b', fontFamily: 'monospace', marginTop: 2, wordBreak: 'break-all' }}>
+                  {cfg.api_url ? `${cfg.api_url.replace(/\/+$/, '')}/contents/generations/tasks` : '—'}
                 </div>
               </div>
+              {cfg.type === 'video' && (
+                <div style={{ marginBottom: 8 }}>
+                  <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    查询接口 (GET)
+                  </Text>
+                  <div style={{ fontSize: 13, color: '#1e293b', fontFamily: 'monospace', marginTop: 2, wordBreak: 'break-all' }}>
+                    {cfg.query_endpoint || (cfg.api_url ? `${cfg.api_url.replace(/\/+$/, '')}/contents/generations/tasks/{id}` : '—')}
+                  </div>
+                </div>
+              )}
               <div style={{ marginBottom: 8 }}>
                 <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   模型
@@ -288,7 +301,8 @@ export default function ApiConfig() {
             <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
               <Form.Item
                 name="api_url"
-                label="API 接口地址"
+                label="提交接口地址 (POST)"
+                extra={editingType === 'video' ? '用于提交视频生成任务，路径: /contents/generations/tasks' : ''}
                 rules={[{ required: true, message: '请输入 API 接口地址' }]}
               >
                 <Input
@@ -296,6 +310,19 @@ export default function ApiConfig() {
                   prefix={<LinkOutlined />}
                 />
               </Form.Item>
+
+              {editingType === 'video' && (
+                <Form.Item
+                  name="query_endpoint"
+                  label="查询接口地址 (GET)"
+                  extra="用于查询异步任务状态，{id} 将被替换为任务ID"
+                >
+                  <Input
+                    placeholder="https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/{id}"
+                    prefix={<SearchOutlined />}
+                  />
+                </Form.Item>
+              )}
 
               <Form.Item
                 name="model_name"

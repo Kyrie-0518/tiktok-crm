@@ -99,6 +99,7 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
   let videoConfigured = false;
   let videoEnabled = false;
   let videoModelType = 'seedance';
+  let videoQueryEndpoint = '';
 
   if (videoCfg) {
     videoApiUrl = videoCfg.api_url || '';
@@ -108,6 +109,19 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
     videoConfigured = !!(videoApiUrl && videoKey && videoModel);
     videoEnabled = videoCfg.status === 'enabled';
   }
+  // 读取查询接口（异步任务查询）
+  try {
+    const qc = db.prepare(`
+      SELECT query_endpoint FROM seedance_user_configs
+      WHERE api_key != '' AND api_url != ''
+      ORDER BY id ASC LIMIT 1
+    `).get() as any;
+    if (qc?.query_endpoint) videoQueryEndpoint = qc.query_endpoint;
+  } catch { /* ignore */ }
+  // 默认值：POST URL + "/{id}" 后缀
+  if (!videoQueryEndpoint && videoApiUrl) {
+    videoQueryEndpoint = `${videoApiUrl.replace(/\/+$/, '')}/contents/generations/tasks/{id}`;
+  }
 
   result.push({
     type: 'video',
@@ -116,6 +130,7 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
     configured: videoConfigured,
     enabled: videoEnabled,
     api_url: videoApiUrl,
+    query_endpoint: videoQueryEndpoint,
     model_name: videoModel,
     api_key_masked: videoKey ? `${videoKey.slice(0, 8)}...${videoKey.slice(-4)}` : '',
     has_key: !!videoKey,
@@ -133,7 +148,7 @@ router.put('/:type', authMiddleware, (req: Request, res: Response) => {
   if (!requireAdmin(req, res, db)) return;
 
   const type = req.params.type;
-  const { api_url, api_key, model_name, status } = req.body as any;
+  const { api_url, api_key, model_name, status, query_endpoint } = req.body as any;
 
   if (!api_url) return res.status(400).json({ error: '请输入 API 接口地址' });
   if (!model_name) return res.status(400).json({ error: '请输入模型名称' });
@@ -184,6 +199,23 @@ router.put('/:type', authMiddleware, (req: Request, res: Response) => {
           INSERT INTO video_model_configs (user_id, model_type, api_url, api_key, model_name, status, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
         `).run(userId, modelType, api_url, api_key || '', model_name, status === 'enabled' ? 'enabled' : 'disabled');
+      }
+
+      // 同时保存 query_endpoint 到 seedance_user_configs（异步任务查询接口）
+      const queryUrl = query_endpoint || `${api_url.replace(/\/+$/, '')}/contents/generations/tasks/{id}`;
+      const existingSeedance = db.prepare("SELECT id FROM seedance_user_configs WHERE user_id = ?").get(userId) as any;
+      if (existingSeedance) {
+        db.prepare(`
+          UPDATE seedance_user_configs SET
+            api_url = ?, api_key = ?, model_name = ?, status = ?,
+            query_endpoint = ?, updated_at = datetime('now', 'localtime')
+          WHERE id = ?
+        `).run(api_url, api_key || '', model_name, status === 'enabled' ? 'enabled' : 'disabled', queryUrl, existingSeedance.id);
+      } else if (userId > 0) {
+        db.prepare(`
+          INSERT INTO seedance_user_configs (user_id, api_url, api_key, model_name, status, query_endpoint, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
+        `).run(userId, api_url, api_key || '', model_name, status === 'enabled' ? 'enabled' : 'disabled', queryUrl);
       }
     } catch (e: any) {
       return res.status(500).json({ error: '保存视频模型配置失败: ' + e.message });
