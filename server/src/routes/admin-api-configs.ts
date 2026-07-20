@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import getDb from '../db';
 import authMiddleware from '../middleware/auth';
-import { resolveLLMEndpoint } from '../utils/llm-endpoint';
 
 const router = Router();
 
@@ -283,13 +282,12 @@ router.post('/:type/test', authMiddleware, async (req: Request, res: Response) =
     return res.status(400).json({ error: '未找到已保存的 API 密钥，请先编辑并保存完整配置' });
   }
 
-  const endpoint = resolveLLMEndpoint(api_url);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30000);
 
   try {
     if (type === 'llm') {
-      const response = await fetch(endpoint, {
+      const response = await fetch(api_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
         body: JSON.stringify({ model: model_name, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),

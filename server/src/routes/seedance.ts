@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import getDb from '../db';
 import authMiddleware from '../middleware/auth';
-import { resolveLLMEndpoint } from '../utils/llm-endpoint';
 
 const router = Router();
 const authenticate = authMiddleware;
@@ -319,7 +318,7 @@ router.post('/chat', authenticate, async (req: Request, res: Response) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 120000);
 
-    const response = await fetch(resolveLLMEndpoint(baseUrl), {
+    const response = await fetch(baseUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
