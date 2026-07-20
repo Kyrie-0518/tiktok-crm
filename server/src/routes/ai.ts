@@ -3,6 +3,7 @@ import authMiddleware, { JwtPayload } from '../middleware/auth';
 import getDb from '../db';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveLLMEndpoint } from '../utils/llm-endpoint';
 
 const router = Router();
 
@@ -94,7 +95,7 @@ router.post('/test-config', authMiddleware, async (req: Request, res: Response) 
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
-    const response = await fetch(`${apiBase}/chat/completions`, {
+    const response = await fetch(resolveLLMEndpoint(apiBase), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({ model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
@@ -209,7 +210,7 @@ export async function callChannel(
       body.tool_choice = toolChoice || 'auto';
     }
 
-    const response = await fetch(`${base}/chat/completions`, {
+    const response = await fetch(resolveLLMEndpoint(base), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -341,7 +342,7 @@ router.post('/chat/stream', authMiddleware, async (req: Request, res: Response) 
   try {
     const controller = new AbortController();
 
-    const response = await fetch(`${base}/chat/completions`, {
+    const response = await fetch(resolveLLMEndpoint(base), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

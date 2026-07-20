@@ -1,6 +1,7 @@
 // AI Engine LLM 调用层 — 复用系统 ai_channels 表
 import axios from 'axios';
 import getDb from '../../db';
+import { resolveLLMEndpoint } from '../../utils/llm-endpoint';
 
 interface LLMCallOptions {
   systemPrompt: string;
@@ -28,9 +29,9 @@ export async function callLLM(opts: LLMCallOptions): Promise<string> {
   }
 
   try {
-    // 加上 /chat/completions 路径，与 ai.ts 的调用方式保持一致
-    const baseUrl = apiUrl.replace(/\/+$/, '');
-    const r = await axios.post(`${baseUrl}/chat/completions`, {
+    // 智能识别：用户填完整 URL 或基础地址都支持
+    const endpoint = resolveLLMEndpoint(apiUrl);
+    const r = await axios.post(endpoint, {
       model, messages: [{ role: 'system', content: opts.systemPrompt }, { role: 'user', content: opts.userPrompt }],
       temperature: opts.temperature ?? 0.3, max_tokens: opts.maxTokens ?? 2048,
       response_format: opts.responseFormat ? { type: opts.responseFormat } : undefined,

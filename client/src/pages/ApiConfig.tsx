@@ -404,8 +404,9 @@ export default function ApiConfig() {
                 </Form.Item>
               </Col>
             </Row>
-            <Form.Item name="api_base" label={<span style={{ fontSize: 13, fontWeight: 500 }}>接口地址</span>}>
-              <Input style={inputStyle} placeholder="https://api.deepseek.com/v1" prefix={<LinkOutlined style={{ color: DS.textTertiary }} />} />
+            <Form.Item name="api_base" label={<span style={{ fontSize: 13, fontWeight: 500 }}>提交接口（完整 URL）</span>}
+              extra="例：https://api.deepseek.com/chat/completions（包含 /chat/completions 路径）">
+              <Input style={inputStyle} placeholder="https://api.deepseek.com/chat/completions" prefix={<LinkOutlined style={{ color: DS.textTertiary }} />} />
             </Form.Item>
             <Form.Item name="api_key" label={<span style={{ fontSize: 13, fontWeight: 500 }}>访问密钥</span>}
               extra={channel?.api_key_masked ? `当前密钥: ${channel.api_key_masked}（留空保持不变）` : ''}>
