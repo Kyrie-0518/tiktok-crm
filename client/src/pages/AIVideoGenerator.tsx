@@ -212,12 +212,12 @@ export default function AIVideoGenerator() {
     setGenerating(true); setGenError(''); setProgress(0); setPreviewVideo(null);
     setPipelineSteps([]); setPipelineResult(null);
     try {
-      // Step 1: AI Engine Pipeline
+      // Step 1: AI Engine Pipeline (7 Agent 全链路, 通常需 30~60 秒)
       const engRes = await api.post('/ai-engine/generate', {
         productId: selectedProduct?.id, productImage: productMaterial?.url,
         productName: selectedProduct?.name, userPrompt: prompt,
         model: modelOption, resolution, aspectRatio, duration, count,
-      });
+      }, { timeout: 180000 });
       const result = engRes.data;
       setPipelineSteps(result.steps || []);
       setPipelineResult({ qualityScore: result.qualityScore, totalTokens: result.totalTokens, totalTime: result.totalTime });
@@ -229,7 +229,7 @@ export default function AIVideoGenerator() {
       const r = await api.post('/video-models/generate', {
         prompt: finalPrompt, product_image: productMaterial?.url, reference_image: referenceMaterial?.url,
         model_type: modelOption, model_name: modelOption, resolution, duration, aspect_ratio: aspectRatio, count, voice_enabled: voiceEnabled,
-      });
+      }, { timeout: 180000 });
       clearInterval(pTimer); setProgress(95);
       const vid = r.data?.video_id || r.data?.id;
       if (vid) { await poll(vid); } else if (r.data?.video_url) {
