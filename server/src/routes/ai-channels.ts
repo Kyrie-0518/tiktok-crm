@@ -178,7 +178,7 @@ router.post('/:id/test', authenticate, async (req: Request, res: Response) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(`${channel.api_base.replace(/\/$/, '')}/chat/completions`, {
+    const response = await fetch(channel.api_base, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
