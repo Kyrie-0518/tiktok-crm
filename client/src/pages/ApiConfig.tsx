@@ -127,7 +127,8 @@ export default function ApiConfig() {
     setVideoLoading(true);
     try {
       const res = await api.get('/video-models/configs');
-      const configured = res.data.find((c: any) => c.is_configured !== false) || res.data[0];
+      // 只取真正已配置的（有 model_type 字段的）
+      const configured = res.data.find((c: any) => c.model_type && c.is_configured !== false);
       if (configured) {
         setVideoCfg(configured);
         videoForm.setFieldsValue({
