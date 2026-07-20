@@ -15,7 +15,6 @@ import AIVideoGenerator from './AIVideoGenerator';
 import AIEngineManager from './AIEngineManager';
 import TemplateCenter from './TemplateCenter';
 import TaskHistory from './TaskHistory';
-import VideoModelConfig from './VideoModelConfig';
 import MaterialLibrary from './MaterialLibrary';
 import RawMaterials from './RawMaterials';
 
@@ -68,13 +67,6 @@ const STUDIO_MENU_GROUPS = [
     items: [
       { key: '/ai-studio/raw-materials', icon: <FileImageOutlined />, label: '原料素材' },
       { key: '/ai-studio/material-library', icon: <PictureOutlined />, label: 'AI 素材库' },
-    ],
-  },
-  {
-    key: 'group-models',
-    label: '模型管理',
-    items: [
-      { key: '/ai-studio/video-models', icon: <SettingOutlined />, label: '视频模型配置' },
     ],
   },
 ];
@@ -358,7 +350,6 @@ export default function AIStudioLayout() {
                 <Route path="engine" element={<AIEngineManager />} />
                 <Route path="templates" element={<TemplateCenter />} />
                 <Route path="history" element={<TaskHistory />} />
-                <Route path="video-models" element={<VideoModelConfig />} />
                 <Route path="material-library" element={<MaterialLibrary />} />
                 <Route path="raw-materials" element={<RawMaterials />} />
                 <Route path="*" element={<Navigate to="/ai-studio" replace />} />
