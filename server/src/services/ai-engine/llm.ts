@@ -28,7 +28,9 @@ export async function callLLM(opts: LLMCallOptions): Promise<string> {
   }
 
   try {
-    const r = await axios.post(apiUrl, {
+    // 加上 /chat/completions 路径，与 ai.ts 的调用方式保持一致
+    const baseUrl = apiUrl.replace(/\/+$/, '');
+    const r = await axios.post(`${baseUrl}/chat/completions`, {
       model, messages: [{ role: 'system', content: opts.systemPrompt }, { role: 'user', content: opts.userPrompt }],
       temperature: opts.temperature ?? 0.3, max_tokens: opts.maxTokens ?? 2048,
       response_format: opts.responseFormat ? { type: opts.responseFormat } : undefined,
