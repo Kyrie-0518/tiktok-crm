@@ -104,6 +104,7 @@ const MENU_GROUPS = [
       { key: '/growth-center/diagnosis', icon: <ThunderboltOutlined />, label: '店铺诊断' },
       { key: '/growth-center/history', icon: <FileTextOutlined />, label: '诊断记录' },
       { key: '/growth-center/review', icon: <FundOutlined />, label: 'AI复盘' },
+      { key: '/growth-center/debug', icon: <ControlOutlined />, label: '数据调试', adminOnly: true },
     ],
   },
 ];
