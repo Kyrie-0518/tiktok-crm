@@ -259,7 +259,7 @@ export default function AIVideoGenerator() {
       const pTimer = setInterval(() => setProgress(v => Math.min(v + Math.random() * 6, 88)), 700);
       const r = await api.post('/video-models/generate', {
         prompt: finalPrompt, product_image: productMaterial?.url, reference_image: referenceMaterial?.url,
-        model_type: modelOption, model_name: modelOption, resolution, duration, aspect_ratio: aspectRatio, count, voice_enabled: voiceEnabled,
+        model_type: modelOption, resolution, duration, aspect_ratio: aspectRatio, count, voice_enabled: voiceEnabled,
       }, { timeout: 180000 });
       clearInterval(pTimer); setProgress(95);
       const vid = r.data?.video_id || r.data?.id;
