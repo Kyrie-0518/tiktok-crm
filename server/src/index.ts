@@ -41,6 +41,7 @@ import uploadRoutes from './routes/upload';
 import aiEngineRoutes from './routes/ai-engine';
 import productsTiktokRoutes from './routes/products-tiktok';
 import adCenterRoutes from './routes/ad-center';
+import growthCenterRoutes from './routes/growth-center';
 import { connectToMCPServer } from './services/tiktok-mcp/client';
 import { startFeishuWebSocket } from './routes/bot-feishu-ws';
 import { startTokenScheduler } from './services/tiktok-oauth';
@@ -116,6 +117,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/ai-engine', aiEngineRoutes);
 app.use('/api/products-tiktok', productsTiktokRoutes);
 app.use('/api/ad-center', adCenterRoutes);
+app.use('/api/growth-center', growthCenterRoutes);
 
 // ⚠️ 404 诊断：记录所有未匹配 /api/* 的请求（便于排查前端调错路径）
 app.use('/api', (req, res) => {

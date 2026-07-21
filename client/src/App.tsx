@@ -40,6 +40,10 @@ import AdLogs from './pages/AdLogs';
 import AdCreatives from './pages/AdCreatives';
 import AdBills from './pages/AdBills';
 import DataReports from './pages/DataReports';
+import ShopDiagnosis from './pages/growth-center/ShopDiagnosis';
+import DiagnosisHistory from './pages/growth-center/DiagnosisHistory';
+import AIReview from './pages/growth-center/AIReview';
+import DataDebug from './pages/growth-center/DataDebug';
 
 const { Sider, Content } = Layout;
 
@@ -90,6 +94,16 @@ const MENU_GROUPS = [
       { key: '/finance', icon: <DollarOutlined />, label: '利润核算' },
       { key: '/ad-bills', icon: <PayCircleOutlined />, label: '广告对账' },
       { key: '/data-reports', icon: <BarChartOutlined />, label: '财务统计表' },
+    ],
+  },
+  {
+    key: 'group-growth',
+    label: 'AI增长中心',
+    icon: <RiseOutlined />,
+    items: [
+      { key: '/growth-center/diagnosis', icon: <ThunderboltOutlined />, label: '店铺诊断' },
+      { key: '/growth-center/history', icon: <FileTextOutlined />, label: '诊断记录' },
+      { key: '/growth-center/review', icon: <FundOutlined />, label: 'AI复盘' },
     ],
   },
 ];
@@ -831,6 +845,10 @@ function AppLayout() {
             <Route path="/ad-rules" element={<AdRules />} />
             <Route path="/ad-logs" element={<AdLogs />} />
             <Route path="/ad-creatives" element={<AdCreatives />} />
+            <Route path="/growth-center/diagnosis" element={<ShopDiagnosis />} />
+            <Route path="/growth-center/history" element={<DiagnosisHistory />} />
+            <Route path="/growth-center/review" element={<AIReview />} />
+            <Route path="/growth-center/debug" element={<DataDebug />} />
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/admin/*" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>} />
 <Route path="/kyrie" element={<ProtectedRoute><Kyrie /></ProtectedRoute>} />

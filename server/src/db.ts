@@ -1312,4 +1312,26 @@ initVideoEngineTables(getDb());
   db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('model_type_renamed_v1', '1')").run();
 })();
 
+/* ── AI Growth Center ── */
+(() => {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS growth_diagnoses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT UNIQUE NOT NULL,
+      shop_id TEXT NOT NULL,
+      shop_name TEXT NOT NULL DEFAULT '',
+      status TEXT DEFAULT 'pending',
+      health_score REAL DEFAULT 0,
+      health_grade TEXT DEFAULT 'N/A',
+      executive_summary TEXT DEFAULT '',
+      result_json TEXT DEFAULT '{}',
+      snapshot_json TEXT DEFAULT '{}',
+      error_message TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+})();
+
 export default getDb;
