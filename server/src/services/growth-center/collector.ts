@@ -9,11 +9,11 @@ import { UnifiedData, ShopSnapshot, ProductSnapshot, InventorySnapshot, PricingS
 const PAGE_SIZE = 50;
 
 export async function collectAllData(shopCipher: string, days = 30): Promise<UnifiedData> {
-  // 获取有效 token 和店铺信息
-  const token = await getValidToken(shopCipher);
+  // 获取有效 token 和店铺信息（注意：getValidToken 需要的是 shop_id 主键，不是 cipher）
   const db = getDb();
   const shopRecord = db.prepare('SELECT * FROM tiktok_shops WHERE shop_cipher = ?').get(shopCipher) as any;
   const shopName = shopRecord?.shop_name || shopCipher;
+  const token = shopRecord ? await getValidToken(shopRecord.id) : '';
 
   const auth = {
     app_key: shopRecord?.app_key || process.env.TIKTOK_APP_KEY || '',
