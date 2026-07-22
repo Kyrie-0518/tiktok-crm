@@ -13,3 +13,4 @@ Thumbs.db
 *.pptx
 adrate-*.png
 nodejs_sdk*.zip
+data/corpus/  
