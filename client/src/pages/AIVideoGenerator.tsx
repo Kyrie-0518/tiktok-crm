@@ -329,7 +329,7 @@ export default function AIVideoGenerator() {
 
   /* ════════════════════════════════════ Render ════════════════════════════════════ */
   return (
-    <div style={{ background: T.bg, minHeight: 'calc(100vh - 56px)', overflow: 'hidden' }}>
+    <div style={{ background: T.bg, overflow: 'hidden' }}>
 
       {/* ── Header ── */}
       <div style={{
