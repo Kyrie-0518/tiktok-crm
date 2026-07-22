@@ -54,7 +54,7 @@ export default function ShopDiagnosis() {
         </div>
         <Space>
           <Select placeholder="选择店铺" value={selectedShop} onChange={setSelectedShop} style={{ width: 200 }}
-            options={shops.map((s: any) => ({ value: s.shop_cipher, label: s.shop_name || s.shop_cipher }))} loading={loading} />
+            options={shops.map((s: any) => ({ value: s.shop_cipher || s.id, label: s.name || s.shop_name || s.shop_cipher || `店铺#${s.id}` }))} loading={loading} />
           <Button type="primary" icon={<ThunderboltOutlined />} onClick={startDiagnosis} loading={diagnosing} style={{ borderRadius: 8, background: '#8B5CF6', borderColor: '#8B5CF6' }}>
             开始诊断
           </Button>
