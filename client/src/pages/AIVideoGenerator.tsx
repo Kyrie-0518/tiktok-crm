@@ -12,6 +12,7 @@ import {
 import api from '../api';
 import { formatDateTime, nowISO } from '../utils/time';
 import { PageHeader } from '../components/design-system';
+import { enhanceImage, enhanceImages, uploadBlob } from '../utils/image-enhancer';
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -217,10 +218,36 @@ export default function AIVideoGenerator() {
     setPipelineSteps(allAgents.map(a => ({ agent: a, status: 'pending' as const })));
     setPipelineResult(null);
 
+    // Step 0: 图片增强 — Seedance 要求图片宽度 >= 300px，太小就放大到 720px
+    let productImageUrl = productMaterial?.url || '';
+    let referenceImageUrl = referenceMaterial?.url || '';
+    try {
+      if (productImageUrl) {
+        const r = await enhanceImage(productImageUrl, 720);
+        if (r.enhanced) {
+          productImageUrl = await uploadBlob(r.url, 'product.png');
+          console.log(`[image-enhance] 商品图 ${r.width}×${r.height} → 增强上传`);
+        } else {
+          console.log(`[image-enhance] 商品图 ${r.width}×${r.height} 合格`);
+        }
+      }
+      if (referenceImageUrl) {
+        const r = await enhanceImage(referenceImageUrl, 720);
+        if (r.enhanced) {
+          referenceImageUrl = await uploadBlob(r.url, 'reference.png');
+          console.log(`[image-enhance] 参考图 ${r.width}×${r.height} → 增强上传`);
+        } else {
+          console.log(`[image-enhance] 参考图 ${r.width}×${r.height} 合格`);
+        }
+      }
+    } catch (e: any) {
+      console.warn('[image-enhance] 图片增强失败，使用原图:', e.message);
+    }
+
     try {
       // Step 1: 启动 AI Engine Pipeline（异步模式，立即返回 taskId）
       const engRes = await api.post('/ai-engine/generate', {
-        productId: selectedProduct?.id, productImage: productMaterial?.url,
+        productId: selectedProduct?.id, productImage: productImageUrl,
         productName: selectedProduct?.name, userPrompt: prompt,
         model: modelOption, resolution, aspectRatio, duration, count,
       }, { timeout: 15000 });
@@ -258,7 +285,7 @@ export default function AIVideoGenerator() {
       setProgress(20);
       const pTimer = setInterval(() => setProgress(v => Math.min(v + Math.random() * 6, 88)), 700);
       const r = await api.post('/video-models/generate', {
-        prompt: finalPrompt, product_image: productMaterial?.url, reference_image: referenceMaterial?.url,
+        prompt: finalPrompt, product_image: productImageUrl, reference_image: referenceImageUrl,
         model_type: modelOption, resolution, duration, aspect_ratio: aspectRatio, count, voice_enabled: voiceEnabled,
       }, { timeout: 180000 });
       clearInterval(pTimer); setProgress(95);
