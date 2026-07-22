@@ -1,11 +1,111 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
+import https from 'https';
+import http from 'http';
 import getDb from '../../db';
 import authMiddleware from '../../middleware/auth';
 import { getModelType, buildEndpoint } from './types';
 import { getUserModelConfig, downloadVideoToLocal } from './db-helpers';
 
 const router = Router();
+
+/**
+ * 检查图片尺寸（兜底，避免 Seedance 拒绝）
+ * 支持 data: / /uploads/ / http(s)://
+ * @returns { ok: true } 或 { ok: false, width, height }
+ */
+async function checkImageSize(url: string): Promise<{ ok: boolean; width: number; height: number; error?: string }> {
+  if (!url) return { ok: true, width: 0, height: 0 };
+
+  try {
+    let buffer: Buffer;
+    if (url.startsWith('data:')) {
+      // data:image/png;base64,xxx
+      const m = url.match(/^data:image\/[^;]+;base64,(.+)$/);
+      if (!m) return { ok: true, width: 0, height: 0 };
+      buffer = Buffer.from(m[1], 'base64');
+    } else if (url.startsWith('/uploads/') || url.includes('/uploads/')) {
+      // 本地文件 — 路径兼容 Windows 和 Linux
+      const m = url.match(/\/uploads\/(.+)/);
+      if (!m) return { ok: true, width: 0, height: 0 };
+      const fn = m[1];
+      // 尝试多个可能路径
+      const candidates = [
+        path.resolve('data', 'uploads', fn),
+        path.resolve('/app/data/uploads', fn),
+        path.resolve('/opt/tiktok-crm/data/uploads', fn),
+      ];
+      let filePath = '';
+      for (const p of candidates) {
+        if (fs.existsSync(p)) { filePath = p; break; }
+      }
+      if (!filePath) return { ok: true, width: 0, height: 0 };
+      buffer = fs.readFileSync(filePath);
+    } else if (url.startsWith('http://') || url.startsWith('https://')) {
+      // 远程 URL — 拉前 64KB 足够读到尺寸头
+      buffer = await new Promise<Buffer>((resolve, reject) => {
+        const lib = url.startsWith('https') ? https : http;
+        lib.get(url, (res) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c) => {
+            chunks.push(c);
+            if (Buffer.concat(chunks).length > 65536) res.destroy();
+          });
+          res.on('end', () => resolve(Buffer.concat(chunks)));
+          res.on('error', reject);
+        }).on('error', reject);
+      });
+    } else {
+      return { ok: true, width: 0, height: 0 };
+    }
+
+    // 解析 PNG / JPEG 头
+    const dims = readImageDimensions(buffer);
+    if (!dims) return { ok: true, width: 0, height: 0 };
+    return {
+      ok: dims.width >= 300,
+      width: dims.width,
+      height: dims.height,
+    };
+  } catch (e: any) {
+    // 检测失败不阻塞主流程，让 Seedance 自己判断
+    return { ok: true, width: 0, height: 0, error: e.message };
+  }
+}
+
+/**
+ * 纯 JS 解析 PNG/JPEG 尺寸（无外部依赖）
+ */
+function readImageDimensions(buf: Buffer): { width: number; height: number } | null {
+  // PNG: 8 byte signature + IHDR chunk
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+    if (buf.length >= 24) {
+      const w = buf.readUInt32BE(16);
+      const h = buf.readUInt32BE(20);
+      return { width: w, height: h };
+    }
+  }
+  // JPEG: 扫描 marker
+  if (buf[0] === 0xFF && buf[1] === 0xD8) {
+    let offset = 2;
+    while (offset < buf.length) {
+      if (buf[offset] !== 0xFF) return null;
+      const marker = buf[offset + 1];
+      // SOFn markers (0xC0 ~ 0xCF, except C4, C8, CC)
+      if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+        const segLen = buf.readUInt16BE(offset + 2);
+        const h = buf.readUInt16BE(offset + 5);
+        const w = buf.readUInt16BE(offset + 7);
+        return { width: w, height: h };
+      }
+      // 跳到下一段
+      const segLen = buf.readUInt16BE(offset + 2);
+      offset += 2 + segLen;
+    }
+  }
+  return null;
+}
 
 // 辅助：将本地文件URL转为 base64 data URI
 async function resolveImageUrl(url: string): Promise<string> {
@@ -63,6 +163,25 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     let requestBody: any;
 
     if (model_type === 'default') {
+      // 兜底：服务端再次校验图片尺寸，避免前端增强未生效导致 Seedance 拒绝
+      const allImages: Array<{ name: string; url: string }> = [];
+      if (product_image) allImages.push({ name: '商品图', url: product_image });
+      if (reference_image) allImages.push({ name: '参考图', url: reference_image });
+      if (reference_images && reference_images.length > 0) {
+        reference_images.forEach((u: string, i: number) => u && allImages.push({ name: `补充图${i + 1}`, url: u }));
+      }
+      for (const img of allImages) {
+        const check = await checkImageSize(img.url);
+        if (check.ok === false) {
+          return res.status(400).json({
+            error: `${img.name}尺寸不足（${check.width}×${check.height}），请使用宽 ≥ 300px 的图片，或在生成前先在前端增强。`,
+            field: img.name,
+            width: check.width,
+            height: check.height,
+          });
+        }
+      }
+
       // 所有图片都放入 content 数组（按顺序：商品图 → 参考图 → 补充图 → 文字）
       const content: any[] = [];
 

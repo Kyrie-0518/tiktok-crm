@@ -218,27 +218,19 @@ export default function AIVideoGenerator() {
     setPipelineSteps(allAgents.map(a => ({ agent: a, status: 'pending' as const })));
     setPipelineResult(null);
 
-    // Step 0: 图片增强 — Seedance 要求图片宽度 >= 300px，太小就放大到 720px
+    // Step 0: 图片增强 — Seedance 要求图片宽度 >= 300px，太小就放大到 720px（base64 dataURL，不依赖上传接口）
     let productImageUrl = productMaterial?.url || '';
     let referenceImageUrl = referenceMaterial?.url || '';
     try {
       if (productImageUrl) {
         const r = await enhanceImage(productImageUrl, 720);
-        if (r.enhanced) {
-          productImageUrl = await uploadBlob(r.url, 'product.png');
-          console.log(`[image-enhance] 商品图 ${r.width}×${r.height} → 增强上传`);
-        } else {
-          console.log(`[image-enhance] 商品图 ${r.width}×${r.height} 合格`);
-        }
+        productImageUrl = r.url;
+        console.log(`[image-enhance] 商品图 ${r.width}×${r.height}${r.enhanced ? ' (已增强)' : ''}`);
       }
       if (referenceImageUrl) {
         const r = await enhanceImage(referenceImageUrl, 720);
-        if (r.enhanced) {
-          referenceImageUrl = await uploadBlob(r.url, 'reference.png');
-          console.log(`[image-enhance] 参考图 ${r.width}×${r.height} → 增强上传`);
-        } else {
-          console.log(`[image-enhance] 参考图 ${r.width}×${r.height} 合格`);
-        }
+        referenceImageUrl = r.url;
+        console.log(`[image-enhance] 参考图 ${r.width}×${r.height}${r.enhanced ? ' (已增强)' : ''}`);
       }
     } catch (e: any) {
       console.warn('[image-enhance] 图片增强失败，使用原图:', e.message);
