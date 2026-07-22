@@ -575,7 +575,7 @@ export default function Kyrie() {
                         <div className="wb-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
                         {msg.role === 'assistant' && (
                           <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${T.cardBorder}`, textAlign: 'right' }}>
-                            <Text style={{ fontSize: 10, color: '#c5c0b8', fontStyle: 'italic', marginRight: 12 }}>[AI]</Text>
+                            <Text style={{ fontSize: 10, color: '#c5c0b8', fontStyle: 'italic', marginRight: 12 }}>内容由AI生成</Text>
                             <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => navigator.clipboard.writeText(msg.content)}
                               style={{ color: T.textTertiary, fontSize: 12 }}>复制</Button>
                           </div>

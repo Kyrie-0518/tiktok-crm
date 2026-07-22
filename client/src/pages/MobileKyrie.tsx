@@ -210,7 +210,7 @@ export default function MobileKyrie() {
                   )}
                   <div className="wb-mobile"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
                   {msg.role === 'assistant' && (
-                    <Text style={{ fontSize: 10, color: '#c5c0b8', fontStyle: 'italic', display: 'block', marginTop: 6 }}>[AI]</Text>
+                    <Text style={{ fontSize: 10, color: '#c5c0b8', fontStyle: 'italic', display: 'block', marginTop: 6 }}>内容由AI生成</Text>
                   )}
                 </div>
               </div>
