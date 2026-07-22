@@ -209,6 +209,9 @@ export default function MobileKyrie() {
                     </div>
                   )}
                   <div className="wb-mobile"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
+                  {msg.role === 'assistant' && (
+                    <Text style={{ fontSize: 10, color: '#c5c0b8', fontStyle: 'italic', display: 'block', marginTop: 6 }}>[AI]</Text>
+                  )}
                 </div>
               </div>
             );
