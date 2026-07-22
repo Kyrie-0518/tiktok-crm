@@ -1,0 +1,102 @@
+<!-- dup_r36 -->
+// Cloudflare Worker — TikTok Ads OAuth 中继（纯 JavaScript 版本）
+// 部署：粘贴到 Worker → Save and Deploy
+// 设置：Settings → Variables 加 TIKTOK_RELAY_TOKEN（任意长字符串）
+// Worker URL 形如：https://tiktok-relay.你的子域名.workers.dev
+
+async function exchangeAuthCode(appId, secret, authCode) {
+  const res = await fetch('https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      app_id: appId,
+      secret: secret,
+      auth_code: authCode,
+      grant_type: 'authorization_code',
+    }),
+  });
+  return res.json();
+}
+
+async function relayRequest(path, method, payload) {
+  const tiktokUrl = 'https://business-api.tiktok.com' + path;
+  const headers = { 'Content-Type': 'application/json' };
+  if (payload && payload.access_token) {
+    headers['Access-Token'] = payload.access_token;
+  }
+  const opts = { method: method || 'GET', headers };
+  if (payload && method && method !== 'GET') {
+    opts.body = JSON.stringify(payload);
+  }
+  const res = await fetch(tiktokUrl, opts);
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch (e) { json = { raw: text }; }
+  return { status: res.status, body: json };
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    // CORS 预检
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      });
+    }
+
+    // 鉴权
+    const authHeader = request.headers.get('Authorization') || '';
+    const expectedToken = env.TIKTOK_RELAY_TOKEN || 'change-me';
+    if (authHeader !== 'Bearer ' + expectedToken) {
+      return new Response(JSON.stringify({ success: false, error: 'unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    try {
+      const body = await request.json();
+
+      // 1. 换 token
+      if (body.action === 'exchange_code') {
+        if (!body.app_id || !body.secret || !body.auth_code) {
+          return new Response(JSON.stringify({ success: false, error: 'missing app_id/secret/auth_code' }), {
+            status: 400, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        const result = await exchangeAuthCode(body.app_id, body.secret, body.auth_code);
+        return new Response(JSON.stringify({ success: true, data: result }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // 2. 通用 TikTok API 转发（GET/POST 都支持）
+      if (body.action === 'relay') {
+        if (!body.path) {
+          return new Response(JSON.stringify({ success: false, error: 'missing path' }), {
+            status: 400, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        const result = await relayRequest(body.path, body.method, body.payload);
+        return new Response(JSON.stringify({ success: true, status: result.status, data: result.body }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: false, error: 'unknown action: ' + body.action }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ success: false, error: e.message || String(e) }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  },
+};
+
+<!-- end -->

@@ -1,0 +1,134 @@
+<!-- dup_r34 -->
+import { Router, Request, Response } from 'express';
+import getDb from '../../db';
+import authMiddleware from '../../middleware/auth';
+import { FormulaItem, DEFAULT_FORMULAS } from './shared';
+
+const router = Router();
+
+// GET /formulas
+router.get('/', authMiddleware, (_req: Request, res: Response) => {
+  const db = getDb();
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'finance_formulas'").get() as any;
+  if (row) {
+    try {
+      const parsed = JSON.parse(row.value);
+      if (!Array.isArray(parsed)) {
+        const migrated = migrateOldFormulas(parsed);
+        db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('finance_formulas', ?)").run(JSON.stringify(migrated));
+        res.json(migrated);
+      } else {
+        res.json(parsed);
+      }
+      return;
+    } catch {}
+  }
+  res.json(DEFAULT_FORMULAS);
+});
+
+// PUT /formulas
+router.put('/', authMiddleware, (req: Request, res: Response) => {
+  const formulas: FormulaItem[] = req.body;
+  if (!Array.isArray(formulas)) return res.status(400).json({ error: '公式格式错误' });
+
+  const names = formulas.map(f => f.name);
+  const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+  if (dupes.length > 0) return res.status(400).json({ error: `公式名称重复：${dupes.join('、')}` });
+
+  for (const f of formulas) {
+    if (!f.name || !f.name.trim()) return res.status(400).json({ error: '公式名称不能为空' });
+    if (!f.expression || !f.expression.trim()) return res.status(400).json({ error: `公式「${f.name}」的表达式不能为空` });
+  }
+
+  const db = getDb();
+  const costItems = db.prepare('SELECT name FROM cost_items WHERE is_active = 1').all() as any[];
+  const costItemNames = costItems.map((ci: any) => ci.name);
+
+  const cycleError = detectCycle(formulas, costItemNames);
+  if (cycleError) return res.status(400).json({ error: cycleError });
+
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('finance_formulas', ?)").run(JSON.stringify(formulas));
+  res.json({ success: true });
+});
+
+// Migrate old Record<string, string> format to new FormulaItem[]
+export function migrateOldFormulas(old: Record<string, string>): FormulaItem[] {
+  const keyToName: Record<string, string> = {
+    gross_margin: '毛利率',
+    breakeven_roi: '保本ROI',
+    total_investment: '总投入',
+    net_profit: '净利润',
+    overall_roi: '整体ROI',
+  };
+  const result: FormulaItem[] = [];
+  let order = 1;
+  for (const [key, expr] of Object.entries(old)) {
+    const name = keyToName[key] || key;
+    const isPercent = key.includes('roi') || key.includes('margin');
+    const defaultCurrency = name === '净利润' ? 'MYR' : 'RMB';
+    result.push({ name, expression: expr, format: isPercent ? 'percentage' : 'number', currency: defaultCurrency, sort_order: order++ });
+  }
+  return result;
+}
+
+// Cycle & forward-reference detection
+function detectCycle(formulas: FormulaItem[], costItemNames: string[] = []): string | null {
+  const nameToIdx = new Map<string, number>();
+  formulas.forEach((f, i) => nameToIdx.set(f.name, f.sort_order));
+
+  for (const f of formulas) {
+    const refs = extractVariableRefs(f.expression);
+    for (const ref of refs) {
+      if (isBaseVariable(ref, costItemNames)) continue;
+      if (!nameToIdx.has(ref)) return `公式「${f.name}」引用了不存在的变量「${ref}」`;
+      if (nameToIdx.get(ref)! >= f.sort_order) return `公式「${f.name}」引用了尚未计算的公式「${ref}」（引用顺序错误）`;
+    }
+  }
+  return null;
+}
+
+function extractVariableRefs(expr: string): string[] {
+  const matches = expr.match(/[\u4e00-\u9fffA-Za-z0-9]+/g) || [];
+  return [...new Set(matches.filter(m => !/^\d+(\.\d+)?$/.test(m)))];
+}
+
+function isBaseVariable(name: string, costItemNames: string[] = []): boolean {
+  const base = ['售价', '采购成本', '产品重量', 'MYR成本合计RMB', 'MYR兑RMB汇率'];
+  return base.includes(name) || costItemNames.includes(name);
+}
+
+// ========== Formula Evaluator ==========
+import { CalcContext } from './shared';
+
+export function evaluateFormula(expression: string, ctx: CalcContext): number {
+  let expr = expression;
+  const keys = Object.keys(ctx).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    expr = expr.replace(regex, String(ctx[key]));
+  }
+  if (!/^[\d\s+\-*/().%]+$/.test(expr)) return 0;
+  try {
+    const result = new Function(`"use strict"; return (${expr})`)();
+    return typeof result === 'number' && isFinite(result) ? Math.round(result * 100) / 100 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Get formulas from DB or return defaults */
+export function getFormulas(db: any): FormulaItem[] {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'finance_formulas'").get() as any;
+  if (row) {
+    try {
+      const parsed = JSON.parse(row.value);
+      if (Array.isArray(parsed)) return parsed;
+      return migrateOldFormulas(parsed);
+    } catch {}
+  }
+  return DEFAULT_FORMULAS;
+}
+
+export default router;
+
+<!-- end -->

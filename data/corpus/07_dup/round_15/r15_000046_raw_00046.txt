@@ -1,0 +1,146 @@
+<!-- dup_r15 -->
+import { Router, Request, Response } from 'express';
+import getDb from '../../db';
+import authMiddleware from '../../middleware/auth';
+import { VIDEO_MODEL_TYPES, getModelType } from './types';
+import { getUserModelConfigs, getUserModelConfig, saveUserModelConfig, updateTestResult } from './db-helpers';
+
+const router = Router();
+
+// GET /types
+router.get('/types', (_, res: Response) => {
+  res.json(VIDEO_MODEL_TYPES);
+});
+
+// GET /configs
+router.get('/', (req: Request, res: Response) => {
+  const userId = (req as any).user?.userId;
+  const configs = getUserModelConfigs(userId);
+
+  const result = configs.map(cfg => ({
+    ...cfg,
+    api_key_masked: cfg.api_key ? `${cfg.api_key.substring(0, 8)}...${cfg.api_key.substring(cfg.api_key.length - 4)}` : '',
+    model_info: getModelType(cfg.model_type) || { name: cfg.model_type, icon: '❓', description: '' },
+    extra_params: typeof cfg.extra_params === 'string' ? JSON.parse(cfg.extra_params || '{}') : cfg.extra_params,
+  }));
+
+  const configuredTypes = new Set(configs.map(c => c.model_type));
+  const availableTypes = VIDEO_MODEL_TYPES.filter(t => !configuredTypes.has(t.type)).map(t => ({ ...t, is_configured: false }));
+
+  res.json([...result, ...availableTypes]);
+});
+
+// GET /available（必须在 /:type 之前，否则会被参数路由匹配）
+router.get('/available', (req: Request, res: Response) => {
+  const userId = (req as any).user?.userId;
+  const configs = getUserModelConfigs(userId);
+  const enabledConfigs = configs.filter((c: any) => c.api_key && c.status === 'enabled');
+  res.json({
+    has_available: enabledConfigs.length > 0,
+    configs: enabledConfigs.map((c: any) => ({ model_type: c.model_type, model_name: c.model_name, model_info: getModelType(c.model_type) })),
+  });
+});
+
+// GET /configs/:type
+router.get('/:type', (req: Request, res: Response) => {
+  const userId = (req as any).user?.userId;
+  const modelType = req.params.type;
+  const config = getUserModelConfig(userId, modelType);
+
+  if (config) {
+    res.json({ ...config, api_key_masked: config.api_key ? `${config.api_key.substring(0, 8)}...${config.api_key.substring(config.api_key.length - 4)}` : '', model_info: getModelType(modelType), extra_params: typeof config.extra_params === 'string' ? JSON.parse(config.extra_params || '{}') : config.extra_params });
+  } else {
+    const modelInfo = getModelType(modelType);
+    res.json({ user_id: userId, model_type: modelType, api_url: modelInfo?.defaultEndpoint || '', api_key: '', api_key_masked: '', model_name: '', extra_params: {}, status: 'disabled', last_tested_at: null, last_test_result: '', last_test_message: '', model_info: modelInfo || { name: modelType, icon: '❓', description: '' } });
+  }
+});
+
+// PUT /configs/:type
+router.put('/:type', (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.userId;
+    const modelType = req.params.type;
+    const { api_url, query_api_url, api_key, model_name, extra_params, status } = req.body as any;
+    if (!api_url) return res.status(400).json({ error: '请输入 API 接口地址' });
+    if (!model_name) return res.status(400).json({ error: '请输入模型名称' });
+
+    saveUserModelConfig(userId, modelType, { api_url, query_api_url: query_api_url || '', api_key: api_key || '', model_name, extra_params: extra_params || {}, status });
+    res.json({ success: true, message: '配置保存成功' });
+  } catch (e: any) {
+    console.error('[video-models PUT]', e.message);
+    res.status(500).json({ error: e.message || '保存失败' });
+  }
+});
+
+// DELETE /configs/:type
+router.delete('/:type', (req: Request, res: Response) => {
+  const userId = (req as any).user?.userId;
+  const r = getDb().prepare('DELETE FROM video_model_configs WHERE user_id = ? AND model_type = ?').run(userId, req.params.type);
+  if (r.changes === 0) return res.status(404).json({ error: '配置不存在' });
+  res.json({ success: true, message: '配置已删除' });
+});
+
+// POST /configs/:type/test
+router.post('/:type/test', async (req: Request, res: Response, next) => {
+  try {
+  const userId = (req as any).user?.userId;
+  const modelType = req.params.type;
+  const { api_url, api_key, model_name } = req.body as any;
+  const config = getUserModelConfig(userId, modelType);
+  const modelInfo = getModelType(modelType);
+  if (!modelInfo) return res.status(400).json({ success: false, error: `不支持的模型类型: ${modelType}` });
+
+  const url = api_url || config?.api_url;
+  const key = api_key || config?.api_key;
+  const model = model_name || config?.model_name;
+
+  if (!url || !key || !model) return res.json({ success: false, error: '请先保存 API 配置（包含接口地址、密钥和模型名称）' });
+
+  const baseUrl = url.replace(/\/+$/, '');
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+
+    if (modelType === 'default') {
+      const response = await fetch(baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ model: model.toLowerCase(), duration: 5, ratio: '16:9', content: [{ type: 'text', text: 'test' }] }), signal: controller.signal });
+      clearTimeout(timer);
+      if (response.ok) { updateTestResult(userId, modelType, 'success', 'API 接入正常'); res.json({ success: true, message: `${modelInfo.name} API 接入正常` }); }
+      else if (response.status === 400) {
+        const data = await response.json().catch(() => ({}));
+        const errMsg = data.error?.message || data.message || '';
+        if (errMsg.includes('does not exist') || errMsg.includes('not found')) { updateTestResult(userId, modelType, 'failed', errMsg); res.json({ success: false, error: `模型不存在：${errMsg}` }); }
+        else { updateTestResult(userId, modelType, 'success', 'API 密钥验证通过'); res.json({ success: true, message: `${modelInfo.name} API 密钥验证通过` }); }
+      } else {
+        const errText = await response.text().catch(() => ''); let errMsg = `HTTP ${response.status}`;
+        try { const d = JSON.parse(errText); errMsg = d.error?.message || d.message || errMsg; } catch {}
+        updateTestResult(userId, modelType, 'failed', errMsg);
+        if (response.status === 401) res.json({ success: false, error: '密钥错误：请检查 API Key 是否正确', detail: errMsg });
+        else res.json({ success: false, error: `连接失败：${errMsg}`, detail: errMsg });
+      }
+    } else if (modelType === 'kling') {
+      const response = await fetch(`${baseUrl}/v1/t2i`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ model, task_type: 'text2video', prompt: 'hi' }), signal: controller.signal });
+      clearTimeout(timer);
+      if (response.ok || response.status === 400) { updateTestResult(userId, modelType, 'success', 'API 密钥验证通过'); res.json({ success: true, message: `${modelInfo.name} API 密钥验证通过` }); }
+      else { const errText = await response.text().catch(() => ''); updateTestResult(userId, modelType, 'failed', errText); res.json({ success: false, error: `连接失败：${errText}`, detail: errText }); }
+    } else {
+      const response = await fetch(`${baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ ...modelInfo.testPrompt, model }), signal: controller.signal });
+      clearTimeout(timer);
+      if (response.ok) { updateTestResult(userId, modelType, 'success', 'API 接入正常'); res.json({ success: true, message: `${modelInfo.name} API 接入正常` }); }
+      else { const errText = await response.text().catch(() => ''); updateTestResult(userId, modelType, 'failed', errText); res.json({ success: false, error: `连接失败：${errText}`, detail: errText }); }
+    }
+  } catch (e: any) {
+    const errMsg = e.name === 'AbortError' ? '连接超时（30秒）' : `网络异常：${e.message}`;
+    updateTestResult(userId, modelType, 'failed', errMsg);
+    res.json({ success: false, error: errMsg });
+  }
+  } catch (outerErr: any) {
+    console.error('[VideoModels/Test] Unhandled error:', outerErr?.message, outerErr?.stack);
+    next(outerErr);
+  }
+});
+
+
+export default router;
+
+
+<!-- end -->

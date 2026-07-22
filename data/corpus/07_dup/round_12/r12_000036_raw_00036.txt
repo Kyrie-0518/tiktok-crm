@@ -1,0 +1,51 @@
+<!-- dup_r12 -->
+import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { authMiddleware } from '../middleware/auth';
+import { auditLog } from '../middleware/audit';
+
+const router = Router();
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'data', 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+    cb(null, `${Date.now()}_${base}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (_req, file, cb) => {
+    const ok = /^image\/(png|jpe?g|gif|webp|bmp)$/i.test(file.mimetype);
+    cb(null, ok);
+  },
+});
+
+// POST /api/upload/image — 单张图片上传（FormData: image）
+router.post('/image', authMiddleware, upload.single('image'), (req: Request, res: Response) => {
+  if (!req.file) return res.status(400).json({ error: '未收到文件' });
+  const filename = req.file.filename;
+  const url = `/uploads/${filename}`;
+  auditLog(req, 'upload', 'image', filename);
+  res.json({ success: true, url, filename, size: req.file.size, mimetype: req.file.mimetype });
+});
+
+// POST /api/upload/multiple — 多张上传（FormData: images[]）
+router.post('/multiple', authMiddleware, upload.array('images', 10), (req: Request, res: Response) => {
+  const files = (req.files as Express.Multer.File[]) || [];
+  const items = files.map(f => ({ url: `/uploads/${f.filename}`, filename: f.filename, size: f.size, mimetype: f.mimetype }));
+  auditLog(req, 'upload', 'image', files.map(f => f.filename).join(','));
+  res.json({ success: true, items });
+});
+
+export default router;
+
+<!-- end -->

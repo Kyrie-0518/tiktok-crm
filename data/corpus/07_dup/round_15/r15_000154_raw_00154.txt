@@ -1,0 +1,136 @@
+<!-- dup_r15 -->
+# 移动端「欧文」独立入口方案
+
+> 创建日期：2026-07-08
+> 状态：方案设计中，尚未开发
+
+---
+
+## 一、目标
+
+后期配置好全套系统后，用户可以在手机端通过扫码快速打开欧文智能体，在手机上完成所有日常操作。
+
+## 二、核心思路
+
+```
+PC端系统设置 → 生成二维码（含 token）
+     ↓
+手机扫码 → 浏览器打开 https://你的域名/m/owen?token=xxx
+     ↓
+自动登录 → 全屏聊天界面 → 添加到主屏幕 = 类App体验
+```
+
+## 三、技术方案
+
+### "某个东西" = 二维码 + PWA
+
+| 环节 | 实现内容 | 难度 |
+|---|---|---|
+| **1. 二维码生成** | 在系统设置页加一个「生成移动端入口」按钮，生成带 token 的二维码 | ⭐ 低 |
+| **2. Token 自动登录** | `/m/owen?token=xxx` 路由，URL 带一次性/长效 token，自动登录 | ⭐ 低 |
+| **3. 移动端独立界面** | 创建 `/m/owen` 移动端页面，只显示聊天对话界面（无侧边栏/菜单） | ⭐⭐ 中 |
+| **4. PWA 化** | `manifest.json` + Service Worker，让用户「添加到主屏幕」变成类 App | ⭐ 低 |
+| **5. 移动端聊天 UI** | 适配触屏操作、语音输入按钮（可选）、底部固定输入框 | ⭐⭐ 中 |
+
+### 不推荐的做法
+
+| 方案 | 原因 |
+|---|---|
+| 微信小程序 | 需要审核、备案、微信生态绑定，太重 |
+| 独立 App（React Native） | 维护两套代码，太重 |
+| 独立域名/子域名 | 没有必要，PWA 就够了 |
+
+## 四、预估工作量
+
+总计 **1-2 天**：
+
+| 任务 | 耗时 |
+|---|---|
+| PWA 配置 + manifest.json + Service Worker | 1 小时 |
+| 二维码生成（qrcode.react） | 0.5 小时 |
+| `/m/owen` 移动端页面（触屏聊天 UI） | 3-4 小时 |
+| Token 自动登录机制 | 1 小时 |
+| 测试 + 调优 | 2 小时 |
+
+## 五、需要创建/修改的文件
+
+| 文件 | 说明 |
+|---|---|
+| `client/public/manifest.json` | PWA manifest 配置 |
+| `client/public/sw.js` | Service Worker（离线缓存） |
+| `client/src/pages/MobileOwen.tsx` | 移动端欧文聊天界面（独立，无侧边栏） |
+| `client/src/App.tsx` | 添加 `/m/owen` 路由 |
+| `client/src/pages/SystemSettings.tsx` | 添加二维码生成区域 |
+| `server/src/routes/auth.ts` | 生成一次性/长效移动端 token 接口 |
+
+## 六、Token 机制设计
+
+```
+用户点击「生成移动端入口」
+  → 后端生成 token（JWT，有效期 30 天）
+  → 前端用 QRCord 生成二维码图片
+  → 二维码 URL: https://域名/m/owen?token=xxx
+
+手机扫码
+  → 浏览器打开 /m/owen?token=xxx
+  → 页面读取 token，调用 /api/auth/mobile-login
+  → 后端验证 token，返回 JWT + 用户信息
+  → 前端存储 JWT，进入聊天界面
+```
+
+### Token 安全策略
+- Token 有效期可配置（默认 30 天）
+- 支持在系统设置页「撤销」已生成的 token
+- 每个用户同时只能有 1 个活跃的移动端 token
+- 重新生成时旧的自动失效
+
+## 七、移动端 UI 设计要点
+
+- **全屏沉浸式**：无顶部导航、无侧边栏
+- **底部固定**：输入框固定在底部，键盘弹出时自动上移
+- **触摸优化**：按钮最小 44px 点击区域
+- **语音输入**：iOS/Android 原生语音按钮（`<input type="text" x-webkit-speech>`）
+- **消息气泡**：左对齐（AI 回复）、右对齐（用户输入）
+- **快捷操作**：预设快捷菜单按钮（查询订单 / 今日数据 / 创建任务等）
+
+## 八、参考代码片段
+
+### QRCord 生成
+```tsx
+import QRCode from 'qrcode.react';
+
+<QRCode
+  value={`https://你的域名/m/owen?token=${token}`}
+  size={200}
+  level="H"
+  includeMargin
+/>
+```
+
+### PWA manifest.json
+```json
+{
+  "name": "虾掌柜 · 欧文",
+  "short_name": "欧文",
+  "start_url": "/m/owen",
+  "display": "standalone",
+  "background_color": "#f5f3f0",
+  "theme_color": "#2563eb",
+  "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+}
+```
+
+---
+
+## 九、后续扩展方向
+
+- 桌面端通知（Web Push API）：新订单/异常告警推送
+- 离线模式：Service Worker 缓存最近对话记录
+- Widget 小组件：手机桌面直接显示今日数据
+- 语音助手：接入手机原生语音识别
+
+---
+
+**文档版本**：v1.0 | **关联模块**：欧文智能体 / 系统设置
+
+<!-- end -->

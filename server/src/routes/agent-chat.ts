@@ -6,6 +6,8 @@ import {
   loadKnowledgeBase, Channel
 } from './ai';
 import * as Ads from '../services/tiktok-ads';
+import { moderationMiddleware } from '../middleware/content-moderation';
+import { logModelCall } from '../services/model-call-log';
 
 const router = Router();
 
@@ -671,7 +673,7 @@ export async function agentLoop(channels: Channel[], userQuery: string): Promise
 // ══════════════════════════════════════════════════════════════
 
 // POST /api/agent/chat
-router.post('/chat', authMiddleware, async (req: Request, res: Response) => {
+router.post('/chat', authMiddleware, moderationMiddleware('owen'), async (req: Request, res: Response) => {
   const { query } = req.body;
   if (!query || typeof query !== 'string') {
     return res.status(400).json({ error: '请输入有效的查询内容' });
@@ -699,6 +701,19 @@ router.post('/chat', authMiddleware, async (req: Request, res: Response) => {
       `).run('agent_chat', query.slice(0, 100), result.report, JSON.stringify(result.toolCalls));
     } catch { /* 静默，不影响响应 */ }
 
+    // 记录模型调用日志（备案合规）
+    logModelCall({
+      userId: (req as any).user?.userId || 0,
+      username: (req as any).user?.username || '',
+      module: 'owen',
+      modelName: channels[0]?.model || 'deepseek',
+      inputPrompt: query.trim(),
+      outputContent: result.report,
+      latencyMs: latency,
+      ip: req.ip || '',
+      userAgent: req.headers['user-agent'] || '',
+      status: 'success',
+    });
     res.json({
       success: true,
       query,

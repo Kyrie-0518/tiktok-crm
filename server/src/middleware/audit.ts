@@ -48,12 +48,12 @@ export function auditMiddleware(req: Request, res: Response, next: NextFunction)
   next();
 }
 
-/** 启动审计日志30天自动清理 */
+/** 启动审计日志180天自动清理（备案合规：不少于6个月） */
 export function startAuditLogCleanup(): void {
   const doCleanup = () => {
     try {
       const db = getDb();
-      const result = db.prepare("DELETE FROM audit_logs WHERE created_at < datetime('now', '-30 days')").run();
+      const result = db.prepare("DELETE FROM audit_logs WHERE created_at < datetime('now','localtime', '-180 days')").run();
       if (result.changes > 0) {
         console.log(`[AuditLog] 清理了 ${result.changes} 条过期审计日志`);
       }

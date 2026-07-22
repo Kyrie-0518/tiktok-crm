@@ -1,0 +1,117 @@
+<!-- dup_r16 -->
+// Pipeline Orchestrator — AI Engine 调度中心
+import { visionAgent } from './agents/vision';
+import { strategyAgent } from './agents/strategy';
+import { directorAgent } from './agents/director';
+import { promptEngine } from './agents/prompt-engine';
+import { optimizerAgent } from './agents/optimizer';
+import { adapterAgent } from './agents/adapter';
+import { qualityAgent } from './agents/quality';
+import getDb from '../../db';
+import { VideoTaskContext, PipelineResult, PipelineStep, VisionOutput, StrategyOutput, DirectorOutput, PromptEngineOutput, OptimizerOutput, AdapterOutput, QualityOutput } from './types';
+
+export async function runPipeline(ctx: VideoTaskContext): Promise<PipelineResult> {
+  const t0 = Date.now();
+  const steps: PipelineStep[] = [];
+  const db = getDb();
+
+  const addStep = (agent: string, status: PipelineStep['status'], input?: any, output?: any, error?: string, tokens?: number) => {
+    const s: PipelineStep = { agent, status, input, output, startTime: Date.now(), endTime: undefined, tokens, error };
+    steps.push(s);
+    // 写数据库日志
+    try { db.prepare(`INSERT INTO video_task_steps (task_id, agent, status, input_json, output_json, tokens, error) VALUES (?,?,?,?,?,?,?)`)
+      .run(ctx.taskId, agent, status, JSON.stringify(input).slice(0, 4000), JSON.stringify(output).slice(0, 8000), tokens || 0, error || ''); }
+    catch {}
+  };
+
+  const completeStep = (agent: string, output: any, tokens?: number) => {
+    const s = steps.find(st => st.agent === agent && st.status === 'running');
+    if (s) {
+      s.status = 'completed';
+      s.output = output;
+      s.endTime = Date.now();
+      s.tokens = tokens;
+      try { db.prepare(`UPDATE video_task_steps SET status='completed', output_json=?, tokens=?, duration_ms=? WHERE task_id=? AND agent=?`)
+        .run(JSON.stringify(output).slice(0, 8000), tokens || 0, (s.endTime! - s.startTime!), ctx.taskId, agent); }
+      catch {}
+    }
+  };
+
+  const failStep = (agent: string, error: string) => {
+    const s = steps.find(st => st.agent === agent);
+    if (s) { s.status = 'failed'; s.error = error; }
+  };
+
+  try {
+    // ① Vision Agent
+    addStep('vision', 'running');
+    const vision = await visionAgent({ productImage: ctx.productImage || '', productName: ctx.productName || '通用商品', productDescription: ctx.productDescription });
+    completeStep('vision', vision);
+
+    // ② Strategy Agent
+    addStep('strategy', 'running', { vision });
+    const strategy = await strategyAgent({ vision, userPrompt: ctx.userPrompt, template: ctx.template, platform: 'TikTok', duration: ctx.duration });
+    completeStep('strategy', strategy);
+
+    // ③ Director Agent
+    addStep('director', 'running', { vision, strategy });
+    const director = await directorAgent({ vision, strategy });
+    completeStep('director', director);
+
+    // ④ Prompt Engine
+    addStep('prompt_engine', 'running', { director, vision });
+    const engine = await promptEngine({ director, vision });
+    completeStep('prompt_engine', engine);
+
+    // ⑤ Optimizer
+    addStep('optimizer', 'running', { promptEngine: engine }, undefined, undefined, 0);
+    const optimizer = await optimizerAgent({ promptEngine: engine, model: ctx.model });
+    completeStep('optimizer', optimizer);
+
+    // ⑥ Adapter
+    addStep('adapter', 'running', undefined, undefined, undefined, 0);
+    const adapter = adapterAgent({ optimizer, model: ctx.model, resolution: ctx.resolution, aspectRatio: ctx.aspectRatio, duration: ctx.duration, count: ctx.count });
+    completeStep('adapter', adapter);
+
+    // ⑦ Quality
+    addStep('quality', 'running', { vision, strategy, director, promptEngine: engine }, undefined, undefined, 0);
+    const quality = await qualityAgent({ vision, strategy, director, promptEngine: engine });
+    completeStep('quality', quality);
+
+    const totalTime = Date.now() - t0;
+
+    // 保存优化后的 Prompt 到最后一个 step
+    const finalPrompt = optimizer.optimizedPrompts[0]?.prompt || engine.finalPrompt;
+
+    // 更新任务状态
+    try {
+      db.prepare(`UPDATE video_tasks SET status='completed', final_prompt=?, quality_score=?, total_time_ms=?, total_tokens=?, steps_json=? WHERE task_id=?`)
+        .run(finalPrompt, quality.score, totalTime, adapter.estimatedTokens, JSON.stringify(steps), ctx.taskId);
+    } catch {}
+
+    return {
+      taskId: ctx.taskId,
+      status: quality.needsRetry ? 'retrying' : 'completed',
+      steps,
+      qualityScore: quality.score,
+      totalTokens: adapter.estimatedTokens,
+      totalTime,
+    };
+  } catch (e: any) {
+    const msg = e.message || 'unknown error';
+    failStep(steps[steps.length - 1]?.agent || 'unknown', msg);
+    try { db.prepare(`UPDATE video_tasks SET status='failed', error=? WHERE task_id=?`).run(msg, ctx.taskId); } catch {}
+    return { taskId: ctx.taskId, status: 'failed', steps, error: msg, totalTokens: 0, totalTime: Date.now() - t0 };
+  }
+}
+
+// 创建任务并执行
+export async function createAndRun(ctx: VideoTaskContext): Promise<PipelineResult> {
+  const db = getDb();
+  db.prepare(`INSERT INTO video_tasks (task_id, product_id, product_name, user_prompt, model, resolution, aspect_ratio, duration, count, status, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,'running',datetime('now','localtime'))`)
+    .run(ctx.taskId, ctx.productId, ctx.productName, ctx.userPrompt, ctx.model, ctx.resolution, ctx.aspectRatio, ctx.duration, ctx.count);
+  return runPipeline(ctx);
+}
+
+<!-- end -->

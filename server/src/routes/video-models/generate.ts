@@ -4,6 +4,7 @@ import fs from 'fs';
 import https from 'https';
 import http from 'http';
 import getDb from '../../db';
+import { logModelCall } from '../../services/model-call-log';
 import authMiddleware from '../../middleware/auth';
 import { getModelType, buildEndpoint } from './types';
 import { getUserModelConfig, downloadVideoToLocal } from './db-helpers';

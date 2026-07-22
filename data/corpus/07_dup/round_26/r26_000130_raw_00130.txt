@@ -1,0 +1,300 @@
+<!-- dup_r26 -->
+import { useEffect, useState } from 'react';
+import {
+  Card, Button, Table, Space, Tag, Modal, message, Input, Select,
+  Upload, Popconfirm, Typography, Row, Col, Popover
+} from 'antd';
+import {
+  InboxOutlined, UploadOutlined, DeleteOutlined, EditOutlined,
+  SearchOutlined, ReloadOutlined, FileImageOutlined,
+  VideoCameraOutlined, AudioOutlined, PlusOutlined
+} from '@ant-design/icons';
+import api from '../api';
+import { formatDateTime } from '../utils/time';
+
+const { Text } = Typography;
+
+interface Material {
+  id: number;
+  category: string;
+  file_type: string;
+  file_url: string;
+  file_name: string;
+  file_size?: number;
+  created_at: string;
+  user_id?: number;
+}
+
+export default function RawMaterials() {
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchKeyword, setSearchKeyword] = useState('');
+
+  const loadMaterials = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/seedance/materials');
+      setMaterials(res.data);
+      // 提取分类
+      const cats = [...new Set(res.data.map((m: Material) => m.category).filter(Boolean))];
+      setCategories(cats as string[]);
+    } catch (e: any) {
+      message.error('加载原料库失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMaterials();
+  }, []);
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const file_type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'audio';
+      await api.post('/seedance/materials', {
+        category: '默认',
+        file_type,
+        file_url: `/uploads/${file.name}`,
+        file_name: file.name,
+        file_size: file.size,
+      });
+      message.success('上传成功');
+      loadMaterials();
+    } catch (e: any) {
+      message.error('上传失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setUploading(false);
+    }
+    return false;
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await api.delete(`/seedance/materials/${id}`);
+      message.success('删除成功');
+      loadMaterials();
+    } catch (e: any) {
+      message.error('删除失败: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
+  const handleCategoryChange = async (id: number, newCategory: string) => {
+    try {
+      await api.put(`/seedance/materials/${id}`, { category: newCategory });
+      message.success('分类更新成功');
+      loadMaterials();
+    } catch (e: any) {
+      message.error('更新失败: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
+  const filteredMaterials = materials.filter(m => {
+    if (selectedCategory !== 'all' && m.category !== selectedCategory) return false;
+    if (searchKeyword && !m.file_name?.includes(searchKeyword)) return false;
+    return true;
+  });
+
+  const getFileIcon = (type: string) => {
+    switch (type) {
+      case 'image': return <FileImageOutlined style={{ fontSize: 32, color: '#1890ff' }} />;
+      case 'video': return <VideoCameraOutlined style={{ fontSize: 32, color: '#52c41a' }} />;
+      case 'audio': return <AudioOutlined style={{ fontSize: 32, color: '#722ed1' }} />;
+      default: return <InboxOutlined style={{ fontSize: 32, color: '#999' }} />;
+    }
+  };
+
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '-';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const columns = [
+    {
+      title: '预览',
+      key: 'preview',
+      width: 100,
+      render: (_: any, r: Material) => (
+        <div
+          style={{
+            width: 80,
+            height: 60,
+            background: '#f5f5f5',
+            borderRadius: 8,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          onClick={() => r.file_url && window.open(r.file_url, '_blank')}
+        >
+          {r.file_type === 'image' && r.file_url ? (
+            <img src={r.file_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+          ) : (
+            getFileIcon(r.file_type)
+          )}
+        </div>
+      ),
+    },
+    {
+      title: '文件名',
+      key: 'name',
+      render: (_: any, r: Material) => (
+        <div>
+          <Text ellipsis style={{ maxWidth: 200, display: 'block' }}>{r.file_name}</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {formatFileSize(r.file_size)}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'file_type',
+      width: 80,
+      render: (v: string) => {
+        const config: Record<string, { color: string; text: string }> = {
+          image: { color: 'blue', text: '图片' },
+          video: { color: 'green', text: '视频' },
+          audio: { color: 'purple', text: '音频' },
+        };
+        const c = config[v] || { color: 'default', text: v };
+        return <Tag color={c.color}>{c.text}</Tag>;
+      },
+    },
+    {
+      title: '分类',
+      key: 'category',
+      width: 150,
+      render: (_: any, r: Material) => (
+        <Select
+          value={r.category}
+          style={{ width: 120 }}
+          size="small"
+          onChange={(v) => handleCategoryChange(r.id, v)}
+          options={[
+            ...categories.map(c => ({ label: c, value: c })),
+            { label: '+ 新建分类', value: 'new' },
+          ]}
+          onSelect={(v) => {
+            if (v === 'new') {
+              const cat = prompt('请输入新分类名称：');
+              if (cat) handleCategoryChange(r.id, cat);
+            }
+          }}
+        />
+      ),
+    },
+    {
+      title: '上传时间',
+      dataIndex: 'created_at',
+      width: 160,
+      render: (v: string) => v ? formatDateTime(v) : '-',
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 120,
+      render: (_: any, r: Material) => (
+        <Space size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => {
+              navigator.clipboard.writeText(r.file_url);
+              message.success('链接已复制');
+            }}
+          >
+            引用
+          </Button>
+          <Popconfirm title="确定删除？" onConfirm={() => handleDelete(r.id)}>
+            <Button type="link" danger size="small" icon={<DeleteOutlined />}>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
+      {/* 页面标题 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'linear-gradient(135deg, #4568FF, #6B8CFF)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 18,
+        }}>
+          <InboxOutlined />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#172033' }}>原料库</h2>
+          <span style={{ fontSize: 12, color: '#999' }}>原始素材 · 文件管理 · 搜索预览</span>
+        </div>
+      </div>
+      <Card
+        title={
+          <Space>
+            <InboxOutlined />
+            <span>原料库</span>
+          </Space>
+        }
+        extra={
+          <Space>
+            <Input
+              placeholder="搜索文件名"
+              prefix={<SearchOutlined />}
+              style={{ width: 160 }}
+              value={searchKeyword}
+              onChange={e => setSearchKeyword(e.target.value)}
+              allowClear
+            />
+            <Select
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              style={{ width: 120 }}
+              options={[
+                { label: '全部分类', value: 'all' },
+                ...categories.map(c => ({ label: c, value: c })),
+              ]}
+            />
+            <Upload beforeUpload={handleUpload} showUploadList={false} accept="image/*,video/*,audio/*">
+              <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
+                上传原料
+              </Button>
+            </Upload>
+            <Button icon={<ReloadOutlined />} onClick={loadMaterials}>
+              刷新
+            </Button>
+          </Space>
+        }
+      >
+        <Table
+          dataSource={filteredMaterials}
+          rowKey="id"
+          columns={columns}
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+        />
+      </Card>
+    </div>
+  );
+}
+
+<!-- end -->

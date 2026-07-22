@@ -1,0 +1,162 @@
+<!-- dup_r13 -->
+import { Router, Request, Response } from 'express';
+import getDb from '../../db';
+import authMiddleware from '../../middleware/auth';
+import { getUserModelConfig, downloadVideoToLocal } from './db-helpers';
+
+const router = Router();
+
+// 连续失败计数器（内存中），超过3次直接标记failed
+const failCounts: Map<number, number> = new Map();
+
+// GET /poll/:videoId
+router.get('/:videoId', async (req: Request, res: Response) => {
+  const userId = (req as any).user?.userId;
+  const videoId = parseInt(req.params.videoId);
+  const db = getDb();
+
+  const video = db.prepare('SELECT * FROM seedance_videos WHERE id = ? AND user_id = ?').get(videoId, userId) as any;
+
+  if (!video) return res.status(404).json({ error: '视频不存在' });
+  if (video.status === 'completed' || video.status === 'failed') {
+    let tokenUsage = video.token_usage || 0;
+    // 回填：token_usage 为 0 时从 api_response 提取
+    if (!tokenUsage && video.api_response) {
+      try {
+        const parsed = JSON.parse(video.api_response);
+        tokenUsage = parsed.usage?.total_tokens || parsed.usage?.completion_tokens || 0;
+        if (tokenUsage > 0) {
+          try { db.prepare('UPDATE seedance_videos SET token_usage = ? WHERE id = ?').run(tokenUsage, videoId); } catch {}
+        }
+      } catch {}
+    }
+    return res.json({ status: video.status, video_url: video.video_url, thumbnail_url: video.thumbnail_url, token_usage: tokenUsage, api_response: video.api_response });
+  }
+
+  let apiResponse: any;
+  try { apiResponse = JSON.parse(video.api_response || '{}'); }
+  catch { return res.json({ status: video.status }); }
+
+  const taskId = apiResponse.id || apiResponse.task_id;
+  if (!taskId) {
+    db.prepare(`UPDATE seedance_videos SET status = 'failed', api_response = ? WHERE id = ?`).run(JSON.stringify({ ...apiResponse, poll_error: 'no_task_id' }), videoId);
+    return res.json({ status: 'failed', error: '未找到任务ID，任务可能提交失败' });
+  }
+
+  const config = getUserModelConfig(userId, 'default');
+  if (!config || !config.api_key) {
+    db.prepare(`UPDATE seedance_videos SET status = 'failed' WHERE id = ?`).run(videoId);
+    return res.json({ status: 'failed', error: '该账号未配置或未启用 Seedance API' });
+  }
+
+  const baseUrl = config.api_url.replace(/\/+$/, '');
+  // 查询 URL：优先用 query_api_url（用户配置的完整 URL），用 {task_id} 占位
+  // 兼容旧逻辑：若没有 query_api_url 则用 api_url + 标准路径
+  const queryUrl = config.query_api_url || `${baseUrl}/contents/generations/tasks/${taskId}`;
+  const endpoint = queryUrl.includes('{task_id}') ? queryUrl.replace(/\{task_id\}/g, taskId) : queryUrl;
+
+  try {
+    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(endpoint, { method: 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.api_key}` }, signal: controller.signal });
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.error(`[poll] 视频${videoId} 查询失败 HTTP ${response.status}:`, errText.substring(0, 300));
+      // 累计失败次数
+      const count = (failCounts.get(videoId) || 0) + 1;
+      failCounts.set(videoId, count);
+      if (count >= 3) {
+        failCounts.delete(videoId);
+        db.prepare(`UPDATE seedance_videos SET status = 'failed', api_response = ? WHERE id = ?`).run(
+          JSON.stringify({ poll_error: `HTTP_${response.status}`, http_status: response.status, body: errText.substring(0, 500) }),
+          videoId
+        );
+        return res.json({ status: 'failed', error: `查询任务连续失败3次 (HTTP ${response.status})，已标记为失败。可能原因：API地址配置错误、密钥无效、或任务已被清理` });
+      }
+      return res.json({ status: video.status, error: `查询失败(HTTP ${response.status})，第${count}/3次重试`, retry_count: count });
+    }
+
+    // 成功则清除失败计数
+    failCounts.delete(videoId);
+
+    const data = await response.json();
+    console.log(`[poll] 视频${videoId} 任务状态:`, data.status, '| task_id:', taskId);
+
+    if (data.status === 'succeeded') {
+      const videoUrl = data.content?.video_url || data.task?.outputs?.video?.url || data.video?.url || '';
+      const thumbnailUrl = data.content?.thumbnail_url || data.task?.outputs?.video?.thumbnail_url || data.thumbnail_url || '';
+      // 提取 token 消耗 — 尝试多种常见路径
+      let tokenUsage = data.usage?.total_tokens
+        || data.usage?.completion_tokens
+        || data.usage?.prompt_tokens
+        || data.token_usage
+        || data.content?.token_usage
+        || 0;
+      // 兜底：从 api_response 里提取（初始创建时的响应里可能有）
+      if (!tokenUsage) {
+        try {
+          const stored = JSON.parse(video.api_response || '{}');
+          tokenUsage = stored.usage?.total_tokens || stored.usage?.completion_tokens || stored.token_usage || 0;
+        } catch {}
+      }
+      console.log(`[poll] 视频${videoId} succeeded | token_usage: ${tokenUsage} | API response keys: ${Object.keys(data).join(',')}`);
+
+      if (videoUrl) {
+        // 先保存远程URL到DB（立即返回给前端），然后异步下载到本地
+        try {
+          db.prepare(`UPDATE seedance_videos SET status = 'completed', video_url = ?, thumbnail_url = ?, api_response = ?, token_usage = ? WHERE id = ?`).run(videoUrl, thumbnailUrl, JSON.stringify(data), tokenUsage, videoId);
+        } catch {
+          // token_usage 列可能还不存在（旧数据库），降级保存
+          db.prepare(`UPDATE seedance_videos SET status = 'completed', video_url = ?, thumbnail_url = ?, api_response = ? WHERE id = ?`).run(videoUrl, thumbnailUrl, JSON.stringify(data), videoId);
+        }
+        // 异步下载，完成后更新为本地路径
+        downloadVideoToLocal(videoUrl, videoId).then(localUrl => {
+          if (localUrl && localUrl !== videoUrl) {
+            getDb().prepare(`UPDATE seedance_videos SET video_url = ? WHERE id = ?`).run(localUrl, videoId);
+          }
+        }).catch(() => {});
+        return res.json({ status: 'completed', video_url: videoUrl, thumbnail_url: thumbnailUrl, token_usage: tokenUsage });
+      } else {
+        console.warn(`[poll] 视频${videoId} 标记为succeeded但无video_url，完整响应:`, JSON.stringify(data).substring(0, 500));
+        db.prepare(`UPDATE seedance_videos SET status = 'failed', api_response = ? WHERE id = ?`).run(JSON.stringify({ ...data, reason: 'succeeded_but_no_video_url' }), videoId);
+        return res.json({ status: 'failed', error: '视频生成完成但未获取到视频地址' });
+      }
+    } else if (data.status === 'failed') {
+      const rawError = data.error?.message || data.error || data.message || '生成失败';
+      let errorMsg: string;
+      // 安全审核拦截 → 友好提示
+      if (typeof rawError === 'string' && /sensitive/i.test(rawError)) {
+        errorMsg = '[安全审核] 生成内容被API安全策略拦截，建议：更换输入图片、调整提示词（避免敏感词汇/品牌名/人物特写）';
+      } else if (typeof rawError === 'string' && rawError.length > 200) {
+        errorMsg = rawError.slice(0, 200) + '...';
+      } else {
+        errorMsg = String(rawError);
+      }
+      console.error(`[poll] 视频${videoId} 任务失败:`, errorMsg);
+      db.prepare(`UPDATE seedance_videos SET status = 'failed', api_response = ? WHERE id = ?`).run(JSON.stringify(data), videoId);
+      return res.json({ status: 'failed', error: errorMsg, error_code: /sensitive/i.test(String(rawError)) ? 'SAFETY_REJECTED' : undefined });
+    }
+
+    db.prepare(`UPDATE seedance_videos SET api_response = ? WHERE id = ?`).run(JSON.stringify(data), videoId);
+    return res.json({ status: data.status || 'processing', progress: data.progress || 0 });
+  } catch (e: any) {
+    const errMsg = e.name === 'AbortError' ? '查询超时(30秒)' : e.message;
+    console.error(`[poll] 视频${videoId} 异常:`, errMsg);
+    const count = (failCounts.get(videoId) || 0) + 1;
+    failCounts.set(videoId, count);
+    if (count >= 3) {
+      failCounts.delete(videoId);
+      db.prepare(`UPDATE seedance_videos SET status = 'failed', api_response = ? WHERE id = ?`).run(
+        JSON.stringify({ poll_error: 'exception', message: errMsg }),
+        videoId
+      );
+      return res.json({ status: 'failed', error: `连续查询异常3次: ${errMsg}` });
+    }
+    return res.json({ status: video.status, error: `${errMsg} (${count}/3次)`, retry_count: count });
+  }
+});
+
+export default router;
+
+<!-- end -->

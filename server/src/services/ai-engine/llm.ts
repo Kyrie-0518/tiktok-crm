@@ -1,6 +1,7 @@
 // AI Engine LLM 调用层 — 复用系统 ai_channels 表
 import axios from 'axios';
 import getDb from '../../db';
+import { logModelCall } from '../model-call-log';
 
 interface LLMCallOptions {
   systemPrompt: string;

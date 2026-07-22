@@ -1,0 +1,406 @@
+<!-- dup_r32 -->
+import { Router, Request, Response } from 'express';
+import getDb from '../db';
+import authMiddleware, { JwtPayload } from '../middleware/auth';
+
+const router = Router();
+
+// 确保表存在（防止数据库重建后丢失）
+function ensureTable() {
+  const db = getDb();
+  try {
+    db.prepare('SELECT id FROM influencer_reports LIMIT 1').get();
+  } catch {
+    // 表不存在，创建
+    console.log('[influencer-reports] 创建 influencer_reports 表...');
+    db.exec(`
+      CREATE TABLE influencer_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        report_type TEXT NOT NULL DEFAULT 'daily',
+        report_date TEXT NOT NULL,
+        content TEXT DEFAULT '',
+        plan TEXT DEFAULT '',
+        issues TEXT DEFAULT '',
+        needs TEXT DEFAULT '',
+        new_influencers_count INTEGER DEFAULT 0,
+        contacted_count INTEGER DEFAULT 0,
+        samples_sent_count INTEGER DEFAULT 0,
+        materials_received_count INTEGER DEFAULT 0,
+        stats_by_shop TEXT DEFAULT '[]',
+        summary TEXT DEFAULT '',
+        feishu_synced INTEGER DEFAULT 0,
+        feishu_message_id TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_reports_user_date ON influencer_reports(user_id, report_date)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_reports_type ON influencer_reports(report_type)');
+    console.log('[influencer-reports] 表已创建');
+  }
+}
+
+// 模块加载时自动确保表存在
+let _tableEnsured = false;
+function ensureTableOnce() {
+  if (_tableEnsured) return;
+  _tableEnsured = true;
+  try {
+    ensureTable();
+  } catch (err: any) {
+    console.error('[influencer-reports] 表检查失败:', err?.message);
+  }
+}
+
+// ========== 飞书推送（多店铺卡片格式） ==========
+async function sendToFeishu(reportData: any, userDisplayName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const db = getDb();
+    const setting = db.prepare("SELECT value FROM settings WHERE key = 'feishu_webhook'").get() as any;
+    if (!setting) return { success: false, error: '未配置飞书Webhook' };
+
+    const config = JSON.parse(setting.value);
+    const webhookUrl = config?.url;
+    if (!webhookUrl) return { success: false, error: '未配置飞书Webhook URL' };
+
+    const reportTypeLabel = reportData.report_type === 'daily' ? '日报' : '周报';
+    const title = `📊 达人BD${reportTypeLabel} - ${reportData.report_date}`;
+
+    const sections: any[] = [];
+
+    // 解析各店铺数据（兼容 JS数组和 JSON字符串 两种格式）
+    let shopStats: any[] = [];
+    const rawStats = reportData.stats_by_shop;
+    if (Array.isArray(rawStats)) {
+      shopStats = rawStats;
+    } else if (typeof rawStats === 'string') {
+      try { shopStats = JSON.parse(rawStats); } catch {
+        console.error('[Feishu] stats_by_shop 解析失败:', rawStats);
+      }
+    }
+
+    console.log('[Feishu] 店铺数据:', JSON.stringify(shopStats), '原始类型:', typeof rawStats, Array.isArray(rawStats) ? 'Array' : '');
+
+    if (shopStats.length > 0) {
+      for (const shop of shopStats) {
+        sections.push({ tag: 'hr' });
+
+        const dataLine = [
+          `邀约 ${shop.invite_count ?? 0}`,
+          `建联 ${shop.contact_count ?? 0}`,
+          `寄样 ${shop.sample_sent ?? 0}`,
+          `视频 ${shop.video_output ?? 0}`,
+        ].join('　｜　');
+
+        sections.push({
+          tag: 'div',
+          text: { tag: 'lark_md', content: `**🏪 ${shop.shop_name || '-'}**\n${dataLine}` },
+        });
+        if (shop.analysis_summary) {
+          sections.push({
+            tag: 'div',
+            text: { tag: 'lark_md', content: `**📝 分析总结：** ${shop.analysis_summary}` },
+          });
+        }
+      }
+
+      const totalInvite = shopStats.reduce((s, x) => s + (x.invite_count || 0), 0);
+      const totalContact = shopStats.reduce((s, x) => s + (x.contact_count || 0), 0);
+      const totalSample = shopStats.reduce((s, x) => s + (x.sample_sent || 0), 0);
+      const totalVideo = shopStats.reduce((s, x) => s + (x.video_output || 0), 0);
+
+      sections.push({ tag: 'hr' });
+      sections.push({
+        tag: 'div',
+        text: {
+          tag: 'lark_md',
+          content:
+            `**📊 本期汇总：**\n` +
+            `邀约 **${totalInvite}**　　建联 **${totalContact}**　　寄样 **${totalSample}**　　视频 **${totalVideo}**`,
+        },
+      });
+    }
+
+    // 整体总结
+    if (reportData.summary) {
+      sections.push({ tag: 'hr' });
+      const summaryText = reportData.summary.length > 2000
+        ? reportData.summary.slice(0, 2000) + '...'
+        : reportData.summary;
+      sections.push({
+        tag: 'div',
+        text: { tag: 'lark_md', content: `**📝 整体工作总结**\n> ${summaryText}` },
+      });
+    }
+
+    if (reportData.issues || reportData.needs) {
+      sections.push({ tag: 'hr' });
+      if (reportData.issues) {
+        sections.push({
+          tag: 'div',
+          text: { tag: 'lark_md', content: `**⚠️ 遇到的问题：** ${reportData.issues}` },
+        });
+      }
+      if (reportData.needs) {
+        sections.push({
+          tag: 'div',
+          text: { tag: 'lark_md', content: `**🔧 需要支持：** ${reportData.needs}` },
+        });
+      }
+    }
+
+    // Footer
+    sections.push({ tag: 'hr' });
+    sections.push({ tag: 'div', text: { tag: 'lark_md', content: `提交人：${userDisplayName} | ${new Date().toLocaleString('zh-CN')}` } });
+
+    const card = {
+      msg_type: 'interactive',
+      card: {
+        header: {
+          title: { tag: 'plain_text', content: title },
+          template: 'blue',
+        },
+        elements: sections,
+      },
+    };
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(card),
+    });
+
+    const respBody = await response.json() as any;
+    if (respBody.code === 0 || respBody.StatusCode === 0) {
+      return { success: true, messageId: respBody.data?.message_id || respBody.msg_id || '' };
+    } else {
+      return { success: false, error: respBody.msg || respBody.message || '飞书返回错误' };
+    }
+  } catch (e: any) {
+    console.error('[Feishu] 推送失败:', e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+function getUserDisplayName(userId: number): string {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT username, display_name FROM users WHERE id = ?').get(userId) as any;
+    if (row) return row.display_name || row.username;
+  } catch {}
+  return '未知用户';
+}
+
+// ========== 提交汇报（支持多店铺）==========
+router.post('/', authMiddleware, async (req: Request, res: Response) => {
+  ensureTableOnce();
+  const user = req.user as JwtPayload;
+  const {
+    report_type, report_date,
+    stats_by_shop, summary, plan, issues, needs,
+  } = req.body;
+
+  if (!report_date) return res.status(400).json({ error: '汇报日期必填' });
+  if (!['daily', 'weekly'].includes(report_type)) return res.status(400).json({ error: '汇报类型无效' });
+
+  try {
+    const db = getDb();
+
+    const existing = db.prepare(
+      'SELECT id FROM influencer_reports WHERE user_id = ? AND report_type = ? AND report_date = ?'
+    ).get(user.userId, report_type, report_date) as any;
+
+    if (existing) {
+      db.prepare(
+        `UPDATE influencer_reports SET stats_by_shop=?, summary=?, plan=?, issues=?, needs=?, created_at=datetime('now','localtime') WHERE id=?`
+      ).run(
+        JSON.stringify(stats_by_shop || []),
+        summary || '', plan || '', issues || '', needs || '',
+        existing.id
+      );
+    } else {
+      db.prepare(
+        `INSERT INTO influencer_reports (user_id, report_type, report_date, stats_by_shop, summary, plan, issues, needs, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))`
+      ).run(
+        user.userId, report_type, report_date,
+        JSON.stringify(stats_by_shop || []),
+        summary || '', plan || '', issues || '', needs || ''
+      );
+    }
+
+    const reportId = existing
+      ? existing.id
+      : (db.prepare('SELECT last_insert_rowid() as id').get() as any).id;
+
+    const displayName = getUserDisplayName(user.userId);
+    const feishuResult = await sendToFeishu({
+      report_type, report_date,
+      stats_by_shop: stats_by_shop || [],
+      summary, plan, issues, needs,
+    }, displayName);
+
+    if (feishuResult.success) {
+      db.prepare('UPDATE influencer_reports SET feishu_synced = 1, feishu_message_id = ? WHERE id = ?')
+        .run(feishuResult.messageId || '', reportId);
+    }
+
+    res.json({
+      id: reportId,
+      feishu_synced: feishuResult.success,
+      feishu_error: feishuResult.success ? undefined : feishuResult.error,
+      is_update: !!existing,
+    });
+  } catch (err: any) {
+    console.error('[influencer-reports] 提交失败:', err?.message || err);
+    res.status(500).json({ error: '提交失败: ' + (err?.message || String(err)) });
+  }
+});
+
+// 获取用户角色 key
+function getUserRoleKey(req: Request): string {
+  const user = req.user as JwtPayload;
+  if (user.roleKey) return user.roleKey;
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT r.role_key FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = ?').get(user.userId) as any;
+    return row?.role_key || 'staff';
+  } catch { return 'staff'; }
+}
+
+// ========== 获取汇报列表 ==========
+router.get('/', authMiddleware, (req: Request, res: Response) => {
+  ensureTableOnce();
+  const user = req.user as JwtPayload;
+  const db = getDb();
+  const { report_type, date_from, date_to, page, page_size } = req.query;
+  const pageNum = Math.max(1, Number(page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(page_size) || 20));
+  const offset = (pageNum - 1) * pageSize;
+
+  // 开发者可见所有用户的汇报，普通用户只能看自己的
+  const isDeveloper = getUserRoleKey(req) === 'developer';
+  let where = isDeveloper ? 'WHERE 1=1' : 'WHERE r.user_id = ?';
+  const params: any[] = isDeveloper ? [] : [user.userId];
+
+  if (report_type) { where += ' AND r.report_type = ?'; params.push(report_type); }
+  if (date_from) { where += ' AND r.report_date >= ?'; params.push(date_from); }
+  if (date_to) { where += ' AND r.report_date <= ?'; params.push(date_to); }
+
+  const countRow = db.prepare(`SELECT COUNT(*) as total FROM influencer_reports r ${where}`).get(...params) as { total: number };
+  const list = db.prepare(
+    `SELECT r.*, u.username, u.display_name
+     FROM influencer_reports r
+     LEFT JOIN users u ON r.user_id = u.id
+     ${where}
+     ORDER BY r.report_date DESC, r.created_at DESC
+     LIMIT ? OFFSET ?`
+  ).all(...params, pageSize, offset);
+
+  res.json({ list, total: countRow.total, page: pageNum, page_size: pageSize });
+});
+
+// ========== 获取最新汇报（用于预填） ==========
+router.get('/latest', authMiddleware, (req: Request, res: Response) => {
+  ensureTableOnce();
+  const user = req.user as JwtPayload;
+  const db = getDb();
+  const { report_type } = req.query;
+  const type = report_type === 'weekly' ? 'weekly' : 'daily';
+  const row = db.prepare(
+    'SELECT * FROM influencer_reports WHERE user_id = ? AND report_type = ? ORDER BY report_date DESC LIMIT 1'
+  ).get(user.userId, type);
+  res.json(row || null);
+});
+
+// ========== 获取按店铺预填统计数据 ==========
+router.get('/stats/prefill', authMiddleware, (_req: Request, res: Response) => {
+  const db = getDb();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 获取所有店铺
+  const shops = db.prepare("SELECT id, name FROM tiktok_shops WHERE status='active' ORDER BY id").all() as any[];
+  if (shops.length === 0) {
+    return res.json([]);
+  }
+
+  const result: any[] = [];
+  for (const shop of shops) {
+    const inviteCount = (
+      db.prepare("SELECT COUNT(*) as c FROM influencers WHERE shop_id = ? AND date(created_at) = ?")
+      .get(shop.id, today) as any
+    )?.c || 0;
+
+    const contactCount = (
+      db.prepare(`
+        SELECT COUNT(DISTINCT fr.influencer_id) as c
+        FROM follow_up_records fr
+        INNER JOIN influencers inf ON fr.influencer_id = inf.id
+        WHERE inf.shop_id = ? AND date(fr.created_at) = ?
+      `)
+      .get(shop.id, today) as any
+    )?.c || 0;
+
+    const sampleSentCount = (
+      db.prepare("SELECT COUNT(*) as c FROM influencers WHERE shop_id = ? AND send_date = ?")
+      .get(shop.id, today) as any
+    )?.c || 0;
+
+    const videoOutputCount = (
+      db.prepare("SELECT COUNT(*) as c FROM influencers WHERE shop_id = ? AND material_url != '' AND date(created_at) = ?")
+      .get(shop.id, today) as any
+    )?.c || 0;
+
+    result.push({
+      shop_id: shop.id,
+      shop_name: shop.name,
+      invite_count: inviteCount,
+      contact_count: contactCount,
+      sample_sent: sampleSentCount,
+      video_output: videoOutputCount,
+      analysis_summary: '',
+    });
+  }
+
+  res.json(result);
+});
+
+// ========== 删除汇报 ==========
+router.delete('/:id', authMiddleware, (req: Request, res: Response) => {
+  ensureTableOnce();
+  const user = req.user as JwtPayload;
+  const db = getDb();
+  const isDeveloper = getUserRoleKey(req) === 'developer';
+  const whereClause = isDeveloper ? 'WHERE r.id = ?' : 'WHERE r.id = ? AND r.user_id = ?';
+  const whereParams: any[] = isDeveloper ? [req.params.id] : [req.params.id, user.userId];
+  const report = db.prepare(`SELECT * FROM influencer_reports ${whereClause}`).get(...whereParams) as any;
+  if (!report) return res.status(404).json({ error: '汇报不存在或无权限' });
+  db.prepare('DELETE FROM influencer_reports WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ========== 重新推送到飞书 ==========
+router.post('/:id/resend', authMiddleware, async (req: Request, res: Response) => {
+  ensureTableOnce();
+  const user = req.user as JwtPayload;
+  const db = getDb();
+  const isDeveloper = getUserRoleKey(req) === 'developer';
+  const whereClause = isDeveloper ? 'WHERE r.id = ?' : 'WHERE r.id = ? AND r.user_id = ?';
+  const whereParams: any[] = isDeveloper ? [req.params.id] : [req.params.id, user.userId];
+  const report = db.prepare(`SELECT * FROM influencer_reports ${whereClause}`).get(...whereParams) as any;
+  if (!report) return res.status(404).json({ error: '汇报不存在或无权限' });
+
+  const displayName = getUserDisplayName(report.user_id);
+  const feishuResult = await sendToFeishu(report, displayName);
+
+  if (feishuResult.success) {
+    db.prepare('UPDATE influencer_reports SET feishu_synced = 1, feishu_message_id = ? WHERE id = ?')
+      .run(feishuResult.messageId || '', report.id);
+  }
+
+  res.json({ success: feishuResult.success, error: feishuResult.error });
+});
+
+export default router;
+
+<!-- end -->

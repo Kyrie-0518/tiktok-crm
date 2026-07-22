@@ -1,0 +1,97 @@
+<!-- dup_r10 -->
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
+import getDb from '../db';
+
+// JWT Secret: 首次启动时随机生成UUID存入settings表
+let _JWT_SECRET: string | null = null;
+
+function getJwtSecret(db: any): string {
+  if (_JWT_SECRET) return _JWT_SECRET;
+  
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'jwt_secret'").get() as any;
+  if (row) {
+    try {
+      const parsed = JSON.parse(row.value);
+      if (parsed && typeof parsed === 'string') {
+        _JWT_SECRET = parsed;
+        return _JWT_SECRET;
+      }
+    } catch {}
+  }
+  
+  // 首次启动：生成随机UUID
+  const newSecret = randomUUID();
+  db.prepare("INSERT INTO settings (key, value) VALUES ('jwt_secret', ?)").run(JSON.stringify(newSecret));
+  _JWT_SECRET = newSecret;
+  console.log('[Security] JWT密钥已自动生成并存入数据库');
+  return _JWT_SECRET;
+}
+
+export function getJwtSecretSync(): string {
+  const db = getDb();
+  return getJwtSecret(db);
+}
+
+export interface JwtPayload {
+  userId: number;
+  username: string;
+  roleKey?: string;
+}
+
+// 扩展 Express Request 类型，消除所有路由文件的 req.user TS 报错
+declare module 'express' {
+  interface Request {
+    user?: JwtPayload;
+  }
+}
+
+export function signToken(payload: JwtPayload): string {
+  const db = getDb();
+  return jwt.sign(payload, getJwtSecret(db), { expiresIn: '7d' });
+}
+
+export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  const mode = process.env.AUTH_MODE;
+  // 本地开发：AUTH_MODE=dev → 固定 Kyrie 用户（不改 .env 就跑这个分支）
+  if (mode !== 'jwt') {
+    req.user = { userId: 1, username: 'Kyrie' };
+    return next();
+  }
+
+  // 生产：AUTH_MODE=jwt → 正式 JWT 验证
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: '未登录，请先登录' });
+  }
+  try {
+    const payload = jwt.verify(header.slice(7), getJwtSecretSync()) as JwtPayload;
+    req.user = payload;
+    next();
+  } catch (e: any) {
+    const msg = e.name === 'TokenExpiredError' ? 'Token 已过期，请重新登录' : 'Token 无效';
+    return res.status(401).json({ error: msg });
+  }
+}
+
+export function optionalAuthMiddleware(req: Request, res: Response, next: NextFunction) {
+  const mode = process.env.AUTH_MODE;
+  if (mode !== 'jwt') {
+    req.user = { userId: 1, username: 'Kyrie' };
+    return next();
+  }
+
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    try {
+      const payload = jwt.verify(header.slice(7), getJwtSecretSync()) as JwtPayload;
+      req.user = payload;
+    } catch { /* ignore invalid token for optional auth */ }
+  }
+  next();
+}
+
+export default authMiddleware;
+
+<!-- end -->

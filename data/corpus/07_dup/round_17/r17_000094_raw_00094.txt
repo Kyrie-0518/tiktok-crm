@@ -1,0 +1,48 @@
+<!-- dup_r17 -->
+import React from 'react';
+import { Button, Space, Row, Col } from 'antd';
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+
+interface SearchBarProps {
+  children?: React.ReactNode;
+  onSearch?: () => void;
+  onReset?: () => void;
+  loading?: boolean;
+  /** Extra actions rendered on the right side */
+  extra?: React.ReactNode;
+}
+
+export default function SearchBar({ children, onSearch, onReset, loading, extra }: SearchBarProps) {
+  return (
+    <div style={{
+      padding: '12px 16px',
+      background: '#fafafa',
+      borderTop: '1px solid #f0f0f0',
+      borderBottom: '1px solid #f0f0f0',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    }}>
+      <Space wrap>
+        {children}
+        {(onSearch || onReset) && (
+          <>
+            {onSearch && (
+              <Button type="primary" icon={<SearchOutlined />} onClick={onSearch} loading={loading}>
+                搜索
+              </Button>
+            )}
+            {onReset && (
+              <Button onClick={onReset}>
+                重置
+              </Button>
+            )}
+          </>
+        )}
+      </Space>
+      {extra && <div>{extra}</div>}
+    </div>
+  );
+}
+
+<!-- end -->

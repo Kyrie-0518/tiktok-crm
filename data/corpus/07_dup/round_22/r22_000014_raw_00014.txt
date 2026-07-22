@@ -1,0 +1,360 @@
+<!-- dup_r22 -->
+import { Router, Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import getDb from '../db';
+import { signToken, authMiddleware, JwtPayload } from '../middleware/auth';
+
+const router = Router();
+
+// POST /api/auth/login — 简化版：仅账号密码验证
+router.post('/login', (req: Request, res: Response) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: '账号和密码必填' });
+  }
+  const db = getDb();
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    return res.status(401).json({ error: '账号或密码错误' });
+  }
+
+  const token = signToken({ userId: user.id, username: user.username });
+
+  // 记录登录 IP + 设备信息
+  try {
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    const ua = req.get('User-Agent') || '';
+    db.prepare(
+      `UPDATE users SET last_login_ip = ?, last_login_at = datetime('now','localtime'), last_user_agent = ? WHERE id = ?`
+    ).run(ip, ua, user.id);
+  } catch { /* 不影响登录流程 */ }
+
+  res.json({
+    token,
+    username: user.username,
+    display_name: user.display_name || user.username,
+    email: user.email || '',
+    role_id: user.role_id,
+    identity: user.identity || 'USER',
+  });
+});
+
+// GET /api/auth/me — get current user info (for page refresh)
+router.get('/me', authMiddleware, (req: Request, res: Response) => {
+  const db = getDb();
+  const user = req.user as JwtPayload;
+  const row = db.prepare(`
+    SELECT u.id, u.username, u.display_name, u.email, u.role_id, u.created_at,
+           r.name as role_name, r.role_key as role_key, r.permissions as permissions
+    FROM users u
+    LEFT JOIN roles r ON u.role_id = r.id
+    WHERE u.id = ?
+  `).get(user.userId) as any;
+  if (!row) return res.status(404).json({ error: '用户不存在' });
+  res.json({
+    username: row.username,
+    display_name: row.display_name,
+    email: row.email || '',
+    permissions: JSON.parse(row.permissions || '{}'),
+    role_name: row.role_name,
+    role_id: row.role_id,
+    role_key: row.role_key,
+    identity: row.identity || 'USER',
+  });
+});
+
+// Helper: get current user's role_key from DB (always fresh)
+// 同时支持 identity=SUPER_ADMIN 兜底（防止角色映射缺失）
+function getUserRoleKey(req: Request, db: any): string {
+  const user = req.user as JwtPayload;
+  const row = db.prepare(`
+    SELECT r.role_key, u.identity FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = ?
+  `).get(user.userId) as any;
+  if (row?.role_key) return row.role_key;
+  if (row?.identity === 'SUPER_ADMIN' || user.roleKey === 'developer') return 'developer';
+  return user.roleKey || 'staff';
+}
+
+// POST /api/auth/register (developer/manager can create accounts)
+router.post('/register', authMiddleware, (req: Request, res: Response) => {
+  const { username, password, role_id } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: '账号和密码必填' });
+  }
+  const db = getDb();
+  const roleKey = getUserRoleKey(req, db);
+  const roleOrder: Record<string, number> = { staff: 0, manager: 1, developer: 2 };
+
+  // Permission check
+  if (roleOrder[roleKey] < 1) {
+    return res.status(403).json({ error: '权限不足，无法创建账号' });
+  }
+
+  // Validate target role
+  if (role_id) {
+    const targetRole = db.prepare('SELECT role_key FROM roles WHERE id = ?').get(role_id) as any;
+    if (targetRole?.role_key === 'developer' && roleKey !== 'developer') {
+      return res.status(403).json({ error: '仅开发者可创建开发者账号' });
+    }
+    if (targetRole?.role_key === 'manager' && roleKey !== 'developer') {
+      return res.status(403).json({ error: '仅开发者可创建管理员账号' });
+    }
+  }
+
+  try {
+    const hash = bcrypt.hashSync(password, 10);
+    const result = db.prepare('INSERT INTO users (username, password, role_id, display_name) VALUES (?, ?, ?, ?)').run(
+      username, hash, role_id || 3, ''
+    );
+    res.json({ id: result.lastInsertRowid, username });
+  } catch (e: any) {
+    if (e.message?.includes('UNIQUE')) {
+      return res.status(400).json({ error: '账号已存在' });
+    }
+    throw e;
+  }
+});
+
+// GET /api/auth/users — list all users with role info
+router.get('/users', authMiddleware, (_req: Request, res: Response) => {
+  const db = getDb();
+  const users = db.prepare(`
+    SELECT u.id, u.username, u.display_name, u.email, u.identity,
+           u.role_id, u.created_at, u.last_login_at, u.last_login_ip, u.last_user_agent,
+           r.name as role_name, r.role_key as role_key, r.permissions as permissions
+    FROM users u
+    LEFT JOIN roles r ON u.role_id = r.id
+    ORDER BY u.id ASC
+  `).all();
+  res.json(users);
+});
+
+// PUT /api/auth/users/:id — update user (change role, display_name, password)
+router.put('/users/:id', authMiddleware, (req: Request, res: Response) => {
+  const { role_id, display_name, password } = req.body;
+  const db = getDb();
+  const roleKey = getUserRoleKey(req, db);
+
+  // Permission check: only developer can edit other users
+  if (roleKey !== 'developer') {
+    const user = req.user as JwtPayload;
+    if (parseInt(String(req.params.id)) !== user.userId) {
+      return res.status(403).json({ error: '仅开发者可编辑其他用户' });
+    }
+  }
+
+  const targetUser = db.prepare('SELECT id, role_id FROM users WHERE id = ?').get(req.params.id) as any;
+  if (!targetUser) return res.status(404).json({ error: '用户不存在' });
+
+  // Prevent demoting developer
+  if (role_id && targetUser.role_id === 1 && role_id !== 1) {
+    const operator = req.user as JwtPayload;
+    if (operator.userId !== targetUser.id) {
+      return res.status(400).json({ error: '不能修改开发者的角色' });
+    }
+  }
+
+  // Validate target role
+  if (role_id) {
+    const targetRole = db.prepare('SELECT role_key FROM roles WHERE id = ?').get(role_id) as any;
+    if (targetRole?.role_key === 'developer' && roleKey !== 'developer') {
+      return res.status(403).json({ error: '仅开发者可分配开发者角色' });
+    }
+    if (targetRole?.role_key === 'manager' && roleKey !== 'developer') {
+      return res.status(403).json({ error: '仅开发者可分配管理员角色' });
+    }
+  }
+
+  if (password) {
+    const hash = bcrypt.hashSync(password, 10);
+    db.prepare('UPDATE users SET role_id=?, display_name=?, password=? WHERE id=?').run(
+      role_id ?? targetUser.role_id, display_name || '', hash, req.params.id
+    );
+  } else {
+    db.prepare('UPDATE users SET role_id=?, display_name=? WHERE id=?').run(
+      role_id ?? targetUser.role_id, display_name || '', req.params.id
+    );
+  }
+  res.json({ success: true });
+});
+
+// DELETE /api/auth/users/:id
+router.delete('/users/:id', authMiddleware, (req: Request, res: Response) => {
+  const db = getDb();
+  const user = req.user as JwtPayload;
+  const roleKey = getUserRoleKey(req, db);
+
+  if (roleKey !== 'developer') {
+    return res.status(403).json({ error: '仅开发者可删除用户' });
+  }
+  if (parseInt(String(req.params.id)) === user.userId) {
+    return res.status(400).json({ error: '不能删除当前登录账号' });
+  }
+
+  // Prevent deleting developer account
+  const targetUser = db.prepare('SELECT role_id FROM users WHERE id = ?').get(req.params.id) as any;
+  if (targetUser?.role_id === 1) {
+    return res.status(400).json({ error: '不能删除开发者账号' });
+  }
+
+  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// PUT /api/auth/password
+router.put('/password', authMiddleware, (req: Request, res: Response) => {
+  const { oldPassword, newPassword } = req.body;
+  const db = getDb();
+  const user = req.user as JwtPayload;
+  const row = db.prepare('SELECT password FROM users WHERE id = ?').get(user.userId) as any;
+  if (!bcrypt.compareSync(oldPassword, row.password)) {
+    return res.status(400).json({ error: '原密码错误' });
+  }
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE users SET password = ?, password_changed = 1 WHERE id = ?').run(hash, user.userId);
+  res.json({ success: true });
+});
+
+// PUT /api/auth/users/:id/reset-password — anyone can reset own password; developer can reset anyone's
+router.put('/users/:id/reset-password', authMiddleware, (req: Request, res: Response) => {
+  const { newPassword } = req.body;
+  const db = getDb();
+  const roleKey = getUserRoleKey(req, db);
+  const targetId = Number(req.params.id);
+  const isSelf = req.user.userId === targetId;
+
+  // 重置自己密码无需 developer 权限；重置他人必须 developer
+  if (!isSelf && roleKey !== 'developer') {
+    return res.status(403).json({ error: '仅开发者可重置他人密码' });
+  }
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: '密码至少6位' });
+  }
+
+  const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(targetId) as any;
+  if (!targetUser) return res.status(404).json({ error: '用户不存在' });
+
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE users SET password = ?, password_changed = 1 WHERE id = ?').run(hash, targetId);
+  res.json({ success: true });
+});
+
+// GET /api/auth/roles — list all roles
+router.get('/roles', authMiddleware, (_req: Request, res: Response) => {
+  const db = getDb();
+  const roles = db.prepare('SELECT * FROM roles ORDER BY sort_order ASC, id ASC').all();
+  res.json(roles);
+});
+
+// POST /api/auth/roles — create custom role (developer only)
+router.post('/roles', authMiddleware, (req: Request, res: Response) => {
+  const { name, description, permissions } = req.body;
+  if (!name) return res.status(400).json({ error: '角色名称必填' });
+  const db = getDb();
+  const roleKey = getUserRoleKey(req, db);
+
+  if (roleKey !== 'developer') {
+    return res.status(403).json({ error: '仅开发者可创建角色' });
+  }
+
+  // Normalize permissions: accept object or JSON string
+  let permsStr: string;
+  if (typeof permissions === 'string') {
+    permsStr = permissions;
+  } else {
+    permsStr = JSON.stringify(permissions || {});
+  }
+
+  try {
+    const result = db.prepare(
+      'INSERT INTO roles (name, description, permissions) VALUES (?, ?, ?)'
+    ).run(name, description || '', permsStr);
+    res.json({ id: result.lastInsertRowid, name });
+  } catch (e: any) {
+    if (e.message?.includes('UNIQUE')) return res.status(400).json({ error: '角色已存在' });
+    throw e;
+  }
+});
+
+// PUT /api/auth/roles/:id — update role
+router.put('/roles/:id', authMiddleware, (req: Request, res: Response) => {
+  const { name, description, permissions } = req.body;
+  const db = getDb();
+  const roleKey = getUserRoleKey(req, db);
+  const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.params.id) as any;
+  if (!role) return res.status(404).json({ error: '角色不存在' });
+
+  // Fixed roles: developer can't change name/role_key
+  if (role.role_key) {
+    if (role.role_key === 'developer' && roleKey !== 'developer') {
+      return res.status(403).json({ error: '仅开发者可修改开发者角色' });
+    }
+    if (role.role_key === 'developer') {
+      // Developer role permissions are always full - ignore changes
+      return res.json({ success: true });
+    }
+    // Other fixed roles: only developer can modify
+    if (roleKey !== 'developer') {
+      return res.status(403).json({ error: '仅开发者可修改固定角色' });
+    }
+    // Fixed roles: don't change name or role_key
+    let fixedPerms: string;
+    if (typeof permissions === 'string') {
+      fixedPerms = permissions;
+    } else if (permissions && Object.keys(permissions).length > 0) {
+      fixedPerms = JSON.stringify(permissions);
+    } else {
+      fixedPerms = role.permissions || '{}';
+    }
+    db.prepare('UPDATE roles SET description=?, permissions=? WHERE id=?').run(
+      description ?? role.description,
+      fixedPerms,
+      req.params.id
+    );
+  } else {
+    // Custom role: only name/description/permissions
+    let customPerms: string;
+    if (typeof permissions === 'string') {
+      customPerms = permissions;
+    } else if (permissions && Object.keys(permissions).length > 0) {
+      customPerms = JSON.stringify(permissions);
+    } else {
+      customPerms = role.permissions || '{}';
+    }
+    db.prepare('UPDATE roles SET name=?, description=?, permissions=? WHERE id=?').run(
+      name || role.name, description ?? role.description,
+      customPerms,
+      req.params.id
+    );
+  }
+  res.json({ success: true });
+});
+
+// DELETE /api/auth/roles/:id
+router.delete('/roles/:id', authMiddleware, (req: Request, res: Response) => {
+  const db = getDb();
+  const roleKey = getUserRoleKey(req, db);
+
+  if (roleKey !== 'developer') {
+    return res.status(403).json({ error: '仅开发者可删除角色' });
+  }
+
+  const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.params.id) as any;
+  if (!role) return res.status(404).json({ error: '角色不存在' });
+
+  // Cannot delete fixed roles
+  if (role.role_key) {
+    return res.status(400).json({ error: `固定角色「${role.name}」不可删除` });
+  }
+
+  // Check if any user is using this role
+  const usage = db.prepare('SELECT COUNT(*) as c FROM users WHERE role_id = ?').get(req.params.id) as { c: number };
+  if (usage.c > 0) return res.status(400).json({ error: `该角色下有 ${usage.c} 个用户，请先解除绑定` });
+
+  db.prepare('DELETE FROM roles WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+export default router;
+
+<!-- end -->

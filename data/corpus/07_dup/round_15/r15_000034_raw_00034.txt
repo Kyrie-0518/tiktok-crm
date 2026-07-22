@@ -1,0 +1,560 @@
+<!-- dup_r15 -->
+/**
+ * TikTok Marketing API / Ads OAuth 授权与 Token 管理
+ * 用于获取 TikTok 广告账号的 access_token
+ */
+
+import { Router, Request, Response } from 'express';
+import { authMiddleware } from '../middleware/auth';
+import getDb from '../db';
+import { getTokenStatus, tiktokAdsPost } from '../services/tiktok-ads';
+import { fetch as undiciFetch, Agent, ProxyAgent } from 'undici';
+
+const router = Router();
+
+// 基础配置
+const APP_ID = process.env.TT_ADS_APP_ID || '7641162218708434960';
+const APP_SECRET = process.env.TT_ADS_APP_SECRET || '9c1115593f6199a22eecb3777b7890cbdb8c5445';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bvefdvp.cn';
+const REDIRECT_URI = process.env.TT_ADS_REDIRECT_URI || `${FRONTEND_URL}/ad-accounts`;
+
+// ── 工具函数 ──
+
+function buildAuthUrl(state: string): string {
+  const redirect = encodeURIComponent(REDIRECT_URI);
+  return `https://business-api.tiktok.com/portal/auth?app_id=${APP_ID}&state=${state}&redirect_uri=${redirect}`;
+}
+
+async function exchangeAuthCode(authCode: string) {
+  const body = {
+    app_id: APP_ID,
+    secret: APP_SECRET,
+    auth_code: authCode,
+    grant_type: 'authorization_code',
+  };
+
+  // 优先直连
+  return tiktokAdsPost('/open_api/v1.3/oauth2/access_token/', body);
+}
+
+/** 递归提取错误的完整根因链（undici 的 fetch failed 经常套 3-4 层 cause） */
+function extractErrorChain(e: any, depth = 0, max = 5): any[] {
+  if (!e || depth >= max) return [];
+  return [{
+    depth,
+    name: e?.name,
+    code: e?.code,
+    message: e?.message,
+    // 一些 undici 错误把状态码放在 cause.status / cause.statusCode
+    status: e?.status ?? e?.statusCode,
+  }, ...extractErrorChain(e?.cause, depth + 1, max)];
+}
+
+/** 通过 Cloudflare Worker 中继换 token（解决国内 ECS 无法访问 TikTok 的问题） */
+async function exchangeAuthCodeViaRelay(authCode: string): Promise<any> {
+  const relayUrl = process.env.TT_ADS_RELAY_URL;
+  const relayToken = process.env.TT_ADS_RELAY_TOKEN || 'change-me';
+  if (!relayUrl) throw new Error('未配置 TT_ADS_RELAY_URL');
+
+  // ── 两条通道 ──
+  // 通道 A：直连（undici Agent，3 秒短超时，命中即用，省代理流量）
+  // 通道 B：走 7890 代理（ProxyAgent + HTTPS_PROXY，国内 ECS 通常需要这一跳才能到 workers.dev）
+  // 两条都失败时抛带根因的 Error
+  const directAgent = new Agent({
+    connect: { timeout: 3_000 },  // 直连短超时，避免在 GFW 阻断时白白等 15s
+    bodyTimeout: 30_000,
+    headersTimeout: 20_000,
+    keepAliveTimeout: 5_000,
+  });
+
+  // 代理 URL 优先级：TT_ADS_RELAY_VIA_PROXY > HTTPS_PROXY > 127.0.0.1:7890
+  const proxyUrl = process.env.TT_ADS_RELAY_VIA_PROXY
+    || process.env.HTTPS_PROXY
+    || 'http://127.0.0.1:7890';
+  const useProxy = process.env.TT_ADS_RELAY_SKIP_PROXY !== '1';
+
+  const payload = {
+    action: 'exchange_code',
+    app_id: APP_ID,
+    secret: APP_SECRET,
+    auth_code: authCode,
+  };
+  // 关键：FC 网关（*.fcapp.run）强制要求 Date 头，否则返回 MissingRequiredHeader
+  // 每次请求生成新的 GMT 时间（HTTP/1.1 标准 RFC 1123 格式）
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${relayToken}`,
+    'Date': new Date().toUTCString(),
+    'User-Agent': 'bozone-server/1.0',
+  };
+
+  // 通道 A：直连
+  let lastError: any = null;
+  try {
+    console.log(`[TikTok Ads] relay attempt 1/2: direct connect to ${relayUrl}`);
+    const res = await undiciFetch(relayUrl, {
+      method: 'POST', headers, body: JSON.stringify(payload), dispatcher: directAgent,
+    });
+    const text = await res.text();
+    console.log(`[TikTok Ads] relay DIRECT success status=${res.status}`);
+    return parseRelayResponse(res.status, text);
+  } catch (e: any) {
+    lastError = e;
+    const directChain = extractErrorChain(e);
+    const directRoot = directChain[directChain.length - 1];
+    console.warn(`[TikTok Ads] relay direct failed: code=${directRoot?.code || '-'} msg=${directRoot?.message || e?.message}`);
+  }
+
+  // 通道 B：走 7890 代理
+  if (useProxy) {
+    try {
+      console.log(`[TikTok Ads] relay attempt 2/2: via proxy ${proxyUrl}`);
+      const proxyDispatcher = new ProxyAgent({
+        uri: proxyUrl,
+        // ProxyAgent 内部用 connect/headers/body timeout，这里只设一个宽松的
+        connect: { timeout: 10_000 },
+        bodyTimeout: 30_000,
+        headersTimeout: 20_000,
+      });
+      const res = await undiciFetch(relayUrl, {
+        method: 'POST', headers, body: JSON.stringify(payload), dispatcher: proxyDispatcher,
+      });
+      const text = await res.text();
+      console.log(`[TikTok Ads] relay PROXY success status=${res.status} via ${proxyUrl}`);
+      return parseRelayResponse(res.status, text);
+    } catch (e: any) {
+      lastError = e;
+      const proxyChain = extractErrorChain(e);
+      const proxyRoot = proxyChain[proxyChain.length - 1];
+      console.error(`[TikTok Ads] relay proxy ${proxyUrl} failed: code=${proxyRoot?.code || '-'} msg=${proxyRoot?.message || e?.message}`);
+    }
+  }
+
+  // 两条都失败 → 抛带根因的 Error
+  const chain = extractErrorChain(lastError);
+  const root = chain[chain.length - 1];
+  const wrapped = new Error(`relay all channels failed → ${root?.message || lastError?.message || 'unknown'} (code=${root?.code || '-'})`);
+  (wrapped as any).chain = chain;
+  (wrapped as any).cause = lastError;
+  throw wrapped;
+}
+
+/** 解析 Worker 返回，提取 data 字段 */
+function parseRelayResponse(status: number, text: string): any {
+  console.log(`[TikTok Ads] relay response status=${status} body=${text.slice(0, 800)}`);
+  let json: any;
+  try { json = JSON.parse(text); } catch {
+    throw new Error(`relay non-JSON response (status=${status}): ${text.slice(0, 200)}`);
+  }
+  if (!json.success) {
+    // 把 FC 的真实错误信息全部打出来
+    console.error('[TikTok Ads] relay returned failure:', JSON.stringify(json).slice(0, 500));
+    throw new Error(json.error || json.message || `Worker relay failed (status=${status})`);
+  }
+  return json.data;
+}
+
+async function saveAccountsCache(idsArray: string[]) {
+  try {
+    const { getAdvertisersInfo, getAdvertiserBalance } = await import('../services/tiktok-ads');
+    const nameMap: Record<string, string> = {};
+    const infoMap: Record<string, { country?: string }> = {};
+    const balanceMap: Record<string, any> = {};
+
+    try {
+      const infoRes = await getAdvertisersInfo(idsArray);
+      (infoRes?.data?.list || []).forEach((item: any) => {
+        const id = item.advertiser_id;
+        const name = item.advertiser_name || item.name;
+        if (name) nameMap[id] = name;
+        infoMap[id] = { country: item.country || '' };
+      });
+    } catch { /* ignore */ }
+    try {
+      const balance = await getAdvertiserBalance(idsArray);
+      (balance?.data?.list || []).forEach((b: any) => { balanceMap[b.advertiser_id] = b; });
+    } catch { /* ignore */ }
+
+    const cache = idsArray.map((id: string) => ({
+      advertiser_id: id,
+      advertiser_name: nameMap[id] || id,
+      status: 'ACTIVE',
+      country: infoMap[id]?.country || undefined,
+      balance_info: balanceMap[id] || null,
+    }));
+    console.log('[tiktok-ads] saveAccountsCache:', JSON.stringify(cache));
+    getDb().prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(cache));
+    return { cached: true };
+  } catch {
+    const fallback = idsArray.map((id: string) => ({ advertiser_id: id, advertiser_name: id, status: 'ACTIVE', balance_info: null }));
+    getDb().prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_accounts_cache', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(fallback));
+    return { cached: false };
+  }
+}
+
+async function handleAuthCodeAndSave(authCode: string) {
+  let result: any;
+  // 1. 尝试直连 TikTok
+  try {
+    result = await exchangeAuthCode(authCode);
+  } catch (directErr: any) {
+    console.warn('[TikTok Ads] direct exchange failed:', directErr.message);
+    // 2. 回退到 Cloudflare Worker 中继
+    if (process.env.TT_ADS_RELAY_URL) {
+      console.log('[TikTok Ads] falling back to Cloudflare Worker relay:', process.env.TT_ADS_RELAY_URL);
+      result = await exchangeAuthCodeViaRelay(authCode);
+    } else {
+      throw directErr; // 没有配置 relay，直接报错
+    }
+  }
+  if (result.code !== 0) throw new Error(result.message || '换取 token 失败');
+
+  const data = result.data || {};
+  const accessToken = data.access_token;
+  const refreshToken = data.refresh_token;
+  const advertiserIds = data.advertiser_ids || data.advertiser_id || [];
+  if (!accessToken) throw new Error('响应中缺少 access_token');
+
+  const db = getDb();
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_access_token', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(accessToken);
+  if (refreshToken) {
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_refresh_token', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(refreshToken);
+  }
+  const idsArray = Array.isArray(advertiserIds) ? advertiserIds : (advertiserIds ? [advertiserIds] : []);
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(idsArray));
+
+  // 异步存账户缓存（不阻塞响应，否则国内 ECS 连不上 TikTok 会超时）
+  saveAccountsCache(idsArray).catch(e => console.warn('[TikTok Ads] async cache update failed:', e.message));
+  return { accessToken, advertiserIds: idsArray };
+}
+
+// ── 路由 ──
+
+// GET /api/tiktok-ads/auth-url — 获取 TikTok 广告授权 URL
+router.get('/auth-url', authMiddleware, (req: Request, res: Response) => {
+  const state = (req.query.state as string) || 'bozone-auth';
+  res.json({
+    success: true,
+    authUrl: buildAuthUrl(state),
+    appId: APP_ID,
+    appSecret: APP_SECRET, // 暴露给前端做客户端 token 交换（避免服务器访问 TikTok）
+    redirectUri: REDIRECT_URI,
+  });
+});
+
+// POST /api/tiktok-ads/save-token — 前端已换取 token，服务器直接保存（用于本地代理场景）
+router.post('/save-token', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { access_token, refresh_token, advertiser_ids, expires_in } = req.body;
+    if (!access_token) return res.status(400).json({ success: false, error: '缺少 access_token' });
+
+    const db = getDb();
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_access_token', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(access_token);
+    if (refresh_token) {
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_refresh_token', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(refresh_token);
+    }
+    if (expires_in) {
+      const expiresAt = Date.now() + Number(expires_in) * 1000;
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_token_expires_at', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(String(expiresAt));
+    }
+    const idsArray = Array.isArray(advertiser_ids) ? advertiser_ids : (advertiser_ids ? [advertiser_ids] : []);
+    if (idsArray.length) {
+      db.prepare(`INSERT INTO settings (key, value) VALUES ('tt_ads_advertiser_ids', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(idsArray));
+    }
+
+    // 重新拉取账户缓存
+    try {
+      const { saveAccountsCache } = await import('../services/tiktok-ads');
+      // saveAccountsCache 是 async 但内部用了 tiktokAdsPost，国内服务器可能访问不到
+      // 这里用 try/catch 包住，失败不影响 token 保存
+      saveAccountsCache(idsArray).catch((e: any) => console.warn('[TikTok Ads] saveAccountsCache failed (non-fatal):', e.message));
+    } catch (e: any) { /* ignore */ }
+
+    res.json({ success: true, data: { accessToken: '***', advertiserIds: idsArray } });
+  } catch (e: any) {
+    console.error('[TikTok Ads] save-token failed:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/tiktok-ads/exchange-code — 前端用 auth_code 换 token（回调地址现在是 /ad-accounts）
+router.post('/exchange-code', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const authCode = req.body.auth_code || req.body.code;
+    if (!authCode) return res.status(400).json({ success: false, error: '缺少 auth_code' });
+
+    const result = await handleAuthCodeAndSave(authCode as string);
+    res.json({ success: true, data: result });
+  } catch (e: any) {
+    console.error('[TikTok Ads] 换 token 失败:', e.message);
+    // 区分网络瞬时错误 vs 业务错误
+    const isTransient = ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED'].includes(e?.code || e?.cause?.code)
+      || /fetch failed|ClientNetworkError/i.test(e?.message || '');
+    res.status(isTransient ? 503 : 500).json({
+      success: false,
+      error: e.message,
+      error_type: isTransient ? 'network_transient' : 'business',
+      hint: isTransient
+        ? '网络瞬时错误，已自动重试 9 次（3 代理 × 3 次）。请稍后手动重试，或检查代理端口 10909 是否正常。'
+        : '请确认 auth_code 有效且未过期（auth_code 仅 5 分钟有效）',
+    });
+  }
+});
+
+// GET /api/tiktok-ads/callback — 兼容旧版回调（保留，避免已配置 redirect_uri 的应用报错）
+router.get('/callback', async (req: Request, res: Response) => {
+  try {
+    const authCode = (req.query.auth_code || req.query.code) as string;
+    if (!authCode) {
+      return res.status(400).json({ success: false, error: '缺少 auth_code 参数' });
+    }
+    await handleAuthCodeAndSave(authCode);
+    res.redirect('/ad-accounts');
+  } catch (e: any) {
+    console.error('[TikTok Ads] 回调处理失败:', e.message);
+    console.error('[TikTok Ads] 错误堆栈:', e.stack);
+    res.status(500).json({ success: false, error: e.message, stack: e.stack });
+  }
+});
+
+// GET /api/tiktok-ads/token-status — 查看当前是否已保存 token
+router.get('/token-status', authMiddleware, (_req: Request, res: Response) => {
+  try {
+    res.json(getTokenStatus());
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/tiktok-ads/test-relay — 诊断 Worker 双通道可达性
+// 返回：direct 通道结果 + proxy 通道结果 + 错误链
+router.get('/test-relay', authMiddleware, async (_req: Request, res: Response) => {
+  const relayUrl = process.env.TT_ADS_RELAY_URL;
+  const relayToken = process.env.TT_ADS_RELAY_TOKEN || 'change-me';
+  if (!relayUrl) return res.status(400).json({ success: false, error: '未配置 TT_ADS_RELAY_URL' });
+
+  const proxyUrl = process.env.TT_ADS_RELAY_VIA_PROXY
+    || process.env.HTTPS_PROXY
+    || 'http://127.0.0.1:7890';
+
+  // 故意发一个空 auth_code，Worker 会返回 400 + missing 错误，但能验证鉴权+网络是否通
+  const testPayload = JSON.stringify({
+    action: 'exchange_code',
+    app_id: APP_ID,
+    secret: APP_SECRET,
+    auth_code: '__test__',
+  });
+  const testHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${relayToken}`,
+  };
+
+  // 通道 A：直连
+  const testChannel = async (label: string, dispatcher: any, timeoutMs: number) => {
+    const t0 = Date.now();
+    try {
+      const r = await undiciFetch(relayUrl, {
+        method: 'POST', headers: testHeaders, body: testPayload, dispatcher,
+      });
+      const text = await r.text();
+      return {
+        channel: label,
+        ok: r.status >= 200 && r.status < 500,
+        http_status: r.status,
+        latency_ms: Date.now() - t0,
+        body_preview: text.slice(0, 300),
+        hint: r.status === 401
+          ? 'Worker 鉴权失败 — 检查 TT_ADS_RELAY_TOKEN 是否等于 Worker env TIKTOK_RELAY_TOKEN'
+          : r.status === 400
+            ? 'Worker 可达+鉴权通过（仅参数错误，正常）'
+            : r.status === 200
+              ? 'Worker 可达且鉴权通过'
+              : `HTTP ${r.status}`,
+      };
+    } catch (e: any) {
+      const chain = extractErrorChain(e);
+      const root = chain[chain.length - 1];
+      return {
+        channel: label,
+        ok: false,
+        latency_ms: Date.now() - t0,
+        error_chain: chain,
+        root_cause: root,
+        hint: (() => {
+          const code = root?.code || '';
+          if (code === 'ENOTFOUND') return 'DNS 解析失败';
+          if (code === 'ECONNREFUSED') return '端口被防火墙挡';
+          if (code === 'ETIMEDOUT' || /timeout/i.test(root?.message || '')) return `连接超时（>${timeoutMs}ms）— 网络不通`;
+          if (code === 'ECONNRESET') return '连接被重置 — 运营商/GFW 干扰';
+          if (/fetch failed/i.test(e?.message || '')) return '底层 fetch 失败（无具体 code）';
+          return '未知网络错误';
+        })(),
+      };
+    }
+  };
+
+  const directAgent = new Agent({
+    connect: { timeout: 3_000 },
+    bodyTimeout: 15_000,
+    headersTimeout: 10_000,
+  });
+  const proxyDispatcher = new ProxyAgent({
+    uri: proxyUrl,
+    connect: { timeout: 10_000 },
+    bodyTimeout: 15_000,
+    headersTimeout: 10_000,
+  });
+
+  const [directRes, proxyRes] = await Promise.all([
+    testChannel('direct', directAgent, 3000),
+    testChannel(`proxy(${proxyUrl})`, proxyDispatcher, 10000),
+  ]);
+
+  const anyOk = directRes.ok || proxyRes.ok;
+  return res.json({
+    success: anyOk,
+    relay_url: relayUrl,
+    proxy_url: proxyUrl,
+    channels: { direct: directRes, proxy: proxyRes },
+    conclusion: anyOk
+      ? `✅ ${directRes.ok ? '直连' : '代理'}通道可用，可走 ${directRes.ok ? '直连' : proxyUrl}`
+      : '❌ 两条通道都失败 — 需检查网络/代理/Worker 状态',
+  });
+});
+
+// GET /api/tiktok-ads/diagnose — 全维度诊断（直连 vs 代理 / HTTP vs HTTPS / 多目标）
+// 返回：4 种组合的连通性 + 根本原因定位
+router.get('/diagnose', authMiddleware, async (_req: Request, res: Response) => {
+  const proxyUrl = process.env.HTTPS_PROXY || 'http://127.0.0.1:7890';
+
+  // 4 个目标：分别代表国内 / 国外 / 普通 / 关键依赖
+  const targets = [
+    { name: 'tiktok_business_api', url: 'https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', method: 'POST', expectStatuses: [400, 401, 405] },
+    { name: 'tiktok_creative_portal', url: 'https://business-api.tiktok.com/portal/auth', method: 'GET', expectStatuses: [200, 302, 400] },
+    { name: 'cloudflare_worker', url: process.env.TT_ADS_RELAY_URL || 'https://kyrie.yangyue0505.workers.dev', method: 'POST', expectStatuses: [200, 400, 401] },
+    { name: 'google_connectivity', url: 'https://www.google.com/generate_204', method: 'GET', expectStatuses: [204, 200, 301, 302] },
+  ];
+
+  const directAgent = new Agent({ connect: { timeout: 5_000 }, bodyTimeout: 8_000, headersTimeout: 5_000 });
+  const proxyDispatcher = new ProxyAgent({ uri: proxyUrl, connect: { timeout: 5_000 }, bodyTimeout: 8_000, headersTimeout: 5_000 });
+
+  // 测试一项：返回 { ok, status, latency_ms, root_code, root_message, hint }
+  async function probe(target: typeof targets[number], dispatcher: any, label: string) {
+    const t0 = Date.now();
+    try {
+      const opts: any = {
+        method: target.method,
+        headers: { 'Content-Type': 'application/json' },
+        dispatcher,
+      };
+      // POST 需要 body
+      if (target.method === 'POST') {
+        opts.body = JSON.stringify({ __test__: 1 });
+      }
+      const r = await undiciFetch(target.url, opts);
+      const text = await r.text();
+      return {
+        target: target.name,
+        via: label,
+        ok: r.status >= 200 && r.status < 500,
+        http_status: r.status,
+        latency_ms: Date.now() - t0,
+        body_preview: text.slice(0, 150),
+        hint: target.expectStatuses.includes(r.status)
+          ? `网络通，目标可达（${r.status}）`
+          : r.status === 401
+            ? '可达但鉴权失败（正常，目标需要 token）'
+            : `HTTP ${r.status}`,
+      };
+    } catch (e: any) {
+      const chain = extractErrorChain(e);
+      const root = chain[chain.length - 1];
+      const code = root?.code || '-';
+      return {
+        target: target.name,
+        via: label,
+        ok: false,
+        latency_ms: Date.now() - t0,
+        root_code: code,
+        root_message: root?.message || e?.message,
+        hint: code === 'ETIMEDOUT' ? 'TCP 握手超时 — 目标域名不可达（可能被 GFW 拦截）'
+          : code === 'ECONNRESET' ? '连接被重置 — 代理 / 防火墙 / 协议不匹配'
+          : code === 'ENOTFOUND' ? 'DNS 解析失败 — 容器内 DNS 问题'
+          : code === 'ECONNREFUSED' ? '端口被拒 — 防火墙拦截 / 端口未开'
+          : code === 'CERT_' ? 'TLS 证书错误'
+          : '未知错误',
+      };
+    }
+  }
+
+  // 8 个组合（4 目标 × 2 通道）顺序探测（避免同时打爆代理）
+  const results: any[] = [];
+  for (const t of targets) {
+    results.push(await probe(t, directAgent, 'direct'));
+    results.push(await probe(t, proxyDispatcher, `proxy(${proxyUrl})`));
+  }
+
+  // 总结：判断每种通道的整体可用性
+  const direct = results.filter(r => r.via === 'direct');
+  const proxy = results.filter(r => r.via.startsWith('proxy('));
+  const directOkCount = direct.filter(r => r.ok).length;
+  const proxyOkCount = proxy.filter(r => r.ok).length;
+
+  // 根因诊断
+  const diagnosis: string[] = [];
+  if (directOkCount === 0 && proxyOkCount === 0) {
+    diagnosis.push('🚨 直连和代理都不通 — 容器可能完全没网，或所有目标都被 GFW 阻断');
+  } else if (directOkCount === 0) {
+    diagnosis.push('⚠️  直连完全不通（GFW 阻断，符合预期）');
+  } else if (directOkCount === direct.length) {
+    diagnosis.push('✅ 直连全部通 — 代理其实没必要用');
+  }
+  if (proxyOkCount === 0) {
+    diagnosis.push(`🚨 代理 ${proxyUrl} 完全不通 — 这是 TikTok OAuth 失败的核心原因`);
+    const proxyFails = proxy.filter(r => r.root_code === 'ECONNRESET');
+    if (proxyFails.length >= 3) {
+      diagnosis.push('   └─ 90% 概率是 SOCKS 代理（不是 HTTP），undici ProxyAgent 不支持');
+      diagnosis.push('   └─ 或者代理需要认证（HTTP 407）');
+      diagnosis.push('   └─ 建议：SSH 到服务器，手动测试 `curl -x ' + proxyUrl + ' https://www.google.com` 看是否成功');
+    }
+  } else if (proxyOkCount < proxy.length) {
+    diagnosis.push(`⚠️  代理部分通（${proxyOkCount}/${proxy.length}）— 可能是路由规则把某些目标 block 了`);
+  } else {
+    diagnosis.push('✅ 代理全部通 — 但 OAuth 仍失败，可能是别的问题');
+  }
+
+  // 给出可执行的建议
+  const recommendations: string[] = [];
+  if (proxyOkCount === 0) {
+    recommendations.push('1. SSH 到 ECS，执行：`curl -v -x ' + proxyUrl + ' https://www.google.com` — 验证代理本身是否工作');
+    recommendations.push('2. 如果 7890 真的是 SOCKS 代理，找一下 SOCKS 端口（通常是 7891），用 socks-proxy-agent');
+    recommendations.push('3. 临时方案：给 Cloudflare Worker 绑定自定义域名（绕过 *.workers.dev 域名封锁）');
+    recommendations.push('4. 终极方案：让运维帮你直连 TikTok 的 IP 加白名单（白嫖不了，认栽）');
+  } else {
+    recommendations.push('代理可用但 OAuth 仍失败 — 可能是 auth_code 已过期（5分钟），重试一次');
+  }
+
+  return res.json({
+    proxy_url: proxyUrl,
+    summary: {
+      direct_pass: `${directOkCount}/${direct.length}`,
+      proxy_pass: `${proxyOkCount}/${proxy.length}`,
+    },
+    results,
+    diagnosis,
+    recommendations,
+  });
+});
+
+export default router;
+
+<!-- end -->

@@ -1,0 +1,32 @@
+<!-- dup_r17 -->
+// Vision Agent — 理解商品
+import { callLLM, parseJSON } from '../llm';
+import { VisionInput, VisionOutput } from '../types';
+
+export async function visionAgent(input: VisionInput): Promise<VisionOutput> {
+  const raw = await callLLM({
+    systemPrompt: `你是商品理解专家。分析商品图片和描述，以 JSON 输出商品特征。
+输出格式：{"category":"","productType":"","brand":"","material":[],"color":[],"style":"","targetAudience":"","sellingPoints":[],"scene":[],"visualTags":[]}
+只输出 JSON，不加解释。`,
+    userPrompt: `商品名称：${input.productName}\n商品描述：${input.productDescription || '无'}\n类目：${input.category || '通用'}`,
+    temperature: 0.1,
+    responseFormat: 'json_object',
+  });
+
+  const j = parseJSON(raw) || {};
+  return {
+    category: j.category || input.category || '通用',
+    productType: j.productType || '商品',
+    brand: j.brand || '',
+    material: j.material || [],
+    color: j.color || [],
+    style: j.style || '简约',
+    targetAudience: j.targetAudience || '泛人群',
+    sellingPoints: j.sellingPoints || [],
+    scene: j.scene || [],
+    visualTags: j.visualTags || [],
+    rawJson: raw,
+  };
+}
+
+<!-- end -->

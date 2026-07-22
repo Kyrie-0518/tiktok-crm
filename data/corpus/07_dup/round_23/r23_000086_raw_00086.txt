@@ -1,0 +1,14 @@
+<!-- dup_r23 -->
+// 路由导航工具 - 用于在 API 拦截器中调用
+// 由于 axios 拦截器中不能直接使用 react-router-dom 的 hooks，需要使用原生方法
+export function navigate(path: string, options?: { replace?: boolean }) {
+  if (options?.replace) {
+    window.history.replaceState(null, '', path);
+  } else {
+    window.history.pushState(null, '', path);
+  }
+  // 触发 popstate 事件让 React Router 更新
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+<!-- end -->

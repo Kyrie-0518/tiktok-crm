@@ -1,0 +1,59 @@
+<!-- dup_r2 -->
+import React from 'react';
+import { Card, Table, Input, Select, DatePicker } from 'antd';
+import { FileSearchOutlined } from '@ant-design/icons';
+import api from '../../api';
+
+export default function AdminAuditLogs() {
+  const [data, setData] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [total, setTotal] = React.useState(0);
+  const [page, setPage] = React.useState(1);
+  const [filters, setFilters] = React.useState<any>({});
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const params: any = { page, pageSize: 20, ...filters };
+      const { data: res } = await api.get('/admin/audit-logs', { params });
+      setData(res.data || []);
+      setTotal(res.total || 0);
+    } finally { setLoading(false); }
+  };
+  React.useEffect(() => { fetchData(); }, [page, filters]);
+
+  return (
+    <div style={{ padding: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #2563eb, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18 }}>
+          <FileSearchOutlined />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>操作日志审计</h2>
+          <p style={{ color: '#94a3b8', fontSize: 13, margin: '2px 0 0' }}>全局权限中心 · 全系统操作日志</p>
+        </div>
+      </div>
+      <Card style={{ borderRadius: 10 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <Input placeholder="用户名" onChange={e => setFilters((f: any) => ({ ...f, username: e.target.value || undefined }))} style={{ width: 150 }} />
+          <Select placeholder="请求方法" allowClear onChange={v => setFilters((f: any) => ({ ...f, method: v }))} style={{ width: 120 }}
+            options={['GET', 'POST', 'PUT', 'DELETE'].map(m => ({ label: m, value: m }))} />
+          <Input placeholder="路径" onChange={e => setFilters((f: any) => ({ ...f, path: e.target.value || undefined }))} style={{ width: 180 }} />
+        </div>
+        <Table rowKey="id" dataSource={data} loading={loading} size="middle"
+          pagination={{ total, current: page, pageSize: 20, onChange: setPage, showTotal: t => `共 ${t} 条` }}
+          columns={[
+            { title: 'ID', dataIndex: 'id', width: 60 },
+            { title: '用户', dataIndex: 'username', width: 100 },
+            { title: '方法', dataIndex: 'method', width: 70 },
+            { title: '路径', dataIndex: 'path', width: 200 },
+            { title: '状态码', dataIndex: 'status_code', width: 70 },
+            { title: 'IP', dataIndex: 'ip', width: 130 },
+            { title: '时间', dataIndex: 'created_at', width: 160 },
+          ]} />
+      </Card>
+    </div>
+  );
+}
+
+<!-- end -->

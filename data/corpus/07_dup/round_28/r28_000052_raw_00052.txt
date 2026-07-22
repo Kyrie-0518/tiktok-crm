@@ -1,0 +1,24 @@
+<!-- dup_r28 -->
+// 视频模型类型定义
+
+export const VIDEO_MODEL_TYPES = [
+  { type: 'default', name: '视频生成引擎', icon: 'volcano', description: '通用视频生成模型', defaultEndpoint: '', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'doubao-seedance-1-0-pro-250528', messages: [{ role: 'user', content: 'hi' }], max_tokens: 10 } },
+  { type: 'kling', name: '快手可灵 (Kling)', icon: '⚡', description: '快手视频生成模型', defaultEndpoint: 'https://api.klingai.com', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'kling-v1', task_type: 'text2video', prompt: 'hi' } },
+  { type: 'minimax', name: 'MiniMax', icon: '🎯', description: 'MiniMax 海螺视频生成模型', defaultEndpoint: 'https://api.minimax.chat', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'abab6-video-01', prompt: 'hi' } },
+  { type: 'haiper', name: 'Haiper', icon: '🌊', description: 'Haiper AI 视频生成模型', defaultEndpoint: 'https://api.haiper.ai', supportsResolution: true, supportsDuration: true, supportsAspectRatio: true, supportsReferenceImages: true, testPrompt: { model: 'haiper-video-v2', prompt: 'hi' } },
+  { type: 'openai-sora', name: 'OpenAI Sora', icon: '🤖', description: 'OpenAI Sora 视频生成模型', defaultEndpoint: 'https://api.openai.com/v1', supportsResolution: true, supportsDuration: true, supportsAspectRatio: false, supportsReferenceImages: true, testPrompt: { model: 'sora-turbo', prompt: 'hi', duration: 5 } },
+  { type: 'custom', name: '自定义模型', icon: '🔧', description: '支持其他 OpenAI 兼容格式的 API', defaultEndpoint: '', supportsResolution: true, supportsDuration: true, supportsAspectRatio: false, supportsReferenceImages: true, testPrompt: { model: 'custom-model', messages: [{ role: 'user', content: 'hi' }], max_tokens: 10 } },
+];
+
+export function getModelType(type: string) {
+  return VIDEO_MODEL_TYPES.find(m => m.type === type);
+}
+
+function buildEndpoint(base: string, path: string): string {
+  if (base.endsWith(path)) return base;
+  return `${base}${path}`;
+}
+
+export { buildEndpoint };
+
+<!-- end -->

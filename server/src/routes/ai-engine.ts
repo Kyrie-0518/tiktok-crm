@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { createAndRun, runPipeline } from '../services/ai-engine/orchestrator';
 import getDb from '../db';
+import { moderationMiddleware } from '../middleware/content-moderation';
 import crypto from 'crypto';
 
 function uuid(): string {
@@ -12,7 +13,7 @@ function uuid(): string {
 const router = Router();
 
 // POST /api/ai-engine/generate — 异步模式：立即返回 taskId，pipeline 在后台跑
-router.post('/generate', authMiddleware, async (req: Request, res: Response) => {
+router.post('/generate', authMiddleware, moderationMiddleware('ai_engine'), async (req: Request, res: Response) => {
   try {
     const { productId, productImage, productName, productDescription, userPrompt, template, model, resolution, aspectRatio, duration, count } = req.body;
 

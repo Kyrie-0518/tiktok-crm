@@ -1,0 +1,117 @@
+<!-- dup_r36 -->
+# TikTok for Business MCP Server 分析与集成规划
+
+## 一、这是什么
+
+**TikTok for Business MCP Server** 是 TikTok 官方基于 **Model Context Protocol (MCP)** 标准构建的 AI 代理接入层。它把大约 **400 个 TikTok API for Business 端点** 封装成结构化的 MCP Tools，让 AI 代理可以直接通过自然语言指令操作 TikTok 广告平台。
+
+通俗讲：在 Claude / CodeBuddy / 其他 MCP 客户端里装上这个 MCP Server 后，你不需要写代码调广告 API，直接对 AI 说句话它就能帮你创建广告、拉报表、调预算、传素材。
+
+## 二、核心能力（基于官方文档 v1.3）
+
+| 能力域 | 说明 | 示例指令 |
+|---|---|---|
+| **Campaign 全生命周期管理** | 创建/更新/暂停 Upgraded Smart+、GMV Max 等广告系列 | "Create an Upgraded Smart+ campaign for my latest product." |
+| **广告组与广告管理** | 管理 ad groups、ads、出价、预算 | "Increase budget by 20% for all ad groups with ROAS > 3." |
+| **数据报表与洞察** | 获取 campaign / ad group / ad / creative 级别的消耗、转化、曝光 | "Show me the performance report for all active campaigns this week." |
+| **商品目录 (Catalog)** | 上传/管理电商商品目录，诊断目录问题 | "Upload this E-commerce catalog and check for any diagnostic issues." |
+| **受众与定向** | 配置 audiences、lookalike、兴趣包 | "Create a lookalike audience based on my top purchasers." |
+| **创意素材** | 管理 videos、images、creative assets | "Upload this video and create 5 ad variations." |
+| **账户管理** | 查询广告账户、授权、资产绑定关系 | "List all my ad accounts and their current spend." |
+
+> 工具示例（来自 Available tools 页面）：
+> - `ad_audience_size_estimate` → `/v1.3/ad/audience_size/estimate/`
+> - `ad_create` → `/v1.3/ad/create/`
+> - `ad_get` → `/v1.3/ad/get/`
+> - `ad_review_info_get` → `/v1.3/ad/review_info/`
+
+## 三、与虾掌柜「流量引擎」的关系
+
+| 对比项 | 我们现有「流量引擎」 | TikTok Ads MCP Server |
+|---|---|---|
+| 广告数据接入 | 预留接口，需要自研 | 官方 400+ API 已封装 |
+| 操作自动化 | 需自己写规则引擎 | AI 通过自然语言直接执行 |
+| 开发工作量 | 2-3 个月起 | 接入 MCP 后 1-2 周即可用 |
+| 维护成本 | 高（TikTok API 升级要跟进） | 低（TikTok 官方维护） |
+| 智能化程度 | 规则驱动 | AI Agent 驱动 |
+
+**结论**：我们的「流量引擎」不应该从零封装 TikTok Ads API，而应该**直接集成 TikTok 官方 MCP Server**，把广告能力快速接入系统，再叠加自己的业务层（如利润核算、订单归因、达人BD联动）。
+
+## 四、接入方式概述
+
+TikTok 官方文档提到的连接方式：
+
+1. **前置条件**
+   - 一个 TikTok for Business 账号
+   - 一个支持 MCP 的 AI 代理 / 平台（如 Claude Desktop、Cursor、CodeBuddy 等）
+   - 网络可达 TikTok MCP Server URL
+
+2. **连接步骤**（官方文档未展示完整细节，但通常 MCP Server 连接模式）
+   - 选择 Server URL（TikTok 提供官方 SSE/stdio 入口）
+   - 在 MCP 客户端配置该 Server 的 endpoint、app_id、access_token 等凭证
+   - 授权 TikTok for Business 账号访问广告数据
+   - 客户端自动发现 400 个 tools
+   - 通过自然语言调用
+
+3. **两种常见集成形态**
+   - **形态 A：外部 MCP 客户端**（如 Claude Desktop）直接连 TikTok MCP Server，适合运营人员单独使用。
+   - **形态 B：集成进虾掌柜系统**（推荐）—— 在我们的后端启动一个 MCP 客户端，把 TikTok MCP Server 的 tools 包装成虾掌柜内部的广告中心 API，前端流量引擎页面直接调用。
+
+## 五、执行规划（建议分 3 阶段）
+
+### 阶段 1：接入与打通（1 周）
+
+**目标**：让虾掌柜系统可以调用 TikTok Ads MCP Server 的 tools。
+
+| 任务 | 内容 | 产出 |
+|---|---|---|
+| 1.1 申请 TikTok for Business 广告账号权限 | 确认有 TikTok Ads 账号、BM、广告账户，申请 API 访问权限 | 可用的 advertiser_id、access_token |
+| 1.2 选择 MCP 接入协议 | 调研 TikTok 官方提供的是 `stdio` 还是 `SSE` 方式；如果是私有部署，决定使用官方 MCP 客户端 SDK（如 `@modelcontextprotocol/sdk`） | 确定协议与依赖 |
+| 1.3 创建 MCP 连接层 | 在 `server/src/services/tiktok-mcp/` 创建服务：启动 MCP 客户端、连接 TikTok MCP Server、加载 tools 列表 | 可调用 tools 的 service |
+| 1.4 基础工具封装 | 把高频 tools 封装成内部函数：获取广告账户列表、获取 campaign 列表、获取广告报表 | 3-5 个可用 API |
+
+### 阶段 2：流量引擎核心页面改造（1.5 周）
+
+**目标**：把广告中心 6 大菜单从占位页变成真实可用功能。
+
+| 菜单 | 改造内容 | 依赖工具 |
+|---|---|---|
+| 广告仪表盘 | 展示广告账户总消耗、曝光、转化、ROAS 趋势 | `ad_report_*`, `advertiser_info` |
+| 账户授权 | 管理 TikTok Ads 广告账户授权状态 | OAuth 流程 + `advertiser_info` |
+| 系列管理 | 列表展示所有 campaigns，支持暂停/启动/编辑预算 | `campaign_get`, `campaign_update` |
+| 智能规则 | 基于 ROAS/Cost/转化数自动调整广告预算/状态 | `campaign_update`, `adgroup_update` + 定时任务 |
+| 执行日志 | 记录每次 AI/规则对广告的操作 | 内部审计表 |
+| 素材分析 | 拉取各 creative 的 CTR、CVR、消耗数据 | `creative_get`, `creative_report` |
+
+### 阶段 3：AI 工作室与智能化（1-2 周）
+
+**目标**：让「欧文」或系统内置 AI 可以直接管理广告。
+
+| 任务 | 内容 | 示例 |
+|---|---|---|
+| 3.1 给 AI 暴露广告工具集 | 在 AI 上下文描述中注入可用广告 tools 及其参数 | 让 AI 知道可以调用 `campaign_get` |
+| 3.2 自然语言广告指令 | 用户输入 "把 ROAS 低于 2 的系列预算降到 10 美元"，AI 解析并执行 | 自动定位 + 更新预算 |
+| 3.3 广告与利润联动 | 把广告消耗自动写入财务核算，计算广告维度 ROI | 财务费用项新增「广告费」自动归集 |
+| 3.4 与达人 BD 联动 | 根据广告高转化商品，推荐匹配达人建联 | 达人广场数据 + 广告商品数据结合 |
+
+## 六、预期收益
+
+- **开发周期**：从 2-3 个月自研广告 API 缩短到 **2-4 周**集成 MCP
+- **功能完整性**：直接获得 TikTok 官方 400+ 广告 API 能力
+- **AI 原生**：从第一天起就是 AI 可操作的，不是后期补 AI
+- **维护成本**：由 TikTok 官方维护 MCP Server 和 API 适配
+
+## 七、风险与注意事项
+
+| 风险 | 说明 | 应对 |
+|---|---|---|
+| 权限申请周期长 | TikTok 广告 API 权限需要商务审核 | 提前申请 TikTok for Business 账号和 API 权限 |
+| MCP 协议版本变化 | 目前是 v1.3，后续可能升级 | 抽象 MCP 连接层，升级时只改一层 |
+| 数据隐私 | 广告数据涉及客户经营数据 | 在本地缓存敏感数据，不落 TikTok 日志 |
+| 依赖外部服务 | 网络稳定性 | 所有 MCP 调用加超时和本地缓存 |
+
+---
+
+**下一步建议**：先确认是否已有 TikTok for Business 广告账号和 API 权限。如果有，立即开始阶段 1 的 POC（Proof of Concept）：用一个小脚本连接 MCP Server，成功调通 3-5 个 tools 后再进入系统级集成。
+
+<!-- end -->

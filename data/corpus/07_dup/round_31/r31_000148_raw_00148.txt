@@ -1,0 +1,61 @@
+<!-- dup_r31 -->
+#!/bin/bash
+# ── 虾掌柜ERP 一站式部署脚本 ──
+# 在服务器上执行: bash deploy.sh
+set -e
+
+echo "=============================="
+echo "  虾掌柜ERP 部署开始"
+echo "=============================="
+
+# 1. 拉取最新代码
+echo "[1/6] 拉取最新代码..."
+cd /opt/tiktok-crm
+git pull
+
+# 2. 停止 Nginx（释放 80/443 端口）
+echo "[2/6] 停止 Nginx..."
+systemctl stop nginx 2>/dev/null || true
+sleep 2
+
+# 3. 停止并删除旧容器
+echo "[3/6] 停止旧容器..."
+docker compose down 2>/dev/null || true
+sleep 2
+
+# 4. 重新构建并启动容器
+echo "[4/6] 构建并启动容器..."
+docker compose up --build -d
+
+# 5. 配置 Nginx（如果尚未配置）
+echo "[5/6] 配置 Nginx..."
+cp deploy/nginx-host.conf /etc/nginx/conf.d/bozone.conf
+rm -f /etc/nginx/conf.d/default.conf
+
+echo "  Nginx 配置已更新"
+
+# 检查 Nginx 配置语法
+nginx -t
+
+# 6. 启动 Nginx
+echo "[6/6] 启动 Nginx..."
+systemctl start nginx
+systemctl enable nginx
+
+# ── 验证 ──
+echo ""
+echo "=============================="
+echo "  部署完成，端口检查："
+echo "=============================="
+ss -tlnp | grep -E 'nginx|docker-proxy' || ss -tlnp | grep -E ':80|:443|:8080|:3000'
+
+echo ""
+echo "=============================="
+echo "  验证访问："
+echo "=============================="
+echo "  前端:  https://bvefdvp.cn"
+echo "  健康:  https://bvefdvp.cn/api/health"
+echo "  OAuth: https://bvefdvp.cn/api/tiktok-ads/auth-url"
+echo "=============================="
+
+<!-- end -->

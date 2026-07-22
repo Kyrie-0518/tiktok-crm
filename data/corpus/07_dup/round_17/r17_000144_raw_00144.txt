@@ -1,0 +1,74 @@
+<!-- dup_r17 -->
+import React, { useState, useEffect } from 'react';
+import { Card, Button, Typography, Table, Tag, Space, Modal, Descriptions, Row, Col, Popconfirm, Empty } from 'antd';
+import { DeleteOutlined, EyeOutlined, FilePdfOutlined, BarChartOutlined } from '@ant-design/icons';
+import api from '../../api';
+const { Text, Title } = Typography;
+
+const DS = { bg: '#f5f3f0', cardBg: '#FFFFFF', cardBorder: '#e8e5e0', primary: '#2563eb', text: '#1A1A2E', textSecondary: '#6B7280', radius: 12 };
+
+export default function DiagnosisHistory() {
+  const [records, setRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewing, setViewing] = useState<any>(null);
+
+  useEffect(() => {
+    api.get('/growth-center/history', { params: { limit: 50 } }).then(r => {
+      setRecords(r.data?.rows || []);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const refresh = () => {
+    setLoading(true);
+    api.get('/growth-center/history', { params: { limit: 50 } }).then(r => setRecords(r.data?.rows || [])).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  const deleteRecord = async (taskId: string) => {
+    await api.delete(`/growth-center/history/${taskId}`);
+    setRecords(prev => prev.filter(r => r.task_id !== taskId));
+  };
+
+  return (
+    <div style={{ padding: 24, background: DS.bg, minHeight: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, background: `linear-gradient(135deg, #8B5CF6, #A78BFA)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20 }}><BarChartOutlined /></div>
+        <div style={{ flex: 1 }}>
+          <Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 700, color: DS.text }}>诊断记录</Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>查看历史诊断报告</Text>
+        </div>
+      </div>
+
+      <Card style={{ borderRadius: DS.radius, border: `1px solid ${DS.cardBorder}` }}>
+        <Table dataSource={records} loading={loading} rowKey="task_id" size="middle"
+          columns={[
+            { title: '时间', dataIndex: 'created_at', width: 160, render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
+            { title: '店铺', dataIndex: 'shop_name', render: (v: string) => v || '-' },
+            { title: '评分', dataIndex: 'health_score', width: 80, render: (v: number) => v || '-' },
+            { title: '等级', dataIndex: 'health_grade', width: 60, render: (v: string) => <Tag color={v === 'A' ? 'green' : v === 'B' ? 'blue' : v === 'C' ? 'orange' : 'red'}>{v || '-'}</Tag> },
+            { title: '状态', dataIndex: 'status', width: 80, render: (v: string) => <Tag color={v === 'completed' ? 'green' : v === 'running' ? 'processing' : 'error'}>{v}</Tag> },
+            { title: '操作', width: 200, render: (_: any, r: any) => (
+              <Space>
+                <Button size="small" icon={<EyeOutlined />} onClick={() => setViewing(r)} style={{ borderRadius: 6 }}>查看</Button>
+                <Popconfirm title="确定删除？" onConfirm={() => deleteRecord(r.task_id)}><Button size="small" danger icon={<DeleteOutlined />} style={{ borderRadius: 6 }} /></Popconfirm>
+              </Space>
+            )},
+          ]}
+          locale={{ emptyText: <Empty description="暂无诊断记录" /> }} />
+      </Card>
+
+      <Modal title="诊断详情" open={!!viewing} onCancel={() => setViewing(null)} width={800} footer={null}>
+        {viewing && (
+          <Descriptions column={2} bordered size="small">
+            <Descriptions.Item label="店铺">{viewing.shop_name}</Descriptions.Item>
+            <Descriptions.Item label="时间">{viewing.created_at ? new Date(viewing.created_at).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
+            <Descriptions.Item label="健康评分">{viewing.health_score}</Descriptions.Item>
+            <Descriptions.Item label="等级"><Tag color="green">{viewing.health_grade}</Tag></Descriptions.Item>
+            <Descriptions.Item label="AI 总结" span={2}>{viewing.executive_summary}</Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+<!-- end -->

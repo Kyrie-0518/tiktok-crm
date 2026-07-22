@@ -1,0 +1,43 @@
+<!-- dup_r20 -->
+// Prompt Optimizer — 适配不同模型
+import { callLLM, parseJSON } from '../llm';
+import { OptimizerInput, OptimizerOutput } from '../types';
+
+const ADAPTER_RULES: Record<string, { enhancements: string; negativePrompt: string }> = {
+  seedance: { enhancements: 'Natural Motion, Stable Camera, Commercial Quality, Realistic Lighting, 8K, Cinematic', negativePrompt: 'blurry, low quality, distorted face, watermark, text' },
+  kling: { enhancements: 'Smooth Motion, Professional Lighting, Product Focus, High Detail, 4K', negativePrompt: 'blurry, deformed, watermark, text, lowres' },
+  minimax: { enhancements: 'Cinematic Lighting, Clean Composition, Stable Shot, Commercial Grade', negativePrompt: 'blur, noise, distortion, text' },
+};
+
+export async function optimizerAgent(input: OptimizerInput): Promise<OptimizerOutput> {
+  const modelLower = input.model.toLowerCase();
+  let adapter = 'seedance';
+  if (modelLower.includes('kling')) adapter = 'kling';
+  else if (modelLower.includes('minimax')) adapter = 'minimax';
+
+  const rule = ADAPTER_RULES[adapter] || ADAPTER_RULES.seedance;
+
+  // 让 LLM 做精细优化
+  try {
+    const raw = await callLLM({
+      systemPrompt: `你是Prompt优化专家。根据目标模型优化Prompt，加入模型偏好的关键词。JSON格式：{"optimizedPrompt":"优化后的完整Prompt","negativePrompt":"负面提示词"}`,
+      userPrompt: `原始Prompt：${input.promptEngine.finalPrompt}\n目标模型：${input.model}\n推荐增强词：${rule.enhancements}\n负面词参考：${rule.negativePrompt}`,
+      temperature: 0.3,
+      responseFormat: 'json_object',
+    });
+    const j = parseJSON(raw) || {};
+    return {
+      optimizedPrompts: [{ index: 0, prompt: j.optimizedPrompt || input.promptEngine.finalPrompt, negativePrompt: j.negativePrompt || rule.negativePrompt }],
+      adapterName: adapter,
+      rawJson: raw,
+    };
+  } catch {
+    return {
+      optimizedPrompts: [{ index: 0, prompt: `${input.promptEngine.finalPrompt}, ${rule.enhancements}`, negativePrompt: rule.negativePrompt }],
+      adapterName: adapter,
+      rawJson: JSON.stringify({ fallback: true, adapter }),
+    };
+  }
+}
+
+<!-- end -->

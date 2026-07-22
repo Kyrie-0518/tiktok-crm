@@ -1,0 +1,119 @@
+<!-- dup_r9 -->
+import React, { useEffect, useState } from 'react';
+import { Card, Table, Tag, Typography, Button, Modal, Input, Spin, Empty, message, Space } from 'antd';
+import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, StarOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import PageHeader from '../components/design-system/PageHeader';
+import api from '../api';
+
+const { Text } = Typography;
+const { TextArea } = Input;
+
+export default function TemplateCenter() {
+  const [loading, setLoading] = useState(true);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [editModal, setEditModal] = useState(false);
+  const [editData, setEditData] = useState<any>(null);
+
+  const fetch = async () => {
+    try { setLoading(true); const r = await api.get('/ai-engine/templates'); setTemplates(r.data?.templates || r.data?.list || []); } catch { message.error('加载失败'); } finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetch(); }, []);
+
+  const handleSave = async () => {
+    if (!editData?.name?.trim() || !editData?.prompt?.trim()) { message.warning('名称和 Prompt 必填'); return; }
+    try {
+      setLoading(true);
+      if (editData.id) {
+        await api.put(`/ai-engine/templates/${editData.id}`, editData);
+      } else {
+        await api.post('/ai-engine/templates', editData);
+      }
+      message.success('保存成功');
+      setEditModal(false);
+      fetch();
+    } catch { message.error('保存失败'); } finally { setLoading(false); }
+  };
+
+  const handleDelete = async (id: number) => {
+    try { await api.delete(`/ai-engine/templates/${id}`); message.success('已删除'); fetch(); } catch { message.error('删除失败'); }
+  };
+
+  const columns = [
+    { title: '名称', dataIndex: 'name', render: (v: string) => <Text strong>{v}</Text> },
+    { title: '分类', dataIndex: 'category', width: 100, render: (v: string) => v ? <Tag style={{ fontSize: 11 }}>{v}</Tag> : '—' },
+    {
+      title: 'Prompt', dataIndex: 'prompt', ellipsis: true, width: 300,
+      render: (v: string) => <Text style={{ fontSize: 12, color: '#64748B' }} code>{v?.slice(0, 60)}…</Text>,
+    },
+    { title: '标签', dataIndex: 'tags', render: (v: string) => v ? v.split(',').map((t: string) => <Tag key={t} style={{ fontSize: 10, margin: '0 2px' }}>{t.trim()}</Tag>) : '—' },
+    { title: '类型', dataIndex: 'is_system', width: 80, render: (v: number) => v ? <Tag color="purple" style={{ fontSize: 11 }}>系统</Tag> : <Tag style={{ fontSize: 11 }}>自定义</Tag> },
+    { title: '使用次数', dataIndex: 'usage_count', width: 80, align: 'right' as const, render: (v: number) => <span style={{ fontWeight: 500 }}>{v || 0}</span> },
+    {
+      title: '操作', width: 120,
+      render: (_: any, r: any) => (
+        <Space size={4}>
+          <Button size="small" type="link" icon={<EditOutlined />}
+            onClick={() => { setEditData({ ...r }); setEditModal(true); }}>编辑</Button>
+          <Button size="small" type="link" danger icon={<DeleteOutlined />}
+            onClick={() => handleDelete(r.id)}>删除</Button>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <PageHeader title="模板中心" description="管理 AI 视频生成的所有 Prompt 模板" icon={<StarOutlined />} />
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={fetch}>刷新</Button>
+          <Button type="primary" icon={<PlusOutlined />}
+            onClick={() => { setEditData({ name: '', category: '', prompt: '', tags: '' }); setEditModal(true); }}>
+            新建模板
+          </Button>
+        </Space>
+      </div>
+
+      <Card style={{ borderRadius: 10 }} bodyStyle={{ padding: 0 }}>
+        <Spin spinning={loading}>
+          <Table rowKey="id" columns={columns} dataSource={templates} size="small" pagination={{ pageSize: 15, size: 'small' }}
+            locale={{ emptyText: <Empty description="暂无模板" /> }} />
+        </Spin>
+      </Card>
+
+      <Modal
+        title={editData?.id ? '编辑模板' : '新建模板'}
+        open={editModal}
+        onCancel={() => setEditModal(false)}
+        onOk={handleSave}
+        width={600}
+        destroyOnClose
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 8 }}>
+          <div>
+            <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>名称</Text>
+            <Input value={editData?.name || ''} onChange={e => setEditData((prev: any) => ({ ...prev, name: e.target.value }))} placeholder="如：TikTok爆款带货" />
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>分类</Text>
+              <Input value={editData?.category || ''} onChange={e => setEditData((prev: any) => ({ ...prev, category: e.target.value }))} placeholder="如：商品带货" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>标签（逗号分隔）</Text>
+              <Input value={editData?.tags || ''} onChange={e => setEditData((prev: any) => ({ ...prev, tags: e.target.value }))} placeholder="TikTok,3C,爆款" />
+            </div>
+          </div>
+          <div>
+            <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Prompt 模板</Text>
+            <TextArea value={editData?.prompt || ''} onChange={e => setEditData((prev: any) => ({ ...prev, prompt: e.target.value }))}
+              rows={6} placeholder="描述这个模板的 Prompt..." />
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+<!-- end -->

@@ -1,0 +1,905 @@
+<!-- dup_r37 -->
+import React, { useEffect, useRef, useState } from 'react';
+import { Button, Input, Select, Modal, message, Tooltip, Empty, Spin, Drawer, Badge, Progress, Typography, Space, Segmented, Dropdown } from 'antd';
+import {
+  VideoCameraOutlined, PictureOutlined, ThunderboltOutlined, HistoryOutlined,
+  ReloadOutlined, DownloadOutlined, CheckCircleFilled, CloseCircleFilled, ClockCircleOutlined,
+  LoadingOutlined, PlayCircleOutlined, AppstoreOutlined, PlusOutlined, BulbOutlined, EditOutlined,
+  CloseOutlined, FireOutlined, GiftOutlined, SmileOutlined, StarOutlined,
+  AppstoreAddOutlined, DownOutlined, SaveOutlined, GlobalOutlined, ExpandOutlined, CompressOutlined,
+  SoundOutlined, StopOutlined, EyeOutlined, FileImageOutlined, InboxOutlined,
+  ThunderboltFilled, SearchOutlined,
+} from '@ant-design/icons';
+import api from '../api';
+import { formatDateTime, nowISO } from '../utils/time';
+import { PageHeader } from '../components/design-system';
+import { enhanceImage, enhanceImages, uploadBlob } from '../utils/image-enhancer';
+
+const { TextArea } = Input;
+const { Text } = Typography;
+
+/* ══════════════════════════ Design Tokens (Enterprise) ══════════════════════════ */
+const T = {
+  bg: '#F5F7FB', cardBg: '#FFFFFF',
+  primary: '#6E56FF', primaryHover: '#7C6BFF', primaryLight: '#F4F2FF',
+  border: '#EAECF0', borderLight: '#F1F3F5',
+  textPrimary: '#1A1D2E', textSecondary: '#5A5F6E', textTertiary: '#9498A4',
+  success: '#22C55E', warning: '#F59E0B', error: '#EF4444', info: '#3B82F6',
+  radiusCard: 16, radiusSm: 8, radiusTag: 6,
+  shadow: '0 2px 12px rgba(15,23,42,0.06)',
+  shadowHover: '0 4px 20px rgba(15,23,42,0.10)',
+  maxW: 1400,
+};
+
+/* ══════════════════════════ Types ══════════════════════════ */
+interface Product { id: number; sku: string; name: string; image: string; sell_price: number; }
+interface Video { id: number; title: string; video_url: string; thumbnail_url: string; prompt: string; model: string; resolution: string; duration: number; aspect_ratio: string; status: string; product_name?: string; product_image?: string; created_at: string; token_usage?: number; time_cost?: number; }
+
+/* ══════════════════════════ Constants ══════════════════════════ */
+const ALL_TEMPLATES = [
+  { cat: '热门', items: [{ label: '商品介绍', icon: <GiftOutlined />, color: '#6E56FF', prompt: '专业商品展示镜头：产品居中，背景纯净柔和，灯光突出产品质感，慢速 360° 旋转展示，质感高清。' },{ label: '真人带货', icon: <SmileOutlined />, color: '#3B82F6', prompt: '真人口播：主播正对镜头，背景虚化，自然亲切地介绍产品卖点，节奏贴近日常对话。' }] },
+  { cat: '电商', items: [{ label: 'TikTok风', icon: <ThunderboltOutlined />, color: '#EF4444', prompt: 'TikTok 潮流风格：快速剪辑、动感音乐、强烈节奏、字幕弹跳、适合年轻用户群体。' },{ label: '种草测评', icon: <ThunderboltOutlined />, color: '#8B5CF6', prompt: '测评风格：手持产品近景演示，配合场景化使用画面，强调使用前后对比和体验感。' },{ label: '开箱', icon: <AppstoreOutlined />, color: '#22C55E', prompt: '开箱风格：俯拍桌面，优雅拆开包装，渐次展示产品细节，反应惊喜自然。' }] },
+  { cat: '品牌', items: [{ label: '品牌故事', icon: <StarOutlined />, color: '#F59E0B', prompt: '电影级品牌片：航拍城市 → 工匠细节 → 使用场景 → logo收尾，舒缓大气。' },{ label: '节日促销', icon: <FireOutlined />, color: '#EF4444', prompt: '节日促销：红色金色交错，礼盒特效，烟花背景，文字动画，节奏明快。' }] },
+  { cat: '行业', items: [{ label: '科技产品', icon: <EyeOutlined />, color: '#3B82F6', prompt: '科技产品风格：深色背景、电子元件细节、多角度展示、未来感光线。' },{ label: '美妆', icon: <StarOutlined />, color: '#EC4899', prompt: '美妆风格：柔光特写、产品涂抹演示、前后对比、品牌质感。' }] },
+];
+
+/* 侧栏 AI导演 用平面模板列表 */
+const TEMPLATES: TemplateItem[] = [
+  { label: '商品介绍',   icon: <GiftOutlined />,     color: '#6E56FF', prompt: '专业商品展示镜头：产品居中，背景纯净柔和，灯光突出产品质感，慢速 360° 旋转展示。' },
+  { label: 'TikTok爆款', icon: <ThunderboltOutlined />, color: '#EF4444', prompt: 'TikTok 潮流风：快速剪辑、动感音乐、字幕弹跳、前3秒抓眼球。' },
+  { label: '真人带货',   icon: <SmileOutlined />,     color: '#3B82F6', prompt: '真人口播：主播正对镜头，背景虚化自然，亲切介绍产品卖点。' },
+  { label: '种草测评',   icon: <StarOutlined />,      color: '#8B5CF6', prompt: '测评风格：手持产品近景演示，场景化使用画面，强调使用前后对比。' },
+  { label: '品牌故事',   icon: <StarOutlined />,      color: '#F59E0B', prompt: '电影级品牌片：航拍城市→工匠细节→用户场景→Logo收尾。' },
+  { label: '开箱测评',   icon: <AppstoreOutlined />,  color: '#22C55E', prompt: '开箱风格：俯拍桌面，双手优雅拆包装，渐次展示细节。' },
+  { label: '节日营销',   icon: <FireOutlined />,      color: '#EF4444', prompt: '节日促销：红金配色交错，礼盒特效，烟花背景，文字动画浮现。' },
+  { label: '3C数码',     icon: <EyeOutlined />,       color: '#3B82F6', prompt: '科技产品风格：深色背景、电子元件细节、多角度展示、未来感光线。' },
+  { label: '美食',       icon: <FireOutlined />,      color: '#F97316', prompt: '美食镜头：慢动作倒酱汁、水汽升腾、餐具特写、饱和度高有食欲。' },
+  { label: '家居',       icon: <AppstoreOutlined />,  color: '#22C55E', prompt: '家居展示：柔和自然光透过窗户，空间广角展示，细节特写材质纹理。' },
+  { label: '美妆',       icon: <SmileOutlined />,     color: '#EC4899', prompt: '美妆风格：柔光特写、产品涂抹演示、前后对比、品牌质感。' },
+  { label: 'Shopee',     icon: <PlayCircleOutlined />,color: '#F97316', prompt: 'Shopee展示：横向平铺产品，关键参数浮现，暖色调背景。' },
+  { label: '汽车',       icon: <ThunderboltOutlined />,color: '#DC2626', prompt: '汽车宣传：低角度车头特写→动态行驶追焦→山顶日出收尾。' },
+  { label: '服装',       icon: <StarOutlined />,      color: '#8B5CF6', prompt: '服装展示：模特动态镜头，光影跟随人体线条，节奏自然流畅。' },
+  { label: '宠物',       icon: <SmileOutlined />,     color: '#F59E0B', prompt: '宠物视频：活泼轻快节奏，可爱特写镜头，主人互动场景。' },
+];
+interface TemplateItem { label: string; icon: React.ReactNode; color: string; prompt: string; }
+
+const AI_INLINE_SUGGESTIONS = [
+  { label: '加入镜头', icon: <VideoCameraOutlined />, text: '\n镜头：推近特写 → 环绕展示 → Logo淡入。' },
+  { label: '加入动作', icon: <PlayCircleOutlined />, text: '\n动作：模特自然微笑，手指轻触屏幕展示交互。' },
+  { label: '加入Logo', icon: <AppstoreOutlined />, text: '\n结尾：品牌Logo从中心放大淡出，浮现Slogan。' },
+  { label: '加入CTA', icon: <ThunderboltOutlined />, text: '\n结尾：行动号召文字"立即购买"，动态弹跳效果。' },
+];
+
+const AGENT_LABELS: Record<string, string> = {
+  vision: '🔍 商品理解',
+  strategy: '💡 创意策略',
+  director: '🎬 AI导演',
+  prompt_engine: '✍️ Prompt生成',
+  optimizer: '⚙️ Prompt优化',
+  adapter: '🔌 模型适配',
+  quality: '✅ 质量评估',
+};
+
+const AI_TOOLS = [
+  { key: 'optimize', label: 'AI 优化', icon: <BulbOutlined /> },
+  { key: 'script', label: '脚本生成', icon: <EditOutlined /> },
+  { key: 'translate', label: '英文Prompt', icon: <GlobalOutlined /> },
+  { key: 'expand', label: '继续扩写', icon: <ExpandOutlined /> },
+  { key: 'shot', label: '镜头建议', icon: <EyeOutlined /> },
+];
+
+/* ══════════════════════════ Prompt Quality ══════════════════════════ */
+function promptScore(prompt: string): { score: number; label: string; color: string } {
+  if (!prompt) return { score: 0, label: '等待输入', color: T.textTertiary };
+  const p = prompt.trim();
+  let s = 30;
+  s += Math.min(p.length * 0.15, 20);
+  if (p.includes('镜头') || p.includes('场景') || p.includes('光线')) s += 15;
+  if (p.includes('风格') || p.includes('节奏')) s += 10;
+  if (p.includes('产品') || p.includes('Logo') || p.includes('结尾')) s += 10;
+  if (p.length > 100) s += 10;
+  if (p.length > 200) s += 5;
+  s = Math.min(s, 100);
+  if (s >= 85) return { score: s, label: '优秀', color: T.success };
+  if (s >= 60) return { score: s, label: '良好', color: T.warning };
+  return { score: s, label: '待完善', color: T.textTertiary };
+}
+
+/* ══════════════════════════ Main ══════════════════════════ */
+export default function AIVideoGenerator() {
+  /* ── State ── */
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [productLoading, setProductLoading] = useState(false);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [templateMarketOpen, setTemplateMarketOpen] = useState(false);
+
+  const [prompt, setPrompt] = useState('');
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [tempPrompt, setTempPrompt] = useState('');
+  const [modelOption, setModelOption] = useState('');
+  const [resolution, setResolution] = useState('720p');
+  const [aspectRatio, setAspectRatio] = useState('9:16');
+  const [duration, setDuration] = useState(5);
+  const [count, setCount] = useState(1);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [paramsOpen, setParamsOpen] = useState(false);
+
+  const [productMaterial, setProductMaterial] = useState<{ url: string; name: string } | null>(null);
+  const [referenceMaterial, setReferenceMaterial] = useState<{ url: string; name: string } | null>(null);
+  const [logoMaterial, setLogoMaterial] = useState<{ url: string; name: string } | null>(null);
+
+  const [generating, setGenerating] = useState(false);
+  const [pipelineSteps, setPipelineSteps] = useState<Array<{ agent: string; status: string; output?: any }>>([]);
+  const [pipelineResult, setPipelineResult] = useState<{ qualityScore?: number; totalTokens?: number; totalTime?: number } | null>(null);
+  const [genError, setGenError] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
+
+  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [recentWorks, setRecentWorks] = useState<Video[]>([]);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const q = promptScore(prompt);
+
+  /* ── Init ── */
+  useEffect(() => {
+    api.get('/video-models/configs/available').then(r => {
+      setAvailableModels(r.data?.configs || []);
+      if (r.data?.configs?.[0]) setModelOption(r.data.configs[0].model_type);
+    }).catch(() => {});
+    loadVideos();
+  }, []);
+
+  const loadVideos = async () => {
+    try { const r = await api.get('/seedance/videos', { params: { limit: 12 } }); const list = r.data?.videos || r.data || []; setVideos(list); setRecentWorks(list.filter((v: Video) => v.status === 'completed').slice(0, 6)); } catch {}
+  };
+
+  /* ── Product ── */
+  const searchProducts = async (kw: string) => {
+    setProductLoading(true);
+    try { const r = await api.get('/products', { params: { keyword: kw, limit: 30 } }); setProducts(r.data || []); } catch { setProducts([]); }
+    finally { setProductLoading(false); }
+  };
+  useEffect(() => { if (productModalOpen && !products.length) searchProducts(''); }, [productModalOpen]);
+
+  const onSelectProduct = (p: Product) => {
+    setSelectedProduct(p); setProductMaterial({ url: p.image, name: p.name }); setProductModalOpen(false);
+    if (!prompt) setPrompt(`专业商品展示：${p.name}，产品居中，背景柔和干净，灯光突出产品质感，节奏舒缓大气。`);
+  };
+
+  /* ── Template ── */
+  const applyTemplate = (t: TemplateItem) => { setPrompt(t.prompt); setTemplateMarketOpen(false); message.success({ content: `✓ 已应用「${t.label}」`, duration: 2 }); };
+
+  /* ── Upload ── */
+  const uploadImage = async (file: File): Promise<string> => {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await api.post('/upload/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return r.data?.url || r.data?.path || URL.createObjectURL(file);
+  };
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: (v: { url: string; name: string }) => void) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    try { setter({ url: await uploadImage(f), name: f.name }); } catch { message.error('上传失败'); }
+  };
+
+  /* ── AI Actions ── */
+  const aiAction = async (tool: string) => {
+    if (!prompt.trim()) return message.warning('请先输入 Prompt');
+    setAiLoading(true);
+    try {
+      const r = await api.post('/ai/optimize-prompt', { prompt, action: tool, product: selectedProduct?.name });
+      if (r.data?.optimized) { setPrompt(r.data.optimized); message.success('已完成'); }
+    } catch {
+      const adds: Record<string, string> = {
+        optimize: '。镜头推进平滑，光线柔和自然，色调温暖，电影级质感。',
+        script: '\n\n【分镜1】环境全景→主角入画\n【分镜2】产品特写→灯光聚焦\n【分镜3】使用演示→自然互动\n【分镜4】Logo淡入→行动号召',
+        shot: '\n\n推荐镜头：①推近特写 ②环绕展示 ③俯拍拆箱',
+        translate: '\n\n[English] Professional TikTok product showcase: centered composition, soft natural lighting, cinema-grade quality.',
+        expand: '。丰富场景细节：清晨阳光透过窗帘洒入，浅景深虚化背景，电影级画质，慢动作产品展示。',
+      };
+      if (adds[tool]) { setPrompt(p => p + adds[tool]); message.info('已应用'); }
+    }
+    finally { setAiLoading(false); }
+  };
+
+  const addInlineSuggestion = (text: string) => { setPrompt(p => p + text); };
+
+  /* ── Generate ── */
+  const handleGenerate = async () => {
+    if (!prompt.trim()) return message.warning('请输入视频创意');
+    if (!modelOption) return message.warning('请先在「模型API配置」中启用至少一个视频模型');
+    if (generating) return;
+    setGenerating(true); setGenError(''); setProgress(0); setPreviewVideo(null);
+    // 初始化 7 个 Agent 步骤，全设为 pending，前端先把骨架显示出来
+    const allAgents = ['vision', 'strategy', 'director', 'prompt_engine', 'optimizer', 'adapter', 'quality'];
+    setPipelineSteps(allAgents.map(a => ({ agent: a, status: 'pending' as const })));
+    setPipelineResult(null);
+
+    // Step 0: 图片增强 — Seedance 要求图片宽度 >= 300px，太小就放大到 720px（base64 dataURL，不依赖上传接口）
+    let productImageUrl = productMaterial?.url || '';
+    let referenceImageUrl = referenceMaterial?.url || '';
+    try {
+      if (productImageUrl) {
+        const r = await enhanceImage(productImageUrl, 720);
+        productImageUrl = r.url;
+        console.log(`[image-enhance] 商品图 ${r.width}×${r.height}${r.enhanced ? ' (已增强)' : ''}`);
+      }
+      if (referenceImageUrl) {
+        const r = await enhanceImage(referenceImageUrl, 720);
+        referenceImageUrl = r.url;
+        console.log(`[image-enhance] 参考图 ${r.width}×${r.height}${r.enhanced ? ' (已增强)' : ''}`);
+      }
+    } catch (e: any) {
+      console.warn('[image-enhance] 图片增强失败，使用原图:', e.message);
+    }
+
+    try {
+      // Step 1: 启动 AI Engine Pipeline（异步模式，立即返回 taskId）
+      const engRes = await api.post('/ai-engine/generate', {
+        productId: selectedProduct?.id, productImage: productImageUrl,
+        productName: selectedProduct?.name, userPrompt: prompt,
+        model: modelOption, resolution, aspectRatio, duration, count,
+      }, { timeout: 15000 });
+      const taskId: string = engRes.data?.taskId;
+      if (!taskId) throw new Error('AI Engine 未返回 taskId');
+
+      // Step 2: 轮询 task 状态，每 1.5s 拉一次
+      const finalTask = await pollAiEngine(taskId);
+
+      if (finalTask.status === 'failed') {
+        setGenError(finalTask.error || 'AI Engine 执行失败');
+        return;
+      }
+
+      // Step 3: 从数据库读到的 steps 中提取最终 prompt
+      const steps = (finalTask.steps || []).map((s: any) => ({
+        agent: s.agent,
+        status: s.status,
+        output: s.output_json ? safeParse(s.output_json) : null,
+      }));
+      setPipelineSteps(steps);
+
+      const optimizerStep = steps.find((s: any) => s.agent === 'optimizer');
+      const finalPrompt = optimizerStep?.output?.optimizedPrompts?.[0]?.prompt || prompt;
+
+      // 同步最终统计
+      const taskRow = finalTask.task || {};
+      setPipelineResult({
+        qualityScore: taskRow.quality_score,
+        totalTokens: taskRow.total_tokens,
+        totalTime: taskRow.total_time_ms,
+      });
+
+      // Step 4: 调用视频模型生成（Seedance）
+      setProgress(20);
+      const pTimer = setInterval(() => setProgress(v => Math.min(v + Math.random() * 6, 88)), 700);
+      const r = await api.post('/video-models/generate', {
+        prompt: finalPrompt, product_image: productImageUrl, reference_image: referenceImageUrl,
+        model_type: modelOption, resolution, duration, aspect_ratio: aspectRatio, count, voice_enabled: voiceEnabled,
+      }, { timeout: 180000 });
+      clearInterval(pTimer); setProgress(95);
+      const vid = r.data?.video_id || r.data?.id;
+      if (vid) { await poll(vid); } else if (r.data?.video_url) {
+        const v: Video = { id: r.data.id || Date.now(), title: selectedProduct?.name || 'AI 视频', video_url: r.data.video_url, thumbnail_url: r.data.thumbnail_url || '', prompt: finalPrompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: nowISO(), token_usage: r.data.token_usage, product_name: selectedProduct?.name };
+        setPreviewVideo(v); setProgress(100); loadVideos();
+      }
+    } catch (e: any) { setGenError(e.response?.data?.error || e.message || '生成失败'); }
+    finally { setGenerating(false); }
+  };
+
+  // 轮询 AI Engine 任务状态，更新 pipelineSteps
+  const pollAiEngine = (taskId: string): Promise<{ status: string; task: any; steps: any[]; error?: string }> => {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const maxAttempts = 90; // 最多 90 次 × 1.5s = 135 秒
+      const tick = async () => {
+        attempts++;
+        try {
+          const r = await api.get(`/ai-engine/tasks/${taskId}`, { timeout: 10000 });
+          const data = r.data || {};
+          const taskRow = data.task;
+          const stepsFromDb: any[] = data.steps || [];
+
+          // 实时更新前端步骤状态
+          if (stepsFromDb.length > 0) {
+            setPipelineSteps(prev => prev.map(s => {
+              const fromDb = stepsFromDb.find((d: any) => d.agent === s.agent);
+              return fromDb ? { agent: s.agent, status: fromDb.status } : s;
+            }));
+          }
+
+          // 估算进度（基于完成的 step 数）
+          const completedCount = stepsFromDb.filter((s: any) => s.status === 'completed').length;
+          setProgress(Math.min(completedCount * 3, 18)); // 0~18 留给 pipeline，20+ 给视频生成
+
+          const status = taskRow?.status;
+          if (status === 'completed' || status === 'failed' || status === 'retrying') {
+            resolve({ status, task: taskRow, steps: stepsFromDb, error: taskRow?.error });
+            return;
+          }
+        } catch (e) {
+          // 单次轮询失败不中断，继续下一次
+        }
+        if (attempts >= maxAttempts) {
+          reject(new Error('AI Engine 轮询超时（135秒）'));
+          return;
+        }
+        setTimeout(tick, 1500);
+      };
+      tick();
+    });
+  };
+
+  function safeParse(json: string): any {
+    try { return JSON.parse(json); } catch { return null; }
+  }
+
+  const poll = async (vid: number) => {
+    for (let i = 0; i < 60; i++) {
+      try { const r = await api.get(`/video-models/poll/${vid}`); const v = r.data?.video || r.data; if (v?.status === 'completed' || v?.video_url) { const finalV: Video = { id: v.id || vid, title: selectedProduct?.name || 'AI 视频', video_url: v.video_url, thumbnail_url: v.thumbnail_url || '', prompt, model: modelOption, resolution, duration, aspect_ratio: aspectRatio, status: 'completed', created_at: v.created_at || nowISO(), token_usage: v.token_usage, product_name: selectedProduct?.name }; setPreviewVideo(finalV); setProgress(100); loadVideos(); return; } if (v?.status === 'failed') { setGenError(v.error || '生成失败'); return; } if (v?.progress) setProgress(v.progress); } catch {}
+      await new Promise(r => setTimeout(r, 5000));
+    } setGenError('超时，请查看历史记录');
+  };
+
+  const handleDownload = (v: Video) => { const a = document.createElement('a'); a.href = v.video_url; a.download = v.title || 'video.mp4'; a.target = '_blank'; a.click(); };
+
+  /* ════════════════════════════════════ Render ════════════════════════════════════ */
+  return (
+    <div style={{ background: T.bg, overflow: 'hidden' }}>
+
+      {/* ── Header ── */}
+      <div style={{
+        height: 56,
+        background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FE 50%, #FFFFFF 100%)',
+        borderBottom: `1px solid ${T.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 20px', flexShrink: 0, position: 'relative',
+        boxShadow: '0 1px 3px rgba(15,23,42,0.03)',
+      }}>
+        {/* Left: Logo + Title + Subtitle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Logo 圆角方块 */}
+          <div style={{
+            width: 32, height: 32, borderRadius: 9,
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #6E56FF 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(110,86,255,0.30), inset 0 1px 0 rgba(255,255,255,0.2)',
+            position: 'relative',
+          }}>
+            <VideoCameraOutlined style={{ fontSize: 15, color: '#fff' }} />
+            <div style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, borderRadius: 5, background: '#22C55E', border: '2px solid #fff' }} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary, letterSpacing: '0.3px' }}>KyrieVG V1</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: T.primary, background: T.primaryLight, padding: '2px 6px', borderRadius: 4, letterSpacing: '0.5px' }}>ENTERPRISE</span>
+            </div>
+            <div style={{ fontSize: 11, color: T.textTertiary, marginTop: 2, lineHeight: 1.2 }}>
+              文生视频 · 图生视频 · AI 智能创作 <span style={{ color: T.textSecondary, margin: '0 4px' }}>·</span> <span style={{ color: T.success, fontWeight: 500 }}>● 就绪</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Actions */}
+        <Space size={12}>
+          {selectedProduct && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.primaryLight, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: T.primary, border: `1px solid ${T.primaryLight}` }}>
+              <img src={selectedProduct.image} style={{ width: 20, height: 20, borderRadius: 4, objectFit: 'cover' }} />
+              <span style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedProduct.name}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.cardBg }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: T.success }} />
+            <span style={{ fontSize: 11, color: T.textTertiary }}>模型</span>
+            <Select size="small" value={modelOption} onChange={setModelOption} variant="borderless" style={{ fontSize: 12, fontWeight: 600, minWidth: 100 }}
+              suffixIcon={<DownOutlined style={{ fontSize: 10, color: T.textTertiary }} />}
+              placeholder={availableModels.length > 0 ? undefined : '请配置'}
+              disabled={availableModels.length === 0}
+              options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : []} />
+          </div>
+          <Badge count={videos.length} size="small" color={T.primary} offset={[-2, 2]}>
+            <Button size="middle" icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}
+              style={{ borderRadius: 8, fontWeight: 500 }}>历史</Button>
+          </Badge>
+        </Space>
+      </div>
+
+      {/* ── Workspace: 3 列铺满页面 ── */}
+      <div style={{ margin: '8px 0', display: 'flex', gap: 12, padding: '0 12px', alignItems: 'flex-start', width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+        {/* ═══ AI导演 ═══ */}
+        <div style={{
+          width: 200, flexShrink: 0,
+          background: T.cardBg, borderRadius: T.radiusCard, border: `1px solid ${T.border}`,
+          boxShadow: T.shadow, padding: 12,
+          position: 'sticky', top: 8, fontSize: 11,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.textPrimary, marginBottom: 8 }}>✨ Prompt模板</div>
+
+          {/* 今日推荐 */}
+          <div style={{ marginBottom: 10 }}>
+            <Text style={{ fontSize: 10, fontWeight: 600, color: '#F59E0B', display: 'block', marginBottom: 6 }}>🔥 今日推荐</Text>
+            {TEMPLATES.slice(0, 3).map(t => (
+              <div key={t.label} onClick={() => applyTemplate(t)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', marginBottom: 3 }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${t.color}08`; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                <div style={{ width: 22, height: 22, borderRadius: 5, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.color, fontSize: 12, flexShrink: 0 }}>{t.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 500, color: T.textPrimary, lineHeight: 1.2 }}>{t.label}</Text>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ height: 1, background: T.borderLight, marginBottom: 10 }} />
+
+          {/* 全部分类 */}
+          <Text style={{ fontSize: 10, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 6 }}>📁 全部分类</Text>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {TEMPLATES.map(t => (
+              <div key={t.label} onClick={() => applyTemplate(t)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 5,
+                  cursor: 'pointer', fontSize: 11, color: T.textSecondary,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${t.color}08`; e.currentTarget.style.color = t.color; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.textSecondary; }}>
+                <div style={{ width: 4, height: 4, borderRadius: 2, background: t.color, flexShrink: 0 }} />
+                {t.label}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ height: 1, background: T.borderLight, margin: '10px 0' }} />
+
+          {/* 最近使用 */}
+          <Text style={{ fontSize: 10, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 4 }}>🕐 最近使用</Text>
+          {TEMPLATES.slice(3, 7).map(t => (
+            <div key={t.label} onClick={() => applyTemplate(t)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 11, color: T.textSecondary }}
+              onMouseEnter={e => { e.currentTarget.style.color = T.primary; }}
+              onMouseLeave={e => { e.currentTarget.style.color = T.textSecondary; }}>
+              {t.label}
+            </div>
+          ))}
+
+          <div style={{ height: 1, background: T.borderLight, margin: '10px 0' }} />
+
+          <Button block size="small" type="text" onClick={() => setTemplateMarketOpen(true)}
+            style={{ fontSize: 10, color: T.primary, fontWeight: 500, borderRadius: 6 }}>
+            🔍 全部模板 →
+          </Button>
+        </div>
+
+        {/* ═══════ Original V5 Content (flex 填满剩余空间) ═══════ */}
+        <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        {/* ═══════ LEFT: 视频创作区 60% ═══════ */}
+        <div style={{ flex: '3 1 0%', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+
+          {/* ── Row1: 当前任务 + 素材 ── */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            {/* 当前任务 */}
+            <CardCompact style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 11, fontWeight: 600, color: T.textSecondary }}>📋 当前任务</Text>
+                <Button size="small" type="text" icon={<AppstoreAddOutlined />} onClick={() => setProductModalOpen(true)} style={{ color: T.textSecondary, fontSize: 10 }}>选择商品</Button>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: T.textPrimary }}>
+                {selectedProduct ? selectedProduct.name : '未选择商品'}
+              </div>
+              <div style={{ fontSize: 11, color: T.textTertiary, marginTop: 2 }}>
+                {modelOption.startsWith('kling') ? 'Kling 2.1' : modelOption.startsWith('minimax') ? 'MiniMax' : 'Seedance V2'} · {aspectRatio} · {duration}秒
+              </div>
+            </CardCompact>
+            {/* 素材上传 */}
+            <CardCompact style={{ flex: 2 }}>
+              <Text style={{ fontSize: 12, fontWeight: 600, color: T.textSecondary, display: 'block', marginBottom: 8 }}>📦 素材</Text>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {[
+                  { k: 'product', label: '商品图', material: productMaterial, setter: setProductMaterial, icon: <FileImageOutlined />, onClear: () => setProductMaterial(null) },
+                  { k: 'ref', label: '参考图', material: referenceMaterial, setter: setReferenceMaterial, icon: <PictureOutlined />, onClear: () => setReferenceMaterial(null) },
+                  { k: 'logo', label: 'Logo', material: logoMaterial, setter: setLogoMaterial, icon: <AppstoreOutlined />, onClear: () => setLogoMaterial(null) },
+                ].map(u => (
+                  <MaterialSlot key={u.k} label={u.label} icon={u.icon} material={u.material}
+                    onChange={e => handleUpload(e, u.setter)} onClear={u.onClear} />
+                ))}
+              </div>
+            </CardCompact>
+          </div>
+
+          {/* ── Row2: PROMPT (420px) ── */}
+          <div style={{
+            background: T.cardBg, borderRadius: T.radiusCard, border: `1px solid ${T.border}`,
+            boxShadow: T.shadow, display: 'flex', flexDirection: 'column',
+            borderColor: prompt ? '#d4bfff' : T.border, transition: 'border-color .2s',
+          }}>
+            <div style={{ padding: '12px 16px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Space size={6}>
+                <Text style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary }}>💡 Prompt 创意</Text>
+                <Button
+                  size="small" type="text"
+                  icon={<ExpandOutlined style={{ fontSize: 12 }} />}
+                  onClick={() => { setTempPrompt(prompt); setPromptModalOpen(true); }}
+                  style={{ height: 20, fontSize: 10, padding: '0 6px', color: T.textSecondary, fontWeight: 500 }}
+                >
+                  全屏编辑
+                </Button>
+              </Space>
+              <Space size={4}>
+                <Text style={{ fontSize: 11, color: q.color }}>{q.label}</Text>
+                <div style={{ width: 44, height: 4, borderRadius: 2, background: '#F1F3F5', overflow: 'hidden' }}>
+                  <div style={{ width: `${q.score}%`, height: '100%', borderRadius: 2, background: q.color, transition: 'width .3s' }} />
+                </div>
+              </Space>
+            </div>
+            <TextArea
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              placeholder={`AI Video Engine 将自动完成：商品理解 → 创意策略 → AI导演分镜 → Prompt生成 → 模型优化 → 质量评估。\n\n你只需要描述核心创意，剩下的交给 7 个 Agent：\n\n例如：马来西亚 TikTok 风格商品带货视频。\n主体：AirPods Pro — 哑光黑充电仓特写\n场景：开放式办公室，间接光环境\n镜头：推近特写 → 环绕展示降噪麦克风 → 佩戴使用\n风格：年轻科技感，轻快剪辑节奏\n光线：侧逆光 + 柔光散射\n结尾：品牌 Logo 淡入 + "立即购买"行动号召\n\n（也可以只写一句话，如"马来西亚卖 AirPods"，AI Engine 会自动补全）`}
+              autoSize={{ minRows: 8, maxRows: 8 }}
+              style={{ fontSize: 13, lineHeight: 1.7, resize: 'none', border: 'none', boxShadow: 'none', padding: '0 20px', flex: 1, fontFamily: '-apple-system, "Inter", sans-serif' }}
+              variant="borderless"
+              maxLength={4000}
+            />
+            {/* AI 内联建议 */}
+            <div style={{ padding: '6px 20px', borderTop: `1px solid ${T.borderLight}`, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {AI_INLINE_SUGGESTIONS.map(a => (
+                <Button key={a.label} size="small" type="text" icon={a.icon}
+                  onClick={() => addInlineSuggestion(a.text)}
+                  style={{ borderRadius: 16, fontSize: 11, color: T.primary, background: T.primaryLight, padding: '2px 12px', border: 'none' }}>
+                  {a.label}
+                </Button>
+              ))}
+            </div>
+            {/* AI Tools */}
+            <div style={{ padding: '8px 20px 0', borderTop: `1px solid ${T.borderLight}`, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {AI_TOOLS.map(t => (
+                <Button key={t.key} size="small" type="text" icon={t.icon}
+                  loading={aiLoading && t.key === 'optimize'}
+                  onClick={() => aiAction(t.key)}
+                  style={{ borderRadius: 16, fontSize: 11, color: T.textSecondary, padding: '3px 12px', background: '#F8FAFC' }}>
+                  {t.label}
+                </Button>
+              ))}
+            </div>
+            {/* Prompt Stats */}
+            <div style={{ padding: '8px 20px 12px', display: 'flex', gap: 16, borderTop: `1px solid ${T.borderLight}`, fontSize: 11, color: T.textTertiary }}>
+              <span>📊 质量分 <strong style={{ color: q.color }}>{q.score}</strong></span>
+              <span>🔤 {prompt.length} 字</span>
+              <span>⚡ 预计 {prompt ? Math.ceil(prompt.length * 0.15) : 0} Token</span>
+              <span>⏱ 预计 {prompt ? Math.ceil(prompt.length * 0.06 + 20) : 0} 秒</span>
+            </div>
+          </div>
+
+          {/* ── Row3: Templates ── */}
+          <div style={{
+            background: T.cardBg, borderRadius: T.radiusCard, border: `1px solid ${T.border}`, boxShadow: T.shadow, padding: '12px 16px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: 600, color: T.textSecondary }}>✨ Prompt 模板</Text>
+              <Button size="small" type="text" onClick={() => setTemplateModalOpen(true)} style={{ fontSize: 11, color: T.primary }}>全部模板</Button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {ALL_TEMPLATES.slice(0, 3).flatMap(g => g.items).map(t => (
+                <div key={t.label} onClick={() => setPrompt(t.prompt)}
+                  style={{
+                    padding: '3px 10px', borderRadius: 14, fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                    border: `1px solid ${T.borderLight}`, background: '#F8FAFC', color: T.textSecondary,
+                    transition: 'all .15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = t.color; e.currentTarget.style.color = t.color; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.borderLight; e.currentTarget.style.color = T.textSecondary; }}>
+                  {t.label}
+                </div>
+              ))}
+              <div onClick={() => setTemplateModalOpen(true)} style={{ padding: '3px 10px', borderRadius: 14, fontSize: 11, color: T.textTertiary, cursor: 'pointer' }}>更多 →</div>
+            </div>
+          </div>
+
+          {/* ── Row4: Params Chips ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px' }}>
+            <Chip active icon={<VideoCameraOutlined />}>{modelOption.startsWith('kling') ? 'Kling 2.1' : modelOption.startsWith('minimax') ? 'MiniMax' : 'Seedance V2'}</Chip>
+            <Chip active>{aspectRatio}</Chip>
+            <Chip active>{resolution}</Chip>
+            <Chip active>{duration}秒</Chip>
+            <Chip active>{count}条</Chip>
+            <Chip active={voiceEnabled} onClick={() => setVoiceEnabled(!voiceEnabled)}>{voiceEnabled ? '🔊 有声' : '🔇 静音'}</Chip>
+            <Button type="link" size="small" onClick={() => setParamsOpen(true)} style={{ color: T.textTertiary, fontSize: 11, padding: '0 4px' }}>高级 ⚙</Button>
+          </div>
+
+          {/* ── Row5: Generate ── */}
+          <Button type="primary" size="large" block loading={generating} disabled={!prompt.trim()}
+            onClick={handleGenerate}
+            icon={generating ? <LoadingOutlined /> : <ThunderboltFilled />}
+            style={{
+              height: 52, borderRadius: 14, fontSize: 16, fontWeight: 700, letterSpacing: '0.3px',
+              background: prompt.trim() ? 'linear-gradient(135deg, #8b5cf6, #6E56FF)' : '#E1E4EA',
+              border: 'none',
+              boxShadow: prompt.trim() ? `0 6px 24px rgba(110,86,255,0.30)` : 'none',
+            }}>
+            {generating ? `生成中 ${Math.round(progress)}%` : `⚡ 立即生成视频`}
+          </Button>
+          {generating && <Text style={{ textAlign: 'center', fontSize: 11, color: T.textTertiary, display: 'block' }}>预计 40-60 秒 · 剩余 Token 充足</Text>}
+        </div>
+
+        {/* ═══════ RIGHT: AI 生成中心 40% ═══════ */}
+        <div style={{ flex: '2 1 0%', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 320 }}>
+          {/* ── Status + Preview ── */}
+          <CardCompact style={{ flex: 1 }}>
+            {generating ? (
+              <div style={{ textAlign: 'center', padding: '20px 16px' }}>
+                <LoadingOutlined spin style={{ fontSize: 28, color: T.primary, marginBottom: 12 }} />
+                <Progress percent={Math.round(progress)} strokeColor={{ from: '#8b5cf6', to: '#6E56FF' }} style={{ maxWidth: 240, margin: '0 auto 8px' }} />
+                <Text style={{ fontSize: 12, color: T.textPrimary, display: 'block', fontWeight: 600 }}>正在生成…</Text>
+                {pipelineSteps.length > 0 && (
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {pipelineSteps.map(s => {
+                      const icon = s.status === 'completed' ? <CheckCircleFilled style={{ color: T.success, fontSize: 11 }} /> :
+                        s.status === 'failed' ? <CloseCircleFilled style={{ color: T.error, fontSize: 11 }} /> :
+                        s.status === 'running' ? <LoadingOutlined style={{ color: T.primary, fontSize: 11 }} /> :
+                        <ClockCircleOutlined style={{ color: T.textTertiary, fontSize: 11 }} />;
+                      return (
+                        <div key={s.agent} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: s.status === 'completed' ? T.success : T.textTertiary }}>
+                          {icon}
+                          <span>{AGENT_LABELS[s.agent] || s.agent}</span>
+                        </div>
+                      );
+                    })}
+                    {pipelineResult && (
+                      <div style={{ marginTop: 4, fontSize: 10, color: T.textTertiary }}>
+                        ⚡ {pipelineResult.totalTokens || 0} Token · {pipelineResult.totalTime ? `${(pipelineResult.totalTime / 1000).toFixed(1)}s` : ''}
+                        · 质量 {pipelineResult.qualityScore || '—'} 分
+                      </div>
+                    )}
+                  </div>
+                )}
+                <Text style={{ fontSize: 12, color: T.textTertiary, marginTop: pipelineSteps.length ? 8 : 0 }}>预计 40-60 秒，请耐心等待</Text>
+              </div>
+            ) : genError ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <CloseCircleFilled style={{ fontSize: 36, color: T.error, marginBottom: 12 }} />
+                <Text style={{ color: T.textPrimary, display: 'block', marginBottom: 12 }}>{genError}</Text>
+                <Button size="small" onClick={handleGenerate} style={{ borderRadius: 8 }}>重新生成</Button>
+              </div>
+            ) : previewVideo ? (
+              <div>
+                <video ref={videoRef} src={previewVideo.video_url} controls poster={previewVideo.thumbnail_url}
+                  style={{ width: '100%', borderRadius: 8, background: '#0F172A' }} />
+                <div style={{ display: 'flex', gap: 6, marginTop: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Button size="small" icon={<DownloadOutlined />} onClick={() => handleDownload(previewVideo)} style={{ borderRadius: 8 }}>下载</Button>
+                  <Button size="small" icon={<ReloadOutlined />} onClick={handleGenerate} style={{ borderRadius: 8 }}>重新生成</Button>
+                  <Button size="small" icon={<SaveOutlined />} style={{ borderRadius: 8 }}>保存素材</Button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>🎬</div>
+                <Text style={{ fontSize: 14, color: T.textSecondary, display: 'block' }}>AI 视频将在这里生成</Text>
+                <Text style={{ fontSize: 12, color: T.textTertiary }}>输入 Prompt 并点击「立即生成」</Text>
+              </div>
+            )}
+          </CardCompact>
+
+          {/* ── Recent Works Grid ── */}
+          {recentWorks.length > 0 && (
+            <CardCompact title="📹 最近作品">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {recentWorks.slice(0, 6).map(w => (
+                  <div key={w.id} onClick={() => setPreviewVideo(w)}
+                    style={{ borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: `1px solid ${T.borderLight}`, transition: 'all .15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = T.primary; e.currentTarget.style.transform = 'scale(1.02)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = T.borderLight; e.currentTarget.style.transform = 'scale(1)'; }}>
+                    <img src={w.thumbnail_url || w.product_image || ''} style={{ width: '100%', aspectRatio: '9/16', objectFit: 'cover', background: '#F1F3F5' }} />
+                  </div>
+                ))}
+              </div>
+            </CardCompact>
+          )}
+
+          {/* ── Queue hint ── */}
+          {generating && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, fontSize: 11, color: T.textTertiary }}>
+              <ClockCircleOutlined /> 任务队列中 · <strong style={{ color: T.primary }}>1 个</strong> 正在生成
+            </div>
+          )}
+        </div>
+      </div>
+      </div>
+
+      {/* ══ Product Modal ══ */}
+      <Modal title="选择商品" open={productModalOpen} onCancel={() => setProductModalOpen(false)} footer={null} width={540}>
+        <Input.Search allowClear onSearch={searchProducts} onChange={() => {}} style={{ marginBottom: 12 }} />
+        <Spin spinning={productLoading}>
+          <div style={{ maxHeight: 400, overflow: 'auto' }}>
+            {products.length === 0 ? <Empty description="未找到产品" /> : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {products.map(p => (
+                  <div key={p.id} onClick={() => onSelectProduct(p)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 8, border: `1px solid ${T.border}`, cursor: 'pointer' }}>
+                    <img src={p.image} style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }} />
+                    <div style={{ flex: 1 }}><Text ellipsis style={{ fontSize: 12, fontWeight: 500, display: 'block' }}>{p.name}</Text><Text style={{ fontSize: 11, color: T.textTertiary }}>{p.sku}</Text></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Spin>
+      </Modal>
+
+      {/* ══ Template Modal ══ */}
+      <Modal title="✨ Prompt 模板" open={templateModalOpen} onCancel={() => setTemplateModalOpen(false)} footer={null} width={580}>
+        {ALL_TEMPLATES.map(g => (
+          <div key={g.cat} style={{ marginBottom: 16 }}>
+            <Text style={{ fontSize: 12, fontWeight: 600, color: T.textTertiary, display: 'block', marginBottom: 8 }}>{g.cat}</Text>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {g.items.map(t => (
+                <div key={t.label} onClick={() => { setPrompt(t.prompt); setTemplateModalOpen(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: '#F8FAFC', cursor: 'pointer' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = `${t.color}12`; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#F8FAFC'; }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 7, background: `${t.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.color, fontSize: 14 }}>{t.icon}</div>
+                  <div style={{ flex: 1 }}><Text style={{ fontSize: 12, fontWeight: 600 }}>{t.label}</Text><Text style={{ fontSize: 11, color: T.textTertiary, display: 'block' }}>{t.prompt.slice(0, 55)}…</Text></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Modal>
+
+      {/* ══ Template Market Modal (full grid) ══ */}
+      <Modal title="✨ Prompt模板 · 全部模板" open={templateMarketOpen} onCancel={() => setTemplateMarketOpen(false)} footer={null} width={760} style={{ top: 20 }}>
+        <Input prefix={<SearchOutlined style={{ color: T.textTertiary }} />} placeholder="搜索模板…" allowClear
+          onChange={() => {}} style={{ marginBottom: 16, borderRadius: 8 }} />
+        <div style={{ maxHeight: 500, overflow: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            {TEMPLATES.map(t => (
+              <div key={t.label} onClick={() => applyTemplate(t)}
+                style={{ padding: '14px 16px', borderRadius: 10, border: `1px solid ${T.border}`, cursor: 'pointer', transition: 'all .15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = t.color; e.currentTarget.style.boxShadow = `0 0 0 2px ${t.color}20`; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = 'none'; }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 8, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.color, fontSize: 16 }}>{t.icon}</div>
+                  <Text style={{ fontSize: 13, fontWeight: 600 }}>{t.label}</Text>
+                </div>
+                <Text style={{ fontSize: 11, color: T.textTertiary, display: 'block', maxHeight: 28, overflow: 'hidden', lineHeight: 1.4 }}>{t.prompt.slice(0, 60)}…</Text>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* ══ Prompt 全屏编辑 Modal（自适应字数） ══ */}
+      <Modal
+        title="💡 Prompt 全屏编辑"
+        open={promptModalOpen}
+        onCancel={() => setPromptModalOpen(false)}
+        onOk={() => { setPrompt(tempPrompt); setPromptModalOpen(false); }}
+        okText="确认应用"
+        cancelText="取消"
+        width={800}
+        destroyOnClose
+      >
+        <TextArea
+          value={tempPrompt}
+          onChange={e => setTempPrompt(e.target.value)}
+          placeholder={`AI Video Engine 将自动完成：商品理解 → 创意策略 → AI导演分镜 → Prompt生成 → 模型优化 → 质量评估。\n\n你只需要描述核心创意，剩下的交给 7 个 Agent。\n\n例如：马来西亚 TikTok 风格商品带货视频。\n主体：AirPods Pro — 哑光黑充电仓特写\n场景：开放式办公室，间接光环境\n镜头：推近特写 → 环绕展示降噪麦克风 → 佩戴使用\n风格：年轻科技感，轻快剪辑节奏\n光线：侧逆光 + 柔光散射\n结尾：品牌 Logo 淡入 + "立即购买"行动号召\n\n（也可以只写一句话，如"马来西亚卖 AirPods"，AI Engine 会自动补全）`}
+          autoSize={{ minRows: 10, maxRows: 30 }}
+          style={{ fontSize: 13, lineHeight: 1.8, fontFamily: '-apple-system, "Inter", sans-serif', resize: 'vertical' }}
+          maxLength={4000}
+        />
+        <div style={{ marginTop: 8, fontSize: 11, color: '#94A3B8', textAlign: 'right' }}>
+          已输入 {tempPrompt.length} 字 / 最多 4000 字
+        </div>
+      </Modal>
+
+      {/* ══ Params Drawer ══ */}
+      <Drawer title="高级参数" placement="right" width={340} open={paramsOpen} onClose={() => setParamsOpen(false)}>
+        <Space direction="vertical" size={24} style={{ width: '100%' }}>
+          <div><Text style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>模型</Text>
+            <Select value={modelOption} onChange={setModelOption} style={{ width: '100%' }}
+              placeholder={availableModels.length > 0 ? undefined : '请先在「模型API配置」中启用模型'}
+              disabled={availableModels.length === 0}
+              options={availableModels.length > 0 ? availableModels.map(m => ({ value: m.model_type, label: m.model_info?.name || m.model_type })) : []} />
+          </div>
+          <div><Text style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>比例</Text>
+            <Segmented block value={aspectRatio} onChange={(v: any) => setAspectRatio(v)} options={[{ value: '9:16', label: '9:16' }, { value: '16:9', label: '16:9' }, { value: '1:1', label: '1:1' }]} />
+          </div>
+          <div><Text style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>分辨率</Text>
+            <Segmented block value={resolution} onChange={(v: any) => setResolution(v)} options={['480p', '720p', '1080p'].map(v => ({ value: v, label: v }))} />
+          </div>
+          <div><Text style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>时长</Text>
+            <Segmented block value={duration} onChange={(v: any) => setDuration(v)} options={[5, 10, 15].map(v => ({ value: v, label: `${v}秒` }))} />
+          </div>
+          <div><Text style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>数量</Text>
+            <Segmented block value={count} onChange={(v: any) => setCount(v)} options={[1, 2, 4].map(v => ({ value: v, label: `${v}条` }))} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: 600 }}>声音</Text>
+            <Button size="small" type={voiceEnabled ? 'primary' : 'default'} onClick={() => setVoiceEnabled(!voiceEnabled)}>{voiceEnabled ? '已开启' : '已关闭'}</Button>
+          </div>
+        </Space>
+      </Drawer>
+
+      {/* ══ History Drawer ══ */}
+      <Drawer title="历史记录" placement="right" width={400} open={historyOpen} onClose={() => setHistoryOpen(false)}>
+        {videos.length === 0 ? <Empty description="暂无历史" /> : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {videos.map(v => (
+              <div key={v.id} onClick={() => { setPreviewVideo(v); setHistoryOpen(false); }}
+                style={{ display: 'flex', gap: 10, padding: 10, borderRadius: 8, border: `1px solid ${T.border}`, cursor: 'pointer' }}>
+                <img src={v.thumbnail_url || v.product_image || ''} style={{ width: 64, height: 64, borderRadius: 6, objectFit: 'cover', background: T.bg }} />
+                <div style={{ flex: 1 }}>
+                  <Text ellipsis style={{ fontSize: 12, fontWeight: 500, display: 'block' }}>{v.title || '未命名'}</Text>
+                  <Text style={{ fontSize: 11, color: T.textTertiary }}>{v.model} · {v.duration}s · {formatDateTime(v.created_at)}</Text>
+                </div>
+                {v.status === 'completed' ? <CheckCircleFilled style={{ color: T.success }} /> : <CloseCircleFilled style={{ color: T.error }} />}
+              </div>
+            ))}
+          </div>
+        )}
+      </Drawer>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════ Sub Components ════════════════════════════════════ */
+
+function CardCompact({ title, children, style }: { title?: string; children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      background: T.cardBg, borderRadius: T.radiusCard, border: `1px solid ${T.border}`,
+      boxShadow: T.shadow, padding: '10px 14px', ...style,
+    }}>
+      {title && <Text style={{ fontSize: 11, fontWeight: 600, color: T.textSecondary, display: 'block', marginBottom: 6 }}>{title}</Text>}
+      {children}
+    </div>
+  );
+}
+
+function MaterialSlot({ label, icon, material, onChange, onClear }: {
+  label: string; icon: React.ReactNode; material?: { url: string } | null;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; onClear: () => void;
+}) {
+  return (
+    <div style={{ position: 'relative', flex: 1 }}>
+      <input type="file" accept="image/*,video/*" onChange={onChange} style={{ display: 'none' }} id={`mat-${label}`} />
+      {material ? (
+        <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}`, aspectRatio: '1' }}>
+          <img src={material.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Button size="small" type="text" icon={<CloseOutlined style={{ fontSize: 10 }} />} onClick={e => { e.stopPropagation(); onClear(); }}
+            style={{ position: 'absolute', top: 2, right: 2, padding: 0, background: 'rgba(255,255,255,0.85)', borderRadius: 4 }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 9, padding: '2px 6px', textAlign: 'center' }}>{label}</div>
+        </div>
+      ) : (
+        <Tooltip title={label}>
+          <label htmlFor={`mat-${label}`}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, height: 64, borderRadius: 8, border: `1px dashed ${T.border}`, cursor: 'pointer', fontSize: 11, color: T.textTertiary, transition: 'all .15s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = T.primary; e.currentTarget.style.color = T.primary; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textTertiary; }}>
+            {icon}
+            <span>{label}</span>
+          </label>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
+function Chip({ active, icon, children, onClick }: { active?: boolean; icon?: React.ReactNode; children: React.ReactNode; onClick?: () => void }) {
+  return (
+    <div onClick={onClick} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6,
+      background: active !== false ? T.primaryLight : '#F1F3F5',
+      color: active !== false ? T.primary : T.textTertiary,
+      fontSize: 11, fontWeight: 500, cursor: onClick ? 'pointer' : 'default',
+      border: active !== false ? `1px solid ${T.primaryLight}` : '1px solid transparent',
+    }}>
+      {icon}{children}
+    </div>
+  );
+}
+
+<!-- end -->

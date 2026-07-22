@@ -1,0 +1,549 @@
+<!-- dup_r20 -->
+import React, { useEffect, useState } from 'react';
+import {
+  Card, Button, Form, Input, Select, message, Spin, Alert, Space, Tag, Typography,
+  Modal, Tabs, Empty, Popconfirm, Row, Col, Divider, Badge
+} from 'antd';
+import {
+  ApiOutlined, ThunderboltOutlined, CheckCircleOutlined,
+  CloseCircleOutlined, SaveOutlined, KeyOutlined, LinkOutlined,
+  PlusOutlined, DeleteOutlined, EditOutlined, RobotOutlined,
+  SettingOutlined
+} from '@ant-design/icons';
+import api from '../api';
+import { formatDateTime } from '../utils/time';
+
+// 火山引擎 Logo SVG
+const VolcanoIcon = ({ size = 22 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+    <path d="M4 28L14 4L12 28H4Z" fill="#2563eb" opacity="0.9"/>
+    <path d="M12 28L20 10L18 28H12Z" fill="#3b82f6" opacity="0.85"/>
+    <path d="M18 28L26 16L24 28H18Z" fill="#06b6d4" opacity="0.9"/>
+  </svg>
+);
+
+const { Text, Title } = Typography;
+const { Option } = Select;
+
+// 预定义模型类型
+const MODEL_TYPES = [
+  {
+    type: 'seedance',
+    name: '火山引擎',
+    icon: <VolcanoIcon size={22} />,
+    description: '字节跳动火山引擎视频生成模型',
+    color: '#2563eb',
+  },
+  {
+    type: 'kling',
+    name: '快手可灵 (Kling)',
+    icon: '⚡',
+    description: '快手视频生成模型',
+    color: '#ff9500',
+  },
+  {
+    type: 'minimax',
+    name: 'MiniMax 海螺',
+    icon: '🎯',
+    description: 'MiniMax 海螺视频生成模型',
+    color: '#5856d6',
+  },
+  {
+    type: 'haiper',
+    name: 'Haiper',
+    icon: '🌊',
+    description: 'Haiper AI 视频生成模型',
+    color: '#00ced1',
+  },
+  {
+    type: 'openai-sora',
+    name: 'OpenAI Sora',
+    icon: '🤖',
+    description: 'OpenAI Sora 视频生成模型',
+    color: '#10a37f',
+  },
+  {
+    type: 'custom',
+    name: '自定义模型',
+    icon: '🔧',
+    description: '支持其他 OpenAI 兼容格式的 API',
+    color: '#666',
+  },
+];
+
+interface ModelConfig {
+  id?: number;
+  user_id: number;
+  model_type: string;
+  api_url: string;
+  api_key: string;
+  api_key_masked: string;
+  model_name: string;
+  extra_params: any;
+  status: 'enabled' | 'disabled';
+  last_tested_at: string | null;
+  last_test_result: string;
+  last_test_message: string;
+  model_info?: any;
+  is_configured?: boolean;
+}
+
+export default function VideoModelConfig() {
+  const [loading, setLoading] = useState(true);
+  const [configs, setConfigs] = useState<ModelConfig[]>([]);
+  const [availableTypes, setAvailableTypes] = useState<any[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [editConfig, setEditConfig] = useState<ModelConfig | null>(null);
+  const [form] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState('configured');
+  // 缓存用户输入的 API Key（按模型类型），避免切换后丢失
+  const [apiKeyCache, setApiKeyCache] = useState<Record<string, string>>({});
+  // 缓存测试时的本地时间（按模型类型），使用 sessionStorage 持久化避免切换页面丢失
+  const loadTestTimes = (): Record<string, string> => {
+    try { return JSON.parse(sessionStorage.getItem('videoModelTestTimes') || '{}'); } catch { return {}; }
+  };
+  const [testLocalTime, setTestLocalTime] = useState<Record<string, string>>(loadTestTimes);
+
+  // 获取已配置的模型列表
+  const fetchConfigs = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/video-models/configs');
+      const configured = res.data.filter((c: any) => c.is_configured !== false);
+      const available = res.data.filter((c: any) => c.is_configured === false);
+      setConfigs(configured);
+      setAvailableTypes(available);
+      setLoading(false);
+    } catch (e: any) {
+      message.error('加载配置失败: ' + (e.response?.data?.error || e.message));
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConfigs();
+  }, []);
+
+  // 各模型默认模型名
+  const DEFAULT_MODEL_NAMES: Record<string, string> = {
+    seedance: 'doubao-seedance-2-0-260128',
+    kling: 'kling-v1',
+    minimax: 'abab6-video-01',
+    haiper: 'haiper-video-v2',
+    'openai-sora': 'sora-turbo',
+  };
+
+  // 选择模型进行编辑
+  const handleSelectModel = async (modelType: string) => {
+    try {
+      const res = await api.get(`/video-models/configs/${modelType}`);
+      setEditConfig(res.data);
+      setSelectedModel(modelType);
+      form.setFieldsValue({
+        api_url: res.data.api_url || '',
+        api_key: res.data.api_key || apiKeyCache[modelType] || '',
+        model_name: res.data.model_name || DEFAULT_MODEL_NAMES[modelType] || '',
+        status: res.data.status || 'enabled',
+      });
+    } catch (e: any) {
+      message.error('加载配置失败');
+    }
+  };
+
+  // 保存配置
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      if (!values.api_url) { message.warning('请输入 API 接口地址'); return; }
+      if (!values.model_name) { message.warning('请输入模型名称'); return; }
+
+      setSaving(true);
+      await api.put(`/video-models/configs/${selectedModel}`, {
+        api_url: values.api_url,
+        api_key: values.api_key || undefined,
+        model_name: values.model_name,
+        status: values.status || 'enabled',
+      });
+      message.success('配置保存成功');
+      if (values.api_key) {
+        setApiKeyCache(prev => ({ ...prev, [selectedModel!]: values.api_key }));
+      }
+      fetchConfigs();
+    } catch (e: any) {
+      if (e.response?.data?.error) {
+        message.error(e.response.data.error);
+      } else {
+        message.error('保存失败');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 测试连接
+  const handleTest = async () => {
+    try {
+      const values = await form.getFieldsValue();
+      if (!values.api_url) { message.warning('请先填写 API 地址'); return; }
+      if (!values.model_name) { message.warning('请填写模型名称'); return; }
+
+      setTesting(true);
+      const localTime = formatDateTime();
+      const updated = { ...testLocalTime, [selectedModel!]: localTime };
+      setTestLocalTime(updated);
+      sessionStorage.setItem('videoModelTestTimes', JSON.stringify(updated));
+
+      // 总是先保存最新配置（包括密钥）
+      await api.put(`/video-models/configs/${selectedModel}`, {
+        api_url: values.api_url,
+        api_key: values.api_key || undefined,
+        model_name: values.model_name,
+        status: values.status,
+      });
+
+      // 再测试
+      const res = await api.post(`/video-models/configs/${selectedModel}/test`, {
+        api_url: values.api_url,
+        api_key: values.api_key,
+        model_name: values.model_name,
+      });
+      if (res.data.success) {
+        message.success('✅ ' + res.data.message);
+      } else {
+        message.error('❌ ' + (res.data.error || '连接失败'));
+      }
+      if (values.api_key) {
+        setApiKeyCache(prev => ({ ...prev, [selectedModel!]: values.api_key }));
+      }
+      fetchConfigs();
+    } catch (e: any) {
+      message.error('测试失败: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  // 删除配置
+  const handleDelete = async (modelType: string) => {
+    try {
+      await api.delete(`/video-models/configs/${modelType}`);
+      message.success('配置已删除');
+      if (selectedModel === modelType) {
+        setSelectedModel(null);
+        setEditConfig(null);
+        form.resetFields();
+      }
+      fetchConfigs();
+    } catch (e: any) {
+      message.error('删除失败: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
+  // 获取模型类型信息
+  const getModelTypeInfo = (type: string) => {
+    return MODEL_TYPES.find(m => m.type === type) || MODEL_TYPES.find(m => m.type === 'custom')!;
+  };
+
+  // 渲染配置卡片
+  const renderConfigCard = (config: ModelConfig) => {
+    const modelInfo = getModelTypeInfo(config.model_type);
+    const isActive = selectedModel === config.model_type;
+
+    return (
+      <Card
+        key={config.model_type}
+        size="small"
+        style={{
+          cursor: 'pointer',
+          borderColor: isActive ? '#2563eb' : undefined,
+          boxShadow: isActive ? '0 0 0 2px rgba(37,99,235,0.2)' : undefined,
+        }}
+        onClick={() => handleSelectModel(config.model_type)}
+      >
+        <Space>
+          <span style={{ fontSize: 24 }}>{modelInfo.icon}</span>
+          <div>
+            <div style={{ fontWeight: 600 }}>{modelInfo.name}</div>
+            <div style={{ fontSize: 12, color: '#666' }}>
+              {config.model_name || '未配置模型名'}
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto' }}>
+            <Space>
+              {config.status === 'enabled' ? (
+                <Badge status="success" text="已启用" />
+              ) : (
+                <Badge status="default" text="未启用" />
+              )}
+              {config.last_test_result === 'success' && (
+                <CheckCircleOutlined style={{ color: '#52c41a' }} />
+              )}
+              {config.last_test_result === 'failed' && (
+                <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+              )}
+            </Space>
+          </div>
+        </Space>
+        {(testLocalTime[config.model_type] || config.last_tested_at) && (
+          <div style={{ fontSize: 11, color: '#999', marginTop: 8 }}>
+            测试时间: {testLocalTime[config.model_type] || formatDateTime(config.last_tested_at!)}
+          </div>
+        )}
+      </Card>
+    );
+  };
+
+  // 渲染添加模型卡片
+  const renderAddCard = () => (
+    <Card
+      size="small"
+      style={{ cursor: 'pointer', borderStyle: 'dashed', minHeight: 80 }}
+      onClick={() => setAddModalVisible(true)}
+    >
+      <div style={{ textAlign: 'center', color: '#999' }}>
+        <PlusOutlined style={{ fontSize: 24, marginBottom: 8 }} />
+        <div>添加模型</div>
+      </div>
+    </Card>
+  );
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: 80 }}><Spin tip="加载配置..." /></div>;
+  }
+
+  return (
+    <div style={{ padding: '20px 24px', background: '#f5f3f0', minHeight: '100%' }}>
+      {/* 页面标题 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 18,
+        }}>
+          <SettingOutlined />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>视频模型配置</h2>
+          <span style={{ fontSize: 12, color: '#999' }}>Seedance API · 模型参数 · 生成设置</span>
+        </div>
+      </div>
+
+      <Row gutter={24}>
+        {/* 左侧：模型列表 */}
+        <Col span={8}>
+          <Card title="已配置模型" size="small" style={{ marginBottom: 16 }}>
+            {configs.length === 0 ? (
+              <Empty description="暂无已配置模型" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            ) : (
+              <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                {configs.map(renderConfigCard)}
+              </Space>
+            )}
+          </Card>
+
+          <Card title="可添加模型" size="small">
+            <Space direction="vertical" style={{ width: '100%' }} size={8}>
+              {availableTypes.map(type => (
+                <Card
+                  key={type.type}
+                  size="small"
+                  style={{ cursor: 'pointer', borderStyle: 'dashed' }}
+                  onClick={() => handleSelectModel(type.type)}
+                >
+                  <Space>
+                    <span style={{ fontSize: 20 }}>{getModelTypeInfo(type.type).icon}</span>
+                    <div>
+                      <div style={{ fontWeight: 500 }}>{getModelTypeInfo(type.type).name}</div>
+                      <div style={{ fontSize: 11, color: '#999' }}>{getModelTypeInfo(type.type).description}</div>
+                    </div>
+                  </Space>
+                </Card>
+              ))}
+              {renderAddCard()}
+            </Space>
+          </Card>
+        </Col>
+
+        {/* 右侧：配置表单 */}
+        <Col span={16}>
+          {selectedModel ? (
+            <Card
+              title={
+                <Space>
+                  <span style={{ fontSize: 24 }}>{getModelTypeInfo(selectedModel).icon}</span>
+                  <span>{getModelTypeInfo(selectedModel).name}</span>
+                </Space>
+              }
+              extra={
+                <Space>
+                  {editConfig?.id && (
+                    <Popconfirm
+                      title="确定删除此配置？"
+                      onConfirm={() => handleDelete(selectedModel)}
+                      okText="删除"
+                      cancelText="取消"
+                    >
+                      <Button danger size="small" icon={<DeleteOutlined />}>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  )}
+                </Space>
+              }
+            >
+              <Alert
+                type="info"
+                showIcon
+                message="配置说明"
+                description="此处的 API 配置仅你本人可见和使用。配置完成后需「测试连接」通过才能正常启用。"
+                style={{ marginBottom: 20 }}
+              />
+
+              <Form form={form} layout="vertical">
+                <Form.Item
+                  name="api_url"
+                  label="API 接口地址"
+                  rules={[{ required: true, message: '请输入 API 接口地址' }]}
+                >
+                  <Input
+                    placeholder={getModelTypeInfo(selectedModel).type === 'custom'
+                      ? "请输入 API 地址，如 https://api.openai.com/v1"
+                      : getModelTypeInfo(selectedModel).name + " API 地址"
+                    }
+                    prefix={<LinkOutlined />}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="model_name"
+                  label="模型名称"
+                  rules={[{ required: true, message: '请输入模型名称' }]}
+                  extra="在模型提供方控制台中获取的模型 ID"
+                >
+                  <Input placeholder="请输入模型名称，如 doubao-seedance-2-0-260128" prefix={<RobotOutlined />} />
+                </Form.Item>
+
+                <Form.Item
+                  name="api_key"
+                  label="API Key"
+                  extra={
+                    editConfig?.api_key_masked
+                      ? `当前密钥: ${editConfig.api_key_masked}（留空则保持原密钥不变）`
+                      : 'API 密钥将作为 Bearer Token 使用'
+                  }
+                >
+                  <Input.Password
+                    placeholder={editConfig?.api_key_masked ? '留空保持原密钥' : '请输入 API Key'}
+                    prefix={<KeyOutlined />}
+                  />
+                </Form.Item>
+
+                <Form.Item name="status" label="状态">
+                  <Select>
+                    <Option value="enabled">✅ 启用</Option>
+                    <Option value="disabled">⏸ 禁用</Option>
+                  </Select>
+                </Form.Item>
+              </Form>
+
+              {/* 测试状态 */}
+              {editConfig?.last_tested_at && (
+                <Alert
+                  type={editConfig.last_test_result === 'success' ? 'success' : 'error'}
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message={
+                    <Space>
+                      {editConfig.last_test_result === 'success' ? (
+                        <CheckCircleOutlined />
+                      ) : (
+                        <CloseCircleOutlined />
+                      )}
+                      <span>
+                        {editConfig.last_test_result === 'success' ? '测试通过' : '测试失败'}
+                      </span>
+                      <Tag color={editConfig.status === 'enabled' ? 'green' : 'default'}>
+                        {editConfig.status === 'enabled' ? '已启用' : '未启用'}
+                      </Tag>
+                    </Space>
+                  }
+                  description={
+                    <div>
+                      <div>测试时间: {testLocalTime[selectedModel!] || formatDateTime(editConfig.last_tested_at)}</div>
+                      {editConfig.last_test_message && (
+                        <div>详情: {editConfig.last_test_message}</div>
+                      )}
+                    </div>
+                  }
+                />
+              )}
+
+              <Space size="middle">
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={handleSave}
+                  loading={saving}
+                >
+                  保存配置
+                </Button>
+                <Button
+                  icon={<ThunderboltOutlined />}
+                  onClick={handleTest}
+                  loading={testing}
+                >
+                  测试连接
+                </Button>
+              </Space>
+            </Card>
+          ) : (
+            <Card>
+              <Empty
+                description="请从左侧选择一个模型进行配置"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            </Card>
+          )}
+        </Col>
+      </Row>
+
+      {/* 添加模型弹窗 */}
+      <Modal
+        title="添加模型"
+        open={addModalVisible}
+        onCancel={() => setAddModalVisible(false)}
+        footer={null}
+        width={500}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size={12}>
+          {availableTypes.map(type => (
+            <Card
+              key={type.type}
+              size="small"
+              hoverable
+              style={{ cursor: 'pointer' }}
+              onClick={() => {
+                handleSelectModel(type.type);
+                setAddModalVisible(false);
+              }}
+            >
+              <Space>
+                <span style={{ fontSize: 28 }}>{getModelTypeInfo(type.type).icon}</span>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 16 }}>{getModelTypeInfo(type.type).name}</div>
+                  <div style={{ color: '#666', fontSize: 12 }}>{getModelTypeInfo(type.type).description}</div>
+                </div>
+              </Space>
+            </Card>
+          ))}
+        </Space>
+      </Modal>
+    </div>
+  );
+}
+
+<!-- end -->
