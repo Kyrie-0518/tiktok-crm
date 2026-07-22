@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Input, Select, Space, DatePicker, Typography, Statistic, Row, Col, message } from 'antd';
+import { Card, Table, Tag, Input, Select, Space, DatePicker, Typography, Statistic, Row, Col, message, Tabs } from 'antd';
 import {
   HistoryOutlined, SearchOutlined, ReloadOutlined,
-  ApiOutlined, UserOutlined, CalendarOutlined,
+  ApiOutlined, UserOutlined, CalendarOutlined, RobotOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { formatDateTimeSec } from '../utils/time';
+import { formatDateTimeSec, formatDateTime } from '../utils/time';
 import api from '../api';
 
 const { Text } = Typography;
@@ -222,6 +222,20 @@ export default function AuditLogs() {
           }}
         />
       </Card>
+    </div>
+    )},
+    { key: 'models', label: <span><RobotOutlined /> 模型调用</span>, children: (
+    <div style={{ paddingTop: 16 }}>
+      <Table rowKey="id" columns={modelCallColumns} dataSource={modelCalls} loading={mcLoading}
+        pagination={{ current: mcPage, total: mcTotal, pageSize: limit, onChange: setMcPage, showSizeChanger: false }}
+        size="small" scroll={{ x: 1100 }} locale={{ emptyText: '暂无模型调用记录' }} />
+    </div>
+    )},
+  ];
+
+  return (
+    <div style={{ background: '#f5f3f0', minHeight: '100%', padding: 24 }}>
+      <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
     </div>
   );
 }

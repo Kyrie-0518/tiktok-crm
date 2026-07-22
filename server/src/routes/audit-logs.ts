@@ -93,4 +93,28 @@ router.get('/stats', authMiddleware, (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/audit-logs/model-calls — 模型调用日志（备案合规：全链路可追溯）
+router.get('/model-calls', authMiddleware, (req: Request, res: Response) => {
+  try {
+    const db = getDb();
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const offset = (page - 1) * limit;
+    const moduleFilter = req.query.module as string;
+    const userId = (req as any).user?.role === 'admin' ? undefined : (req as any).user?.userId;
+
+    let where = 'WHERE 1=1';
+    const params: any[] = [];
+    if (userId) { where += ' AND user_id = ?'; params.push(userId); }
+    if (moduleFilter) { where += ' AND module = ?'; params.push(moduleFilter); }
+
+    const rows = db.prepare(`SELECT * FROM model_call_logs ${where} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+    const total = (db.prepare(`SELECT COUNT(*) as c FROM model_call_logs ${where}`).get(...params) as any)?.c || 0;
+
+    res.json({ data: rows, total, page, limit });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
