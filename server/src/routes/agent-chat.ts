@@ -8,6 +8,7 @@ import {
 import * as Ads from '../services/tiktok-ads';
 import { moderationMiddleware } from '../middleware/content-moderation';
 import { logModelCall } from '../services/model-call-log';
+import { createSession, getUserSessions, deleteSession, loadHistory, saveMessages, buildContext } from '../services/chat-memory';
 
 const router = Router();
 
@@ -586,7 +587,43 @@ async function executeTool(name: string, args: any): Promise<any> {
 //  Agent 核心循环：LLM 决策 → 工具执行 → 结果分析 → 报告
 // ══════════════════════════════════════════════════════════════
 
-export async function agentLoop(channels: Channel[], userQuery: string): Promise<{ report: string; toolCalls: any[] }> {
+export // agentLoop 的变体：接收已构建好的 messages（带历史上下文）
+async function agentLoopWithContext(channels: AiChannel[], messages: any[]): Promise<any> {
+  const result = { report: '', toolCalls: [] as any[], toolCallsResult: [] as any[], totalTokens: 0 };
+  for (let turn = 0; turn < 5; turn++) {
+    const channel = channels[0];
+    const start = Date.now();
+    const tools = getToolDefinitions();
+    try {
+      const r = await callLLMApi(channel, messages, tools);
+      result.totalTokens += r.usage?.total_tokens || 0;
+      const msg = r.choices[0].message;
+      if (msg.tool_calls) {
+        messages.push(msg);
+        const toolResults = [];
+        for (const tc of msg.tool_calls) {
+          const output = await executeToolCall(tc.function.name, JSON.parse(tc.function.arguments));
+          toolResults.push({ id: tc.id, name: tc.function.name, content: typeof output === 'string' ? output : JSON.stringify(output) });
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: typeof output === 'string' ? output : JSON.stringify(output) });
+          result.toolCalls.push({ tool: tc.function.name, args: tc.function.arguments, result: output });
+        }
+        result.toolCallsResult = toolResults;
+      } else {
+        messages.push(msg);
+        result.report = msg.content || '';
+        break;
+      }
+    } catch (e: any) {
+      // 重试一次
+      if (turn < 1) continue;
+      result.report = '[error] AI 引擎执行失败: ' + e.message;
+      break;
+    }
+  }
+  return result;
+}
+
+async function agentLoop(channels: Channel[], userQuery: string): Promise<{ report: string; toolCalls: any[] }> {
   // 注入实时日期信息到 system prompt
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
@@ -673,8 +710,28 @@ export async function agentLoop(channels: Channel[], userQuery: string): Promise
 // ══════════════════════════════════════════════════════════════
 
 // POST /api/agent/chat
+
+// GET /api/agent/sessions — 获取会话列表
+router.get('/sessions', authMiddleware, (req, res) => {
+  try {
+    const userId = (req as any).user?.userId;
+    res.json({ data: getUserSessions(userId) });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/agent/sessions/:id — 删除会话
+router.delete('/sessions/:id', authMiddleware, (req, res) => {
+  try {
+    const userId = (req as any).user?.userId;
+    deleteSession(userId, req.params.id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 router.post('/chat', authMiddleware, moderationMiddleware('owen'), async (req: Request, res: Response) => {
-  const { query } = req.body;
+  const { query, sessionId: reqSessionId } = req.body;
+  const userId = (req as any).user?.userId;
+  const sessionId = reqSessionId || createSession(userId, query.trim());
   if (!query || typeof query !== 'string') {
     return res.status(400).json({ error: '请输入有效的查询内容' });
   }
@@ -687,7 +744,18 @@ router.post('/chat', authMiddleware, moderationMiddleware('owen'), async (req: R
 
   try {
     const startTime = Date.now();
-    const result = await agentLoop(channels, query.trim());
+    // --- 智能对话记忆：加载历史 + 构建上下文 ---
+    const history = loadHistory(userId, sessionId);
+    const ctx = buildContext(SYSTEM_PROMPT + '\n' + datePrompt, history, query.trim());
+    const result = await agentLoopWithContext(channels, ctx.messages);
+    // 保存本轮对话
+    try {
+      saveMessages(userId, sessionId, [
+        { role: 'user', content: query.trim() },
+        ...(result.toolCallsResult || []).map((tc: any) => ({ role: 'tool' as const, content: tc.content || '', tool_call_id: tc.id })),
+        { role: 'assistant', content: result.report },
+      ]);
+    } catch (e) { console.warn('[memory] save failed', e); }
     const latency = Date.now() - startTime;
 
     // 记录渠道统计
@@ -716,6 +784,7 @@ router.post('/chat', authMiddleware, moderationMiddleware('owen'), async (req: R
     });
     res.json({
       success: true,
+      sessionId,
       query,
       report: result.report,
       toolCalls: result.toolCalls,
