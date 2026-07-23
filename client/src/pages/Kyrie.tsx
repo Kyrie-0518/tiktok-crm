@@ -277,10 +277,23 @@ export default function Kyrie() {
             <Button
               type="text"
               icon={<ArrowLeftOutlined />}
-              onClick={() => window.location.href = '/dashboard'}
-              style={{ color: T.textSecondary, borderRadius: 10, fontSize: 13 }}
+            onClick={() => window.location.href = '/dashboard'}
+            style={{ color: T.textSecondary, borderRadius: 10, fontSize: 13 }}
             >
               返回主系统
+            </Button>
+            <Button
+              type="text"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setSessionId('');
+                localStorage.removeItem('kyrie_session');
+                setMessages([]);
+                message.success('已开启新对话');
+              }}
+              style={{ color: T.textSecondary, borderRadius: 10, fontSize: 13 }}
+            >
+              新对话
             </Button>
             <div style={{ width: 1, height: 28, background: T.cardBorder }} />
             {/* Agent Avatar */}
