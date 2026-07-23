@@ -4,7 +4,7 @@ import { Layout, Button, Typography, Avatar, Menu } from 'antd';
 import {
   SafetyOutlined,
   ArrowLeftOutlined,
-  SettingOutlined, KeyOutlined, AuditOutlined, ApiOutlined, RobotOutlined,
+  SettingOutlined, KeyOutlined, AuditOutlined, ApiOutlined, RobotOutlined, SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
 import Settings from './Settings';
@@ -12,6 +12,7 @@ import AccountCenter from './admin/AccountCenter';
 import AuditLogs from './AuditLogs';
 import ApiConfig from './ApiConfig';
 import BotManagement from './BotManagement';
+import AdminModeration from './AdminModeration';
 
 const { Sider, Content } = Layout;
 const { Text } = Typography;
@@ -39,6 +40,7 @@ const ADMIN_MENU_ITEMS = [
   { key: '/admin/api-config', icon: <ApiOutlined />, label: 'API管理' },
   { key: '/admin/bot-management', icon: <RobotOutlined />, label: 'Bot管理' },
   { key: '/admin/audit', icon: <AuditOutlined />, label: '操作日志' },
+  { key: '/admin/moderation', icon: <SafetyCertificateOutlined />, label: '违禁词管理' },
 ];
 
 const COMPONENT_MAP: Record<string, React.ComponentType> = {
@@ -47,6 +49,7 @@ const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/admin/api-config': ApiConfig,
   '/admin/bot-management': BotManagement,
   '/admin/audit': AuditLogs,
+  '/admin/moderation': AdminModeration,
 };
 
 export default function AdminLayout() {

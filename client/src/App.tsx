@@ -44,6 +44,7 @@ import ShopDiagnosis from './pages/growth-center/ShopDiagnosis';
 import DiagnosisHistory from './pages/growth-center/DiagnosisHistory';
 import AIReview from './pages/growth-center/AIReview';
 import DataDebug from './pages/growth-center/DataDebug';
+import AdminModeration from './pages/AdminModeration';
 
 const { Sider, Content } = Layout;
 
@@ -850,6 +851,7 @@ function AppLayout() {
             <Route path="/growth-center/history" element={<DiagnosisHistory />} />
             <Route path="/growth-center/review" element={<AIReview />} />
             <Route path="/growth-center/debug" element={<DataDebug />} />
+            <Route path="/admin/moderation" element={<AdminModeration />} />
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/admin/*" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>} />
 <Route path="/kyrie" element={<ProtectedRoute><Kyrie /></ProtectedRoute>} />
