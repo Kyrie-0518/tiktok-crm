@@ -623,15 +623,22 @@ async function agentLoopWithContext(channels: AiChannel[], messages: any[]): Pro
   return result;
 }
 
-async function agentLoop(channels: Channel[], userQuery: string): Promise<{ report: string; toolCalls: any[] }> {
+async function agentLoop(channels: Channel[], userQuery: string, history: ChatMessage[] = []): Promise<{ report: string; toolCalls: any[] }> {
   // 注入实时日期信息到 system prompt
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const yesterday = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
   const datePrompt = `\n\n## ⏰ 当前日期信息\n今天是 ${today}（${now.toLocaleDateString('zh-CN', { weekday: 'long' })}）。昨日是 ${yesterday}。所有"昨日数据"请以 ${yesterday} 为准。`;
   
+  // 构建 messages：system + 历史 + 当前用户问题
   const messages: any[] = [
     { role: 'system', content: SYSTEM_PROMPT + datePrompt },
+    ...history.map((h: any) => ({
+      role: h.role,
+      content: h.content || '',
+      ...(h.tool_calls ? { tool_calls: h.tool_calls } : {}),
+      ...(h.tool_call_id ? { tool_call_id: h.tool_call_id } : {}),
+    })),
     { role: 'user', content: userQuery }
   ];
 
@@ -746,14 +753,8 @@ router.post('/chat', authMiddleware, moderationMiddleware('owen'), async (req: R
     const startTime = Date.now();
     // --- 智能对话记忆：加载历史 + 构建上下文 ---
     const history = loadHistory(userId, sessionId);
-    // 生成日期 prompt（与 agentLoop 内 datePrompt 保持一致）
-    const _now = new Date();
-    const _today = _now.toISOString().slice(0, 10);
-    const _yesterday = new Date(_now.getTime() - 86400000).toISOString().slice(0, 10);
-    const _weekday = _now.toLocaleDateString('zh-CN', { weekday: 'long' });
-    const datePrompt = `\n\n## 当前日期信息\n今天是 ${_today}（${_weekday}）。昨日是 ${_yesterday}。所有"昨日数据"请以 ${_yesterday} 为准。`;
-    const ctx = buildContext(SYSTEM_PROMPT + datePrompt, history, query.trim());
-    const result = await agentLoopWithContext(channels, ctx.messages);
+// 直接调用 agentLoop，传入历史
+    const result = await agentLoop(channels, query.trim(), history);
     // 保存本轮对话
     try {
       saveMessages(userId, sessionId, [
