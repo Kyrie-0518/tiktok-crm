@@ -148,7 +148,7 @@ export default function Kyrie() {
       const res = await api.post('/agent/chat', { query: query.trim() }, { timeout: AGENT_REQUEST_TIMEOUT_MS });
       setProgressText('');
       const data = res.data;
-      if (data.sessionId) { setSessionId(data.sessionId); localStorage.setItem("kyrie_session", data.sessionId); }
+      if (data.sessionId) { setCurrentSessionId(data.sessionId); localStorage.setItem("kyrie_session", data.sessionId); }
       let header = '';
       if (data.toolCalls?.length) {
         header = `⚡ 调用了 ${data.toolCalls.length} 个工具：${data.toolCalls.map((tc: any) => TOOL_LABELS[tc.tool] || tc.tool).join(' → ')}\n\n`;
@@ -286,7 +286,7 @@ export default function Kyrie() {
               type="text"
               icon={<PlusOutlined />}
               onClick={() => {
-                setSessionId('');
+                setCurrentSessionId('');
                 localStorage.removeItem('kyrie_session');
                 setMessages([]);
                 message.success('已开启新对话');
