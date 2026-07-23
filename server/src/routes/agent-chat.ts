@@ -746,7 +746,13 @@ router.post('/chat', authMiddleware, moderationMiddleware('owen'), async (req: R
     const startTime = Date.now();
     // --- 智能对话记忆：加载历史 + 构建上下文 ---
     const history = loadHistory(userId, sessionId);
-    const ctx = buildContext(SYSTEM_PROMPT + '\n' + datePrompt, history, query.trim());
+    // 生成日期 prompt（与 agentLoop 内 datePrompt 保持一致）
+    const _now = new Date();
+    const _today = _now.toISOString().slice(0, 10);
+    const _yesterday = new Date(_now.getTime() - 86400000).toISOString().slice(0, 10);
+    const _weekday = _now.toLocaleDateString('zh-CN', { weekday: 'long' });
+    const datePrompt = `\n\n## 当前日期信息\n今天是 ${_today}（${_weekday}）。昨日是 ${_yesterday}。所有"昨日数据"请以 ${_yesterday} 为准。`;
+    const ctx = buildContext(SYSTEM_PROMPT + datePrompt, history, query.trim());
     const result = await agentLoopWithContext(channels, ctx.messages);
     // 保存本轮对话
     try {
