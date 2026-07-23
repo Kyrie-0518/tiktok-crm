@@ -99,7 +99,7 @@ const MENU_GROUPS = [
   },
   {
     key: 'group-growth',
-    label: 'AI增长中心',
+    label: <span>AI增长中心 <span style={{ fontSize: 10, color: '#2563eb', background: '#eff6ff', padding: '1px 6px', borderRadius: 4, marginLeft: 4, fontWeight: 600 }}>META</span></span>,
     icon: <RiseOutlined />,
     items: [
       { key: '/growth-center/diagnosis', icon: <ThunderboltOutlined />, label: '店铺诊断' },

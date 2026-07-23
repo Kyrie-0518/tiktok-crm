@@ -32,7 +32,7 @@ export default function DiagnosisHistory() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <div style={{ width: 42, height: 42, borderRadius: 12, background: `linear-gradient(135deg, #8B5CF6, #A78BFA)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20 }}><BarChartOutlined /></div>
         <div style={{ flex: 1 }}>
-          <Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 700, color: DS.text }}>诊断记录</Title>
+          <Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 700, color: DS.text }}>诊断记录 <span style={{fontSize:10,color:"#2563eb",background:"#eff6ff",padding:"1px 6px",borderRadius:4,marginLeft:8,fontWeight:600}}>META</span></Title>
           <Text type="secondary" style={{ fontSize: 13 }}>查看历史诊断报告</Text>
         </div>
       </div>
