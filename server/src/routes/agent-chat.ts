@@ -735,6 +735,19 @@ router.delete('/sessions/:id', authMiddleware, (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/agent/chat-history?sessionId=xxx — 加载会话历史消息
+router.get('/chat-history', authMiddleware, (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.userId;
+    const sessionId = req.query.sessionId as string;
+    if (!sessionId) { res.json({ data: [] }); return; }
+    const rows = getDb().prepare(
+      `SELECT role, content, created_at FROM chat_history WHERE session_id = ? AND user_id = ? ORDER BY id ASC LIMIT 200`
+    ).all(sessionId, userId);
+    res.json({ data: rows });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 router.post('/chat', authMiddleware, moderationMiddleware('owen'), async (req: Request, res: Response) => {
   const { query, sessionId: reqSessionId } = req.body;
   const userId = (req as any).user?.userId;

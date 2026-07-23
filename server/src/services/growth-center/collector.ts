@@ -33,7 +33,7 @@ export async function collectAllData(shopCipher: string, days = 30): Promise<Uni
       collectInventory(api),
       collectPricing(api),
       collectOrders(api, days),
-      collectAds(shopCipher),
+      collectAds(shopCipher, days || 7),
       collectLogistics(api),
       collectVideos(shopCipher, days),
       collectReviews(api),
@@ -216,22 +216,42 @@ async function collectOrders(api: TikTokAPI, days: number): Promise<OrderSnapsho
 }
 
 /* ══════════════════════════ 📢 广告 ══════════════════════════ */
-async function collectAds(shopCipher: string): Promise<AdSnapshot[]> {
+async function collectAds(shopCipher: string, days: number = 7): Promise<AdSnapshot[]> {
+  // 直接调 TikTok Ads API（不走本地缓存，避免数据假/过时）
   try {
     const db = getDb();
-    const ads = db.prepare('SELECT * FROM ad_campaigns WHERE shop_id = ? ORDER BY updated_at DESC LIMIT 50').all(shopCipher) as any[];
-    return (ads || []).map((a: any) => ({
-      campaign_id: a.campaign_id || '', campaign_name: a.campaign_name || '',
-      adgroup_id: a.adgroup_id || '', adgroup_name: a.adgroup_name || '',
-      creative_id: a.creative_id || '',
-      status: a.status || '', budget: a.budget || 0, spend: a.spend || 0,
-      impressions: a.impressions || 0, clicks: a.clicks || 0,
-      ctr: a.ctr || 0, cpm: a.cpm || 0, cpc: a.cpc || 0, cpa: a.cpa || 0, cvr: a.cvr || 0,
-      orders: a.orders || 0, gmv: a.gmv || 0, roas: a.roas || 0,
-      learning_phase: a.learning_phase || '', review_status: a.review_status || '',
-      start_time: a.start_time || '', end_time: a.end_time || '',
-    }));
-  } catch (e: any) { console.warn('[Collector] ads:', e.message); return []; }
+    const adAcc = db.prepare("SELECT * FROM ad_accounts WHERE shop_id = ? AND status = 'enabled' LIMIT 1").get(shopCipher) as any;
+    const advertiserId = adAcc?.advertiser_id || '';
+    const token = adAcc?.access_token || '';
+    const startDate = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const endDate = new Date().toISOString().slice(0, 10);
+    const url = `https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?advertiser_id=${advertiserId}&report_type=BASIC&data_level=AUCTION_AD&dimensions=["campaign_id","adgroup_id"]&metrics=["spend","impressions","clicks","ctr","cpm","cpc","complete_payment","complete_payment_rate","cost_per_complete_payment"]&start_date=${startDate}&end_date=${endDate}&page_size=1000`;
+    const { fetchWithProxy } = await import('../tiktok-api');
+    const res: any = await fetchWithProxy(url, { method: 'GET', headers: { 'Access-Token': token } });
+    const list = res?.data?.data?.list || res?.data?.list || [];
+    const campaigns = db.prepare('SELECT campaign_id, campaign_name, status FROM ad_campaigns WHERE shop_id = ?').all(shopCipher) as any[];
+    const cmpMap = new Map(campaigns.map((c: any) => [c.campaign_id, c]));
+    return list.map((row: any) => {
+      const cmp: any = cmpMap.get(row.campaign_id) || {};
+      const m = row.metrics || {};
+      return {
+        campaign_id: row.campaign_id || '', campaign_name: cmp.campaign_name || '',
+        adgroup_id: row.adgroup_id || '', adgroup_name: '',
+        creative_id: '',
+        status: cmp.status || '',
+        budget: 0, spend: parseFloat(m.spend || 0),
+        impressions: parseInt(m.impressions || 0),
+        clicks: parseInt(m.clicks || 0),
+        ctr: parseFloat(m.ctr || 0), cpm: parseFloat(m.cpm || 0),
+        cpc: parseFloat(m.cpc || 0), cpa: parseFloat(m.cost_per_complete_payment || 0),
+        cvr: parseFloat(m.complete_payment_rate || 0),
+        orders: parseInt(m.complete_payment || 0),
+        gmv: 0, roas: 0,
+        learning_phase: '', review_status: '',
+        start_time: startDate, end_time: endDate,
+      };
+    });
+  } catch (e: any) { console.warn('[Collector] ads (live API failed):', e.message); return []; }
 }
 
 /* ══════════════════════════ 🚚 物流 ══════════════════════════ */
