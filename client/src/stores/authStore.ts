@@ -69,7 +69,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
-    localStorage.clear();
+    // 只清除认证相关 key，保留聊天记录、主题等用户设置
+    ['erp_token','erp_username','erp_display_name','erp_email','erp_identity','erp_permissions','erp_role_name','erp_role_key','erp_token_expire_at'].forEach(k => localStorage.removeItem(k));
     set({ token: null, username: null, displayName: null, email: null, identity: null, permissions: {}, roleName: null, roleKey: null, tokenExpireAt: null });
   },
 
